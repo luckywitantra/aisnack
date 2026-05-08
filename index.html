@@ -48,17 +48,22 @@
         <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
         <button class="numpad-btn text-red-500 text-lg" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
       </div>
-      
-      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center" id="login-status">Status: Menunggu API...</p>
+      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center" id="login-status">Sistem Offline. Menyinkronkan...</p>
     </div>
   </div>
 
   <div id="modal-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-shift-content">
-      <div class="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-clock"></i></div>
-      <h3 class="font-extrabold text-xl mb-2">Mulai Shift Baru</h3>
-      <p class="text-slate-500 font-medium text-sm mb-6">Kasir: <span id="shift-user-name" class="font-bold text-brand-500"></span></p>
-      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Buka Kasir Sekarang</button>
+      <div class="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-lock"></i></div>
+      <h3 class="font-extrabold text-2xl mb-2">Buka Shift Operasional</h3>
+      <p class="text-slate-500 font-medium text-sm mb-2">Kasir: <span id="shift-user-name" class="font-bold text-brand-500"></span></p>
+      <p class="text-slate-500 font-medium text-sm mb-6">Cabang: <span id="shift-outlet-name" class="font-bold text-brand-500"></span></p>
+      <div class="bg-orange-50 border border-orange-200 text-orange-700 p-4 rounded-2xl mb-6 text-sm font-bold text-left flex gap-3 items-start"><i class="fas fa-triangle-exclamation mt-1"></i><p>Sistem Logika Ketat: Wajib memilih minimal 1 staf berstatus "Senior" untuk membuka mesin POS cabang ini.</p></div>
+      <div class="text-left mb-6">
+        <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Tim Operasional yang Bertugas</label>
+        <div id="shift-staff-list" class="space-y-2 max-h-48 overflow-y-auto no-scrollbar border-y border-slate-100 py-2"></div>
+      </div>
+      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Validasi & Buka Shift</button>
     </div>
   </div>
 
@@ -172,17 +177,11 @@
       <div id="view-gudang" class="app-view hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="font-extrabold text-lg">Stok Gudang Pusat</h3>
-                    <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200"><i class="fas fa-boxes-packing mr-1"></i>Restok Supplier</button>
-                </div>
+                <div class="flex justify-between items-center mb-4 border-b pb-3"><h3 class="font-extrabold text-lg">Stok Gudang Pusat</h3><button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200"><i class="fas fa-boxes-packing mr-1"></i>Restok Supplier</button></div>
                 <table class="w-full text-left text-sm"><thead class="text-slate-400"><tr><th class="pb-2">SKU Bahan / Produk</th><th class="pb-2 text-right">Sisa Stok Induk</th></tr></thead><tbody id="gudang-tbody" class="divide-y divide-slate-50"></tbody></table>
             </div>
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="flex justify-between items-center border-b pb-3 mb-4">
-                    <h3 class="font-extrabold text-lg">Master Produk (BOM)</h3>
-                    <button onclick="superApp.openCrudMaster('add')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i>Tambah Item</button>
-                </div>
+                <div class="flex justify-between items-center border-b pb-3 mb-4"><h3 class="font-extrabold text-lg">Master Produk (BOM)</h3><button onclick="superApp.openCrudMaster('add')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i>Tambah Item</button></div>
                 <div class="overflow-y-auto max-h-64 no-scrollbar">
                     <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Nama Menu</th><th class="pb-2">Memotong Bahan</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="master-tbody" class="divide-y divide-slate-50"></tbody></table>
                 </div>
@@ -204,9 +203,10 @@
             </div>
         </div>
       </div>
+
       <div id="view-staf" class="app-view hidden">
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div class="flex justify-between items-center mb-6 border-b pb-4"><h3 class="font-extrabold text-lg">Kinerja Operasional & Sales Keseluruhan</h3></div>
+          <div class="flex justify-between items-center mb-6 border-b pb-4"><h3 class="font-extrabold text-lg">Kinerja Operasional Keseluruhan</h3></div>
           <table class="w-full text-left whitespace-nowrap"><thead class="text-slate-400 text-sm"><tr><th class="pb-3">Username</th><th class="pb-3">Role</th><th class="pb-3">Cabang (Penempatan)</th><th class="pb-3 text-right">Total Akumulasi Sales</th></tr></thead><tbody id="staf-tbody" class="text-sm font-bold divide-y divide-slate-50"></tbody></table>
         </div>
       </div>
@@ -223,8 +223,8 @@
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
       
       <div class="grid grid-cols-3 gap-2 mb-4">
-          <button onclick="superApp.addPayNumpad(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white shadow-sm">+50k</button>
-          <button onclick="superApp.addPayNumpad(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white shadow-sm">+100k</button>
+          <button onclick="superApp.addPayNumpad(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white shadow-sm hover:border-brand-500">+50k</button>
+          <button onclick="superApp.addPayNumpad(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white shadow-sm hover:border-brand-500">+100k</button>
           <button onclick="superApp.setCash('pas')" class="py-2 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm">UANG PAS</button>
       </div>
       <div class="flex items-center gap-2 mb-5">
@@ -232,17 +232,17 @@
         <button onclick="superApp.setCash('')" class="p-3 bg-red-50 text-red-500 rounded-xl font-bold"><i class="fas fa-times"></i></button>
       </div>
 
-      <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
+      <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan Transaksi</button>
     </div>
   </div>
 
-  <div id="modal-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div id="modal-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl modal-enter" id="modal-detail-content">
       <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-lg">Detail Struk</h3><button onclick="superApp.closeModal('modal-detail')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
       <div id="detail-struk-body" class="bg-slate-50 p-4 rounded-xl text-sm font-mono text-slate-700 h-64 overflow-y-auto mb-4 border border-slate-200"></div>
       <div class="flex flex-col gap-2">
-        <button onclick="superApp.executeReprint()" class="w-full bg-slate-900 text-white py-3 rounded-xl font-extrabold shadow-sm hover:bg-slate-800 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang Struk</button>
+        <button onclick="superApp.executeReprint()" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold shadow-sm hover:bg-brand-600 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang Struk</button>
         <button onclick="superApp.promptVoidTrx()" id="btn-void-trx" class="w-full bg-white border-2 border-red-100 text-red-500 py-3 rounded-xl font-extrabold hover:bg-red-50 transition"><i class="fas fa-ban mr-2"></i>Batalkan & Kembalikan Stok</button>
       </div>
     </div>
@@ -271,7 +271,7 @@
         showToast: function(msg, type = 'success') {
             const container = document.getElementById('toast-container');
             const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-exclamation-circle text-red-500"></i>';
-            const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-3 toast-animate z-[999]`;
+            const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3 toast-animate z-[999]`;
             t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
             container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
         },
@@ -317,12 +317,18 @@
         },
         
         processLogin: function() {
-            let user = (this.db.users || []).find(u => u.PIN == this.pinBuffer);
+            // Null safety check: Make sure db and users exist before validating PIN
+            if (!this.db || !this.db.users) {
+                this.showToast('Gagal! Koneksi ke Database belum siap. Pastikan URL API sudah benar.', 'error');
+                this.clearPin();
+                return;
+            }
+
+            let user = this.db.users.find(u => u.PIN == this.pinBuffer);
             if(user) {
                 this.currentUser = user;
                 this.outlet = user.Outlet === 'Pusat' ? (this.db.outlets[0]?.ID_Outlet || 'Penajam') : user.Outlet;
                 
-                // Konfigurasi Role Based Access Control (RBAC)
                 document.getElementById('sb-role').innerText = user.Role;
                 document.getElementById('header-initial').innerText = user.Username.charAt(0).toUpperCase();
                 let isAdmin = user.Role.toLowerCase().includes('admin');
@@ -331,7 +337,6 @@
                     document.getElementById('admin-menus').classList.remove('hidden');
                     document.getElementById('select-outlet').disabled = false;
                     document.getElementById('report-outlet-filter').classList.remove('hidden');
-                    // Setup Dropdowns
                     let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                     this.db.outlets.forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
                     document.getElementById('select-outlet').innerHTML = outOptions;
@@ -344,7 +349,6 @@
                     document.getElementById('select-outlet').innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`;
                 }
                 
-                // Transisi Tampilan
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('sidebar').classList.remove('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
@@ -370,12 +374,28 @@
                 this.activeShiftId = null; this.activeStaffTeam = [];
                 document.getElementById('main-app').classList.add('blur-lock');
                 document.getElementById('shift-user-name').innerText = this.currentUser.Username;
+                
+                let staffHtml = '';
+                this.db.users.filter(u => u.Outlet === this.outlet || u.Outlet === 'Pusat').forEach(u => {
+                    let badge = u.Role.toLowerCase().includes('senior') || u.Role.toLowerCase().includes('admin') ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-slate-100 text-slate-500';
+                    staffHtml += `<label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100"><input type="checkbox" value="${u.Username}" data-role="${u.Role}" class="shift-cb w-5 h-5 text-brand-500 rounded"><div class="flex-1 font-bold text-sm">${u.Username}</div><span class="px-2 py-0.5 border rounded text-[10px] font-black uppercase ${badge}">${u.Role}</span></label>`;
+                });
+                document.getElementById('shift-staff-list').innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar di cabang ini.</p>';
                 document.getElementById('modal-shift').classList.remove('hidden'); setTimeout(() => document.getElementById('modal-shift-content').classList.add('modal-enter-active'), 10);
             }
         },
         executeBukaShift: async function() {
-            // Karena yang login adalah Senior Kasir, otomatis valid.
-            let tim = [{username: this.currentUser.Username, role: this.currentUser.Role}];
+            let cbs = document.querySelectorAll('.shift-cb:checked');
+            if(cbs.length === 0) return this.showToast("Pilih minimal 1 anggota tim!", "error");
+            
+            let tim = []; let hasSenior = false;
+            cbs.forEach(cb => {
+                tim.push({username: cb.value, role: cb.getAttribute('data-role')});
+                if(cb.getAttribute('data-role').toLowerCase().includes('senior') || cb.getAttribute('data-role').toLowerCase().includes('admin')) hasSenior = true;
+            });
+
+            if(!hasSenior) return this.showToast("Ditolak: Wajib 1 Senior atau Admin dalam Shift!", "error");
+
             this.setLoading(true, "Membuka Shift...");
             try {
                 const res = await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'buka_shift', outlet: this.outlet, tim: tim }) });
@@ -383,16 +403,16 @@
                 this.activeShiftId = data.id_shift; this.activeStaffTeam = tim;
                 this.closeModal('modal-shift'); document.getElementById('main-app').classList.remove('blur-lock');
                 this.showToast("Shift Berhasil Dibuka!");
-            } catch(e) { this.showToast("Gagal memvalidasi server", "error"); }
+            } catch(e) { this.showToast("Gagal validasi server", "error"); }
             this.setLoading(false);
         },
         tutupShift: async function() {
-            if(!confirm("Yakin ingin menutup shift? Anda akan dikeluarkan dari sistem.")) return;
+            if(!confirm("Yakin ingin menutup shift dan merekap penjualan hari ini?")) return;
             this.setLoading(true, "Menutup Shift...");
             try {
                 await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'tutup_shift', id_shift: this.activeShiftId }) });
                 location.reload(); 
-            } catch(e) { this.showToast("Gagal", "error"); this.setLoading(false); }
+            } catch(e) { this.showToast("Gagal tutup shift", "error"); this.setLoading(false); }
         },
 
         // 3. CORE POS DATA
@@ -496,7 +516,6 @@
                 if(data.status === 'sukses') {
                     this.showToast(`Transaksi Sukses!`);
                     await this.printReceipt(data.trx_id, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses');
-                    // Refresh data DB via background fetch
                     const refreshRes = await fetch(API_URL); this.db = await refreshRes.json();
                     this.refreshData();
                 }
@@ -514,7 +533,7 @@
         },
         renderReport: function() {
             let filterVal = document.getElementById('report-outlet-filter') ? document.getElementById('report-outlet-filter').value : this.outlet;
-            if(this.currentUser.Role.toLowerCase().includes('admin')) { filterVal = document.getElementById('report-outlet-filter').value; } else { filterVal = this.outlet; }
+            if(this.currentUser && this.currentUser.Role.toLowerCase().includes('admin')) { filterVal = document.getElementById('report-outlet-filter').value; } else { filterVal = this.outlet; }
             
             document.getElementById('report-date-label').innerText = new Date().toLocaleString('id-ID');
             document.getElementById('report-title-label').innerText = `Filter Outlet: ${filterVal}`;
@@ -571,7 +590,6 @@
             strukHtml += `<div class="flex justify-between"><span>TUNAI</span><span>${trx.Tunai}</span></div><div class="flex justify-between"><span>KEMBALI</span><span>${trx.Kembalian}</span></div>`;
             document.getElementById('detail-struk-body').innerHTML = strukHtml;
             
-            // Atur tombol void
             let btnVoid = document.getElementById('btn-void-trx');
             if(trx.Status === 'Sukses') { btnVoid.classList.remove('hidden'); } else { btnVoid.classList.add('hidden'); }
 
@@ -583,7 +601,6 @@
         },
         promptVoidTrx: function() {
             let pin = prompt("Masukkan PIN Super Admin (Owner) untuk Membatalkan & Mengembalikan Stok:");
-            // Check Admin PIN from DB
             let adminUser = this.db.users.find(u => u.Role.toLowerCase().includes('admin') && u.PIN == pin);
             if(adminUser) { 
                 this.executeVoidTrx(this.activeReprintTrx.ID_TRX); 
@@ -597,17 +614,15 @@
                 await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'batal_trx', trx_id: trxId, tim_operasional: this.activeStaffTeam }) });
                 this.showToast("Transaksi Dibatalkan!"); 
                 
-                // Cetak Struk Void Otomatis
                 let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, t.Tunai, t.Kembalian, items, 'Batal');
 
                 const refreshRes = await fetch(API_URL); this.db = await refreshRes.json();
-                this.refreshData();
-                this.closeModal('modal-detail');
+                this.refreshData(); this.closeModal('modal-detail');
             } catch(e) { this.showToast("Gagal membatalkan transaksi", "error"); this.setLoading(false); }
         },
 
-        // 5. GUDANG & OUTLET (ADMIN ONLY)
+        // 5. GUDANG & OUTLET
         renderGudang: function() {
             const gBody = document.getElementById('gudang-tbody'); const mOutBody = document.getElementById('outlet-manage-tbody');
             if(gBody) gBody.innerHTML = this.db.stokGudang.map(g => `<tr class="border-b border-slate-50"><td class="py-2 font-bold">${g.SKU}<br><span class="text-[10px] text-slate-400 font-normal">${g.Nama_Item}</span></td><td class="py-2 text-right font-black text-brand-500">${g.Stok_Pusat} Pcs</td></tr>`).join('');
@@ -620,10 +635,12 @@
                 });
                 mOutBody.innerHTML = html;
             }
+            
             const masterBody = document.getElementById('master-tbody');
             if(masterBody) masterBody.innerHTML = this.db.masterProduk.map(m => `<tr><td class="py-2 font-bold">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-2 text-xs">${m.SKU_Bahan ? `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">${m.SKU_Bahan}</span>` : '-'}</td><td class="py-2 text-center"><button onclick="superApp.openCrudMaster('edit', '${m.SKU}')" class="text-blue-500"><i class="fas fa-edit"></i></button></td></tr>`).join('');
+            
             const outBody = document.getElementById('crud-outlet-tbody');
-            if(outBody) outBody.innerHTML = this.db.outlets.map(o => `<tr class="border-b border-slate-50"><td class="py-3 font-bold text-sm">${o.ID_Outlet}</td><td class="py-3">${o.Nama_Outlet}</td><td class="py-3 text-center"><button onclick="superApp.openCrudOutlet('edit', '${o.ID_Outlet}')" class="text-blue-500 mx-1"><i class="fas fa-edit"></i></button></td></tr>`).join('');
+            if(outBody) outBody.innerHTML = this.db.outlets.map(o => `<tr class="border-b border-slate-50"><td class="py-3 font-bold text-sm">${o.ID_Outlet}</td><td class="py-3">${o.Nama_Outlet}</td><td class="py-3 text-center"><button onclick="superApp.openCrudOutlet('edit', '${o.ID_Outlet}')" class="text-blue-500 mx-1"><i class="fas fa-edit"></i></button><button onclick="superApp.deleteCrud('Daftar_Outlet', '${o.ID_Outlet}')" class="text-red-500 mx-1"><i class="fas fa-trash"></i></button></td></tr>`).join('');
         },
         openEditHargaOutlet: function(sku, nama, currHarga) {
             let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Produk</label><input type="text" disabled value="${nama}" class="w-full border-2 border-slate-200 bg-slate-100 rounded-xl px-3 py-2 font-bold text-sm outline-none"></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', currHarga, 'number');
@@ -676,6 +693,11 @@
             if(!idVal) return this.showToast("ID/SKU Wajib Diisi", "error"); this.setLoading(true, "Menyimpan...");
             await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'save', sheetName: sheet, id: oldId || idVal, rowData: row }) });
             this.closeModal('modal-form'); const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+        },
+        deleteCrud: async function(sheet, id) {
+            if(!confirm(`Yakin hapus data ${id}?`)) return; this.setLoading(true, "Menghapus...");
+            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'delete', sheetName: sheet, id: id }) });
+            const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
         },
 
         // 6. STAF
