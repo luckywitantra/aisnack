@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ai-Snack ERP & POS Ultimate</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f97316">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3081/3081308.png">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -51,14 +56,10 @@
     </div>
     
     <div class="w-1/3 bg-white flex flex-col shadow-2xl relative z-10">
-        <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md">
-            <h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2>
-        </div>
-        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50" id="cfd-cart-list">
-            </div>
+        <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md"><h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2></div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50" id="cfd-cart-list"></div>
         <div class="p-8 bg-white border-t-4 border-brand-500 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-            <p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p>
-            <p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p>
+            <p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p><p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p>
         </div>
     </div>
     
@@ -97,7 +98,7 @@
         <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
         <button class="numpad-btn text-red-500 text-lg" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
       </div>
-      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center" id="login-status">Sistem Offline. Menyinkronkan API...</p>
+      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center" id="login-status">Memuat Database...</p>
     </div>
   </div>
 
@@ -113,17 +114,40 @@
         <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label>
         <input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Ketik nominal uang fisik">
       </div>
-      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Validasi & Buka Kasir</button>
+      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Buka Kasir Offline</button>
+    </div>
+  </div>
+
+  <div id="modal-kas-keluar" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-slate-800" id="modal-kas-keluar-content">
+      <h3 class="font-extrabold text-xl mb-2 border-b pb-3">Input Kas Keluar</h3>
+      <p class="text-slate-500 text-sm mb-4">Catat pengeluaran darurat dari uang laci.</p>
+      <div class="space-y-4 mb-6">
+        <div><label class="text-xs font-bold text-slate-500 block mb-1">Nominal (Rp)</label><input type="number" id="kas-out-nominal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white" placeholder="Contoh: 15000"></div>
+        <div><label class="text-xs font-bold text-slate-500 block mb-1">Keterangan / Keperluan</label><input type="text" id="kas-out-ket" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white" placeholder="Beli es batu, dll"></div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="superApp.closeModal('modal-kas-keluar')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200">Batal</button>
+        <button onclick="superApp.executeKasKeluar()" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-red-600">Simpan Kas Keluar</button>
+      </div>
     </div>
   </div>
 
   <div id="modal-tutup-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
-    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-tutup-shift-content">
-      <h3 class="font-extrabold text-xl mb-2 text-slate-800">Tutup Laci & Rekap Shift</h3>
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center text-slate-800" id="modal-tutup-shift-content">
+      <h3 class="font-extrabold text-xl mb-2">Tutup Laci & Rekap Shift</h3>
       <p class="text-slate-500 text-sm mb-6">Hitung uang fisik di laci kasir sekarang.</p>
+      
+      <div class="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200">
+          <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Modal Awal</span><span class="text-xs font-black" id="ts-modal">Rp 0</span></div>
+          <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Sales Tunai</span><span class="text-xs font-black text-green-600" id="ts-sales">Rp 0</span></div>
+          <div class="flex justify-between mb-3"><span class="text-xs font-bold text-slate-500">Kas Keluar</span><span class="text-xs font-black text-red-500" id="ts-kasout">Rp 0</span></div>
+          <div class="flex justify-between border-t border-slate-200 pt-2"><span class="text-sm font-bold text-slate-800">Uang Laci (Sistem)</span><span class="text-sm font-black text-brand-600" id="ts-expected">Rp 0</span></div>
+      </div>
+
       <div class="text-left mb-6">
-        <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Rp)</label>
-        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Uang riil yang ada">
+        <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Uang Riil)</label>
+        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Masukkan total uang laci">
       </div>
       <div class="flex gap-2">
         <button onclick="superApp.closeModal('modal-tutup-shift')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200">Batal</button>
@@ -147,6 +171,7 @@
       <nav class="space-y-1 px-4" id="sidebar-nav">
         <p class="px-4 text-xs font-bold text-slate-400 uppercase mb-2">Aplikasi Kasir</p>
         <button onclick="superApp.switchMenu('pos')" id="nav-pos" class="nav-btn nav-active w-full flex items-center p-3 rounded-2xl transition group"><i class="fas fa-cash-register w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Point of Sale</span></button>
+        <button onclick="superApp.openKasKeluar()" class="w-full flex items-center p-3 rounded-2xl text-red-500 hover:bg-red-50 transition group"><i class="fas fa-money-bill-transfer w-8 group-hover:text-red-600"></i><span class="font-bold text-sm">Input Kas Keluar</span></button>
         <button onclick="superApp.switchMenu('opname')" id="nav-opname" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-clipboard-check w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Opname Fisik Stok</span></button>
         <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Riwayat & Rekap</span></button>
         
@@ -175,6 +200,11 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
+        <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
+            <span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span>
+            <span id="net-text" class="text-[10px] font-bold text-green-600">Online & Tersinkron</span>
+        </div>
+        
         <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition"><i class="fas fa-display"></i> Layar Pelanggan</button>
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition"><i class="fas fa-moon" id="dark-icon"></i></button>
         <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
@@ -235,7 +265,8 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
                 <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-6 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-bold shadow-sm">Histori Transaksi</button>
-                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan Harian</button>
+                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan</button>
+                <button onclick="superApp.toggleReportTab('kas')" id="tab-kas" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Kas Keluar</button>
             </div>
             <div class="flex gap-2 flex-wrap items-center">
                 <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
@@ -252,8 +283,9 @@
             <div id="report-content-trx">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Total Transaksi</p><h4 class="text-xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
-                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Omset Bersih (Tunai)</p><h4 class="text-xl font-black text-green-600" id="rep-total-tunai">Rp 0</h4></div>
-                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Omset Bersih (QRIS)</p><h4 class="text-xl font-black text-blue-600" id="rep-total-qris">Rp 0</h4></div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Omset Tunai</p><h4 class="text-xl font-black text-green-600" id="rep-total-tunai">Rp 0</h4></div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Omset QRIS</p><h4 class="text-xl font-black text-blue-600" id="rep-total-qris">Rp 0</h4></div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Total Kas Keluar</p><h4 class="text-xl font-black text-red-500" id="rep-total-kas">Rp 0</h4></div>
                 </div>
                 <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">A. Histori Transaksi (Detail & Void)</h3>
                 <div class="overflow-x-auto mb-8 bg-slate-50 rounded-2xl p-4 border border-slate-100">
@@ -268,7 +300,14 @@
                 </div>
                 <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">C. Log Mutasi (Stok Masuk Gudang -> Cabang)</h3>
                 <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 text-slate-800">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">SKU Bahan</th><th class="pb-2">Tujuan</th><th class="pb-2 text-right">Qty Masuk</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">SKU Bahan</th><th class="pb-2">Tujuan</th><th class="pb-2 text-right">Qty Kirim</th><th class="pb-2">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                </div>
+            </div>
+
+            <div id="report-content-kas" class="hidden">
+                <h3 class="font-extrabold text-lg mb-4 text-red-500 border-l-4 border-red-500 pl-3">D. Log Kas Keluar (Pengeluaran Laci)</h3>
+                <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 text-slate-800">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">Cabang & Kasir</th><th class="pb-2">Keterangan</th><th class="pb-2 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
         </div>
@@ -297,7 +336,7 @@
                     <div><h3 class="font-extrabold text-lg">Stok Gudang Pusat</h3><p class="text-xs text-slate-500">Bahan baku yang dikelola pusat.</p></div>
                     <div class="flex gap-2">
                         <button onclick="superApp.openCrudBahan()" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 shadow"><i class="fas fa-plus mr-1"></i>Bahan Baru</button>
-                        <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200 shadow"><i class="fas fa-boxes-packing mr-1"></i>Restok Masuk</button>
+                        <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200 shadow"><i class="fas fa-boxes-packing mr-1"></i>Restok</button>
                     </div>
                 </div>
                 <div class="overflow-y-auto max-h-[500px] no-scrollbar">
@@ -323,7 +362,6 @@
                 <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><h3 class="font-extrabold text-lg">Daftar Cabang</h3><button onclick="superApp.openCrudOutlet('add')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 shadow"><i class="fas fa-plus mr-1"></i>Outlet Baru</button></div>
                 <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">ID</th><th class="pb-2">Nama Outlet</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="crud-outlet-tbody" class="divide-y divide-slate-50"></tbody></table>
             </div>
-            
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
                 <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
                     <div><h3 class="font-extrabold text-lg">Kelola Cabang: <span id="label-outlet-manage" class="text-brand-500">Penajam</span></h3></div>
@@ -347,7 +385,6 @@
   </main>
 
   <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3"></div>
-  <div id="app-loader" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[999] flex flex-col items-center justify-center hidden"><i class="fas fa-circle-notch fa-spin text-5xl text-brand-500 mb-4"></i><p class="font-extrabold text-lg text-white animate-pulse" id="loader-text">Memproses...</p></div>
 
   <div id="modal-payment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
@@ -358,16 +395,16 @@
           <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Metode Pembayaran</label>
           <div class="grid grid-cols-2 gap-2">
               <button onclick="superApp.setPaymentMethod('Tunai')" id="btn-pay-tunai" class="py-3 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition"><i class="fas fa-money-bill-wave mr-2"></i>TUNAI</button>
-              <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS</button>
+              <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS/TRANSFER</button>
           </div>
       </div>
       
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
-              <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
-              <button onclick="superApp.addPayNumpad(20000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
-              <button onclick="superApp.addPayNumpad(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
-              <button onclick="superApp.addPayNumpad(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
+              <button onclick="superApp.setCash(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
+              <button onclick="superApp.setCash(20000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
+              <button onclick="superApp.setCash(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
+              <button onclick="superApp.setCash(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
               <button onclick="superApp.setCash('pas')" class="col-span-4 py-2 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition">UANG PAS</button>
           </div>
           <div class="flex items-center gap-2 mb-5">
@@ -396,7 +433,7 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800" id="modal-form-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
       <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
-      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan</button>
+      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan Perubahan</button>
     </div>
   </div>
 
@@ -410,11 +447,13 @@
         outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
+        offlineQueue: [], isOnline: navigator.onLine,
 
+        // 1. UTILITAS DASAR & PWA OFFLINE ENGINE
         showToast: function(msg, type = 'success') {
             const container = document.getElementById('toast-container');
             if(!container) return;
-            const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-exclamation-circle text-red-500"></i>';
+            const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500"></i>' : (type === 'warning' ? '<i class="fas fa-cloud-arrow-up text-orange-500"></i>' : '<i class="fas fa-exclamation-circle text-red-500"></i>');
             const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3 toast-animate z-[999] dark:bg-slate-800 dark:border-slate-700`;
             t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
             container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
@@ -447,84 +486,132 @@
             return new Date(dateStr); 
         },
 
+        // API WRAPPER (OFFLINE FIRST)
+        apiPost: async function(payload, silent = false) {
+            if(!this.isOnline) {
+                this.offlineQueue.push(payload);
+                localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
+                this.updateNetworkUI();
+                return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift };
+            }
+            try {
+                const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                return await res.json();
+            } catch(e) {
+                this.offlineQueue.push(payload);
+                localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
+                this.updateNetworkUI();
+                return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift };
+            }
+        },
+        syncOfflineQueue: async function() {
+            if(!this.isOnline || this.offlineQueue.length === 0) return;
+            this.showToast("Menyinkronkan data offline ke Server...", "warning");
+            
+            let failedQueue = [];
+            for (let i = 0; i < this.offlineQueue.length; i++) {
+                try {
+                    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(this.offlineQueue[i]) });
+                } catch(e) {
+                    failedQueue.push(this.offlineQueue[i]);
+                }
+            }
+            this.offlineQueue = failedQueue;
+            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
+            
+            if(this.offlineQueue.length === 0) {
+                this.showToast("Semua data berhasil tersinkron ke Server!");
+                try { const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); } catch(e){}
+            }
+            this.updateNetworkUI();
+        },
+        updateNetworkUI: function() {
+            const ind = document.getElementById('network-indicator'); const dot = document.getElementById('net-dot'); const txt = document.getElementById('net-text');
+            if(!ind || !dot || !txt) return;
+
+            if(this.isOnline) {
+                if(this.offlineQueue.length > 0) {
+                    ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200 cursor-pointer';
+                    dot.className = 'w-2 h-2 rounded-full bg-orange-500 animate-pulse';
+                    txt.className = 'text-[10px] font-bold text-orange-600';
+                    txt.innerText = `Menyinkron ${this.offlineQueue.length} data...`;
+                } else {
+                    ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200';
+                    dot.className = 'w-2 h-2 rounded-full bg-green-500';
+                    txt.className = 'text-[10px] font-bold text-green-600';
+                    txt.innerText = 'Online & Tersinkron';
+                }
+            } else {
+                ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200';
+                dot.className = 'w-2 h-2 rounded-full bg-red-500';
+                txt.className = 'text-[10px] font-bold text-red-600';
+                txt.innerText = `Offline (${this.offlineQueue.length} Tertunda)`;
+            }
+        },
+
         // ============================
         // CFD (CUSTOMER FACING DISPLAY)
         // ============================
-        openCFD: function() {
-            window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', 'width=1024,height=768');
-        },
+        openCFD: function() { window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', 'width=1024,height=768'); },
         syncStorage: function(status = 'ordering') {
             if(new URLSearchParams(window.location.search).get('mode') === 'cfd') return; 
-            localStorage.setItem('ai_snack_cfd', JSON.stringify({
-                outlet: this.outlet || 'Ai-Snack', items: this.cart, total: this.payTotal, kembali: this.payChange, status: status, timestamp: new Date().getTime()
-            }));
+            localStorage.setItem('ai_snack_cfd', JSON.stringify({ outlet: this.outlet || 'Ai-Snack', items: this.cart, total: this.payTotal, kembali: this.payChange, status: status, timestamp: new Date().getTime() }));
         },
         initCFD: function() {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('sidebar').classList.add('hidden');
-            document.getElementById('main-app').classList.add('hidden');
-            
-            const cfdScreen = document.getElementById('cfd-screen');
-            if(cfdScreen) cfdScreen.classList.remove('hidden');
-
-            window.addEventListener('storage', (e) => {
-                if(e.key === 'ai_snack_cfd') { let data = JSON.parse(e.newValue); if(data) this.renderCFD(data); }
-            });
-            let initialData = localStorage.getItem('ai_snack_cfd');
-            if(initialData) this.renderCFD(JSON.parse(initialData));
+            document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
+            const cfdScreen = document.getElementById('cfd-screen'); if(cfdScreen) cfdScreen.classList.remove('hidden');
+            window.addEventListener('storage', (e) => { if(e.key === 'ai_snack_cfd') { let data = JSON.parse(e.newValue); if(data) this.renderCFD(data); } });
+            let initialData = localStorage.getItem('ai_snack_cfd'); if(initialData) this.renderCFD(JSON.parse(initialData));
         },
         renderCFD: function(data) {
             document.getElementById('cfd-outlet-name').innerText = `Cabang ${data.outlet}`;
-            const cfdStandby = document.getElementById('cfd-standby');
-            const cfdSuccess = document.getElementById('cfd-success');
+            const cfdStandby = document.getElementById('cfd-standby'); const cfdSuccess = document.getElementById('cfd-success');
             
             if(data.status === 'paid') {
                 cfdSuccess.classList.remove('hidden');
                 document.getElementById('cfd-kembali').innerText = `Rp ${data.kembali.toLocaleString('id-ID')}`;
                 setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 5000);
-            } else {
-                cfdSuccess.classList.add('hidden');
-            }
+            } else { cfdSuccess.classList.add('hidden'); }
 
             if(data.items.length === 0 && data.status !== 'paid') {
                 cfdStandby.classList.remove('opacity-0', 'pointer-events-none');
             } else {
                 cfdStandby.classList.add('opacity-0', 'pointer-events-none');
                 let html = '';
-                data.items.forEach(i => {
-                    html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div>`;
-                });
-                document.getElementById('cfd-cart-list').innerHTML = html;
-                document.getElementById('cfd-total').innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
+                data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div>`; });
+                document.getElementById('cfd-cart-list').innerHTML = html; document.getElementById('cfd-total').innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
             }
         },
 
         // INIT & LOGIN
         init: async function() {
             if(new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
+
+            // Network Listeners
+            window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
+            window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
+            this.offlineQueue = JSON.parse(localStorage.getItem('aisnack_offline_queue')) || [];
+            
             try {
+                let cacheDb = localStorage.getItem('aisnack_db_cache');
+                if(cacheDb) this.db = JSON.parse(cacheDb); // Load dari cache agar instan
+
                 const res = await fetch(API_URL, { redirect: 'follow' });
                 const data = await res.json();
                 
-                if(data && data.status === 'error') {
-                     const logStat = document.getElementById('login-status');
-                     if(logStat) { logStat.innerText = 'ERROR DB: ' + data.pesan; logStat.className = 'text-[10px] text-red-500 font-bold tracking-widest text-center'; }
-                     return;
-                }
-
+                if(data && data.status === 'error') throw new Error(data.pesan);
                 this.db = data;
-                
-                // Set Auto Date Filter (Hari Ini) Default
-                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
-                let todayStr = `${yyyy}-${mm}-${dd}`;
-                const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
-                if(fs && !fs.value) fs.value = todayStr; if(fe && !fe.value) fe.value = todayStr;
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); // Save cache
 
                 const logStat = document.getElementById('login-status');
                 if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
             } catch (err) { 
                 const logStat = document.getElementById('login-status');
-                if(logStat) { logStat.innerText = 'Gagal Terkoneksi API. Cek URL Deployment Anda.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
+                if(logStat && this.db) { 
+                    logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
+                } else if (logStat) {
+                    logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center';
+                }
             }
         },
         addPin: function(num) {
@@ -578,11 +665,19 @@
                 const sbar = document.getElementById('sidebar'); if(sbar) sbar.classList.remove('hidden');
                 const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('hidden');
                 
+                this.updateNetworkUI(); this.syncOfflineQueue();
+                
+                // Set Auto Date Filter (Hari Ini) Default
+                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
+                let todayStr = `${yyyy}-${mm}-${dd}`;
+                const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
+                if(fs) fs.value = todayStr; if(fe) fe.value = todayStr;
+
                 this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
             } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
         },
 
-        // 3. SHIFT VALIDATION
+        // 3. SHIFT & KAS KELUAR
         checkShiftStatus: function() {
             const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = this.outlet;
             let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
@@ -624,21 +719,68 @@
                 tim.push({username: cb.value, role: cb.getAttribute('data-role')});
                 if(cb.getAttribute('data-role').toLowerCase().includes('senior') || cb.getAttribute('data-role').toLowerCase().includes('admin')) hasSenior = true;
             });
-
             if(!hasSenior) return this.showToast("Ditolak: Wajib 1 Senior dalam Shift!", "error");
 
             this.setLoading(true, "Membuka Laci Kasir...");
-            try {
-                const res = await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'buka_shift', outlet: this.outlet, tim: tim, modal_awal: parseInt(m_awal) }) });
-                const data = await res.json();
-                this.activeShiftId = data.id_shift; this.activeStaffTeam = tim;
+            
+            let shiftID = 'SHF' + new Date().getTime();
+            const payload = { action: 'buka_shift', outlet: this.outlet, tim: tim, modal_awal: parseInt(m_awal), id_shift: shiftID };
+            
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.activeShiftId = shiftID; this.activeStaffTeam = tim;
+                
+                if(res.is_offline) {
+                    let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+                    this.db.shifts.push({ID_Shift: shiftID, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Outlet: this.outlet, Waktu_Tutup: '', Tim_Operasional: JSON.stringify(tim), Modal_Awal: parseInt(m_awal)});
+                }
+
                 this.closeModal('modal-shift'); const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('blur-lock');
-                this.showToast("Shift Dibuka! Laci siap digunakan.");
-            } catch(e) { this.showToast("Gagal menyambung server", "error"); }
+                this.showToast(res.is_offline ? "Shift Dibuka (Mode Offline Aktif)" : "Shift Dibuka! Laci siap digunakan.");
+            }
+            this.setLoading(false);
+        },
+        openKasKeluar: function() {
+            document.getElementById('kas-out-nominal').value = ''; document.getElementById('kas-out-ket').value = '';
+            document.getElementById('modal-kas-keluar').classList.remove('hidden'); setTimeout(() => document.getElementById('modal-kas-keluar-content').classList.add('modal-enter-active'), 10);
+        },
+        executeKasKeluar: async function() {
+            let nom = document.getElementById('kas-out-nominal').value; let ket = document.getElementById('kas-out-ket').value;
+            if(!nom || !ket) return this.showToast("Nominal dan Keterangan wajib diisi!", "error");
+            
+            this.setLoading(true, "Mencatat Pengeluaran...");
+            let kasId = 'KAS' + new Date().getTime();
+            const payload = { action: 'kas_keluar', id_kas: kasId, outlet: this.outlet, kasir: this.currentUser.Username, nominal: parseInt(nom), keterangan: ket, id_shift: this.activeShiftId };
+            
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                if(res.is_offline) {
+                    let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+                    if(!this.db.kasKeluar) this.db.kasKeluar = [];
+                    this.db.kasKeluar.push({ID_Kas: kasId, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Nominal: parseInt(nom), Keterangan: ket, ID_Shift: this.activeShiftId});
+                }
+                this.closeModal('modal-kas-keluar'); this.showToast("Kas Keluar Tersimpan.");
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+            }
             this.setLoading(false);
         },
         promptTutupShift: function() {
             const setAkhir = document.getElementById('shift-setoran-akhir'); if(setAkhir) setAkhir.value = '';
+            
+            let shiftData = (this.db.shifts || []).find(s => s.ID_Shift === this.activeShiftId);
+            let modal = shiftData ? Number(shiftData.Modal_Awal) : 0;
+            let salesTunai = 0; let totalKasKeluar = 0;
+            
+            (this.db.transactions || []).forEach(t => { if(t.ID_Shift === this.activeShiftId && t.Status === 'Sukses' && t.Metode_Bayar === 'Tunai') salesTunai += Number(t.Total_Bayar); });
+            (this.db.kasKeluar || []).forEach(k => { if(k.ID_Shift === this.activeShiftId) totalKasKeluar += Number(k.Nominal); });
+            
+            let expected = modal + salesTunai - totalKasKeluar;
+
+            document.getElementById('ts-modal').innerText = `Rp ${modal.toLocaleString('id-ID')}`;
+            document.getElementById('ts-sales').innerText = `Rp ${salesTunai.toLocaleString('id-ID')}`;
+            document.getElementById('ts-kasout').innerText = `Rp ${totalKasKeluar.toLocaleString('id-ID')}`;
+            document.getElementById('ts-expected').innerText = `Rp ${expected.toLocaleString('id-ID')}`;
+
             const modalTutup = document.getElementById('modal-tutup-shift'); const modalTutupContent = document.getElementById('modal-tutup-shift-content');
             if(modalTutup && modalTutupContent) { modalTutup.classList.remove('hidden'); setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10); }
         },
@@ -649,24 +791,29 @@
             
             let shiftData = (this.db.shifts || []).find(s => s.ID_Shift === this.activeShiftId);
             let modal = shiftData ? Number(shiftData.Modal_Awal) : 0;
-            let salesTunai = 0;
+            let salesTunai = 0; let totalKasKeluar = 0;
+            
             (this.db.transactions || []).forEach(t => { if(t.ID_Shift === this.activeShiftId && t.Status === 'Sukses' && t.Metode_Bayar === 'Tunai') salesTunai += Number(t.Total_Bayar); });
-            let expected = modal + salesTunai;
+            (this.db.kasKeluar || []).forEach(k => { if(k.ID_Shift === this.activeShiftId) totalKasKeluar += Number(k.Nominal); });
+
+            let expected = modal + salesTunai - totalKasKeluar;
             let selisih = parseInt(setor) - expected;
 
             this.setLoading(true, "Merekap Penjualan Hari Ini...");
-            try {
-                await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'tutup_shift', id_shift: this.activeShiftId, setoran_akhir: parseInt(setor), selisih: selisih }) });
+            const payload = { action: 'tutup_shift', id_shift: this.activeShiftId, setoran_akhir: parseInt(setor), selisih: selisih };
+            let res = await this.apiPost(payload);
+            
+            if(res.status === 'sukses') {
                 alert(`SHIFT DITUTUP!\nUang Sistem: Rp ${expected.toLocaleString('id-ID')}\nUang Fisik (Setoran): Rp ${parseInt(setor).toLocaleString('id-ID')}\nSelisih: Rp ${selisih.toLocaleString('id-ID')}`);
                 location.reload(); 
-            } catch(e) { this.showToast("Gagal tutup shift", "error"); this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
 
         // OPNAME
         renderOpname: function() {
-            document.getElementById('lbl-opname-outlet').innerText = this.outlet;
-            const tbUtama = document.getElementById('opname-tbody-utama');
-            const tbPdk = document.getElementById('opname-tbody-pendukung');
+            const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
+            const tbUtama = document.getElementById('opname-tbody-utama'); const tbPdk = document.getElementById('opname-tbody-pendukung');
             if(!tbUtama || !tbPdk) return;
             
             let hUtama = ''; let hPdk = '';
@@ -678,13 +825,12 @@
                         let strHtml = `<tr class="border-b border-slate-50">
                             <td class="py-3 text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${sData.SKU}</span></td>
                             <td class="py-3 text-center text-brand-600" id="opn-sys-${sData.SKU}">${sData.Stok_Toko}</td>
-                            <td class="py-3 text-center"><input type="number" id="opn-fisik-${sData.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white" placeholder="0" oninput="superApp.calcOpname('${sData.SKU}')"></td>
+                            <td class="py-3 text-center"><input type="number" id="opn-fisik-${sData.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${sData.SKU}')"></td>
                             <td class="py-3 text-right font-black text-slate-300" id="opn-selisih-${sData.SKU}">-</td>
-                            <td class="py-3"><input type="text" id="opn-note-${sData.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs" placeholder="Kondisi Fisik..."></td>
+                            <td class="py-3"><input type="text" id="opn-note-${sData.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td>
                         </tr>`;
                         
-                        if (m.Kategori.toLowerCase() === 'bahan') hUtama += strHtml;
-                        else hPdk += strHtml;
+                        if (m.Kategori.toLowerCase() === 'bahan') hUtama += strHtml; else hPdk += strHtml;
                     }
                 }
             });
@@ -693,8 +839,7 @@
         },
         calcOpname: function(sku) {
             let sys = parseInt(document.getElementById(`opn-sys-${sku}`).innerText) || 0;
-            let fisikEl = document.getElementById(`opn-fisik-${sku}`);
-            let fisik = parseInt(fisikEl.value);
+            let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = parseInt(fisikEl.value);
             let selEl = document.getElementById(`opn-selisih-${sku}`);
             if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'py-3 text-right font-black text-slate-300'; return; }
             let selisih = fisik - sys;
@@ -720,19 +865,18 @@
             });
             if(items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada stok yang dihitung!", "error"); }
             
-            try {
-                await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: items }) });
-                this.showToast("Opname Berhasil Disimpan!");
-                const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json();
-                this.refreshData(); this.switchMenu('pos');
-            } catch(e) { this.showToast("Gagal menyimpan opname", "error"); }
+            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.showToast("Opname Tersimpan!");
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
+            }
             this.setLoading(false);
         },
 
         // 4. POS ENGINE
         refreshData: function() {
             const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${this.outlet}`;
-            const lOutManage = document.getElementById('label-outlet-manage'); if(lOutManage) lOutManage.innerText = this.outlet;
             
             this.filteredProducts = [];
             if(this.db && this.db.masterProduk) {
@@ -761,7 +905,7 @@
             const activeView = document.getElementById(`view-${menu}`);
             if(activeView) activeView.classList.remove('hidden');
 
-            const titles = { 'pos': 'Point of Sale', 'opname': 'Opname Fisik Stok', 'report': 'Laporan Terpadu', 'ai': 'Asisten AI & Analitik', 'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan' };
+            const titles = { 'pos': 'Point of Sale', 'opname': 'Opname Fisik Stok', 'report': 'Laporan Terpadu', 'ai': 'Asisten AI & Analitik', 'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga', 'staf': 'Kinerja Karyawan' };
             const pageTitle = document.getElementById('page-title');
             if(pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
             
@@ -826,11 +970,11 @@
             this.syncStorage(); 
         },
 
-        // CHECKOUT & PAYMENT MODAL
+        // CHECKOUT
         openPaymentModal: function() {
             if (this.cart.length === 0) return this.showToast("Pilih produk dahulu!", "error");
             const pt = document.getElementById('pay-total'); if(pt) pt.innerText = `Rp ${this.payTotal.toLocaleString('id-ID')}`;
-            this.setPaymentMethod('Tunai'); // Reset ke tunai
+            this.setPaymentMethod('Tunai'); 
             this.setCash(''); 
             const mp = document.getElementById('modal-payment');
             const mpc = document.getElementById('modal-payment-content');
@@ -838,9 +982,7 @@
         },
         setPaymentMethod: function(method) {
             this.payMethod = method;
-            const btnTunai = document.getElementById('btn-pay-tunai');
-            const btnQris = document.getElementById('btn-pay-qris');
-            const sectTunai = document.getElementById('tunai-section');
+            const btnTunai = document.getElementById('btn-pay-tunai'); const btnQris = document.getElementById('btn-pay-qris'); const sectTunai = document.getElementById('tunai-section');
 
             if(method === 'Tunai') {
                 if(btnTunai) btnTunai.className = 'py-3 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition';
@@ -853,9 +995,7 @@
                 this.setCash('pas'); 
             }
         },
-        addPayNumpad: function(val) {
-            this.setCash(val); // Sesuai instruksi: Menggantikan input, bukan akumulasi
-        },
+        addPayNumpad: function(val) { this.setCash(val); },
         setCash: function(val) {
             let input = document.getElementById('pay-cash-input');
             if(input) {
@@ -877,21 +1017,24 @@
         },
         executeCheckout: async function() {
             this.setLoading(true, "Memproses Transaksi...");
-            const payload = { action: 'checkout', outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam };
-            try {
-                const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-                const data = await res.json();
-                if(data.status === 'sukses') {
-                    this.showToast(`Transaksi Sukses!`);
-                    try {
-                        await this.printReceipt(data.trx_id, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses');
-                    } catch(e) { this.showToast("Transaksi disimpan, Printer gagal/tidak terhubung", "success"); }
-                    
-                    this.syncStorage('paid'); 
+            let trxID = 'TRX' + new Date().getTime();
+            const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam };
+            
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.showToast(`Transaksi Sukses!`);
+                try { await this.printReceipt(res.trx_id, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses'); } catch(e) {}
+                
+                this.syncStorage('paid'); 
+                
+                if(res.is_offline) {
+                    let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+                    this.db.transactions.push({ID_TRX: res.trx_id, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses'});
+                } else {
                     const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json();
-                    this.refreshData();
                 }
-            } catch(e) { this.showToast("Gagal menyimpan transaksi", "error"); }
+                this.refreshData();
+            }
             this.cart = []; this.renderCart(); 
             this.closeModal('modal-payment');
             this.setLoading(false);
@@ -901,8 +1044,11 @@
         toggleReportTab: function(tab) {
             const rt = document.getElementById('report-content-trx'); if(rt) rt.classList.add('hidden'); 
             const rr = document.getElementById('report-content-rekap'); if(rr) rr.classList.add('hidden');
+            const rk = document.getElementById('report-content-kas'); if(rk) rk.classList.add('hidden');
+            
             const tt = document.getElementById('tab-trx'); if(tt) tt.className = 'px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold shadow-sm';
             const tr = document.getElementById('tab-rekap'); if(tr) tr.className = 'px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold shadow-sm';
+            const tk = document.getElementById('tab-kas'); if(tk) tk.className = 'px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold shadow-sm';
             
             const rct = document.getElementById(`report-content-${tab}`); if(rct) rct.classList.remove('hidden'); 
             const tbtn = document.getElementById(`tab-${tab}`); if(tbtn) tbtn.className = 'px-6 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-bold shadow-sm';
@@ -921,16 +1067,13 @@
             const rdl = document.getElementById('report-date-label'); if(rdl) rdl.innerText = new Date().toLocaleString('id-ID');
             const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal} ${dStart ? `| Tgl: ${dStart} s/d ${dEnd}` : ''}`;
 
-            let totalRev = 0, totalTunai = 0, totalQris = 0, countTrx = 0, trxHtml = ''; let productSales = {};
+            let totalRev = 0, totalTunai = 0, totalQris = 0, countTrx = 0, totalKas = 0, trxHtml = ''; let productSales = {};
             [...(this.db.transactions || [])].reverse().forEach((t, i) => {
                 let trxDate = this.parseDateId(t.Tanggal);
-                
                 if((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
                     if (t.Status === 'Sukses') { 
-                        totalRev += t.Total_Bayar || 0; 
-                        countTrx++; // FIX BUG UNDEFINED VARIABLE
-                        if(t.Metode_Bayar === 'QRIS') totalQris += t.Total_Bayar || 0;
-                        else totalTunai += t.Total_Bayar || 0;
+                        totalRev += t.Total_Bayar || 0; countTrx++;
+                        if(t.Metode_Bayar === 'QRIS') totalQris += t.Total_Bayar || 0; else totalTunai += t.Total_Bayar || 0;
                     }
                     
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
@@ -954,20 +1097,28 @@
             const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || '<tr><td colspan="6" class="text-center py-4">Belum ada transaksi di rentang tanggal ini</td></tr>';
 
             let rekapHtml = '';
-            for (const [nama, data] of Object.entries(productSales)) {
-                rekapHtml += `<tr><td class="py-2 px-2 text-brand-600 font-bold">${nama}</td><td class="py-2 px-2 text-center font-black">${data.qty} Pcs</td><td class="py-2 px-2 text-right font-black text-green-600">Rp ${data.rev.toLocaleString('id-ID')}</td></tr>`;
-            }
+            for (const [nama, data] of Object.entries(productSales)) { rekapHtml += `<tr><td class="py-2 px-2 text-brand-600 font-bold">${nama}</td><td class="py-2 px-2 text-center font-black">${data.qty} Pcs</td><td class="py-2 px-2 text-right font-black text-green-600">Rp ${data.rev.toLocaleString('id-ID')}</td></tr>`; }
             const rreb = document.getElementById('report-rekap-tbody'); if(rreb) rreb.innerHTML = rekapHtml || '<tr><td colspan="3" class="text-center py-4">Belum ada penjualan sukses</td></tr>';
             
-            // Log Mutasi
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
                 let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-2">${m.Waktu}</td><td class="py-2 px-2 text-brand-600">${m.SKU}</td><td class="py-2 px-2">${m.Outlet_Tujuan}</td><td class="py-2 px-2 text-right font-black">${m.Qty} Pcs</td></tr>`;
+                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-2">${m.Waktu}</td><td class="py-2 px-2 text-brand-600">${m.SKU}</td><td class="py-2 px-2">${m.Outlet_Tujuan}</td><td class="py-2 px-2 text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-2 text-xs italic">${m.Keterangan}</td></tr>`;
                 }
             });
-            const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || '<tr><td colspan="4" class="text-center py-4">Belum ada data distribusi di rentang tanggal ini</td></tr>';
+            const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || '<tr><td colspan="5" class="text-center py-4">Belum ada data distribusi di rentang tanggal ini</td></tr>';
+
+            let kasHtml = '';
+            [...(this.db.kasKeluar || [])].reverse().forEach((k, i) => {
+                let kDate = this.parseDateId(k.Tanggal);
+                if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
+                    totalKas += Number(k.Nominal);
+                    if(i < 100) kasHtml += `<tr><td class="py-2 px-2">${k.Tanggal} ${k.Waktu}</td><td class="py-2 px-2">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-2">${k.Keterangan}</td><td class="py-2 px-2 text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
+                }
+            });
+            const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
+            const kBody = document.getElementById('report-kas-tbody'); if(kBody) kBody.innerHTML = kasHtml || '<tr><td colspan="4" class="text-center py-4">Belum ada data kas keluar</td></tr>';
         },
         exportPDF: function() {
             this.showToast("Mempersiapkan PDF Laporan...");
@@ -976,6 +1127,7 @@
             
             const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
             const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
+            const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
             
             const opt = { margin: 0.3, filename: `Laporan_ERP_${new Date().getTime()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
             html2pdf().set(opt).from(element).save().then(()=> { 
@@ -1018,16 +1170,18 @@
         },
         executeVoidTrx: async function(trxId) {
             this.setLoading(true, "Membatalkan Transaksi & Mengembalikan Stok...");
-            try {
-                await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'batal_trx', trx_id: trxId, tim_operasional: this.activeStaffTeam }) });
+            const payload = { action: 'batal_trx', trx_id: trxId, tim_operasional: this.activeStaffTeam };
+            let res = await this.apiPost(payload);
+            
+            if(res.status === 'sukses') {
                 this.showToast("Transaksi Dibatalkan!"); 
-                
                 let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, t.Tunai, t.Kembalian, items, 'Batal'); } catch(e){}
 
-                const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json();
+                if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json(); }
                 this.refreshData(); this.closeModal('modal-detail');
-            } catch(e) { this.showToast("Gagal membatalkan transaksi", "error"); this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
 
         // 6. AI ASSISTANT (CONSUMABLES PREDICTION)
@@ -1166,8 +1320,14 @@
         executeEditHarga: async function(sku) {
             let editHrg = document.getElementById('frm-edit-hrg'); if(!editHrg) return;
             let hrg = editHrg.value; this.setLoading(true, "Update Harga...");
-            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'edit_harga_outlet', sku: sku, outlet: this.outlet, harga: hrg }) });
-            this.closeModal('modal-form'); const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+            const payload = { action: 'edit_harga_outlet', sku: sku, outlet: this.outlet, harga: hrg };
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.closeModal('modal-form'); 
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+                this.refreshData(); 
+            }
+            this.setLoading(false);
         },
         openRestokModal: function() {
             let opt = ''; (this.db.masterProduk || []).forEach(p => { if(p.Kategori.toLowerCase()==='bahan' || p.Kategori.toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
@@ -1178,8 +1338,15 @@
             const elSku = document.getElementById('frm-rstk-sku'); const elQty = document.getElementById('frm-rstk-qty');
             if(!elSku || !elQty) return; let sku = elSku.value; let qty = elQty.value; let n = elSku.options[elSku.selectedIndex].text;
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Menyimpan Restok...");
-            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'restok_gudang', sku: sku, nama: n, qty: qty }) });
-            this.closeModal('modal-form'); const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+            
+            const payload = { action: 'restok_gudang', sku: sku, nama: n, qty: qty };
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.closeModal('modal-form'); 
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+                this.refreshData(); 
+            }
+            this.setLoading(false);
         },
         openDistribusiModal: function() {
             let opt = ''; 
@@ -1197,8 +1364,15 @@
             if(!elSku || !elQty || !elOut) return;
             let sku = elSku.value; let qty = elQty.value; let targetOutlet = elOut.value;
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Distribusi Stok...");
-            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'distribusi', sku: sku, outlet: targetOutlet, qty: qty }) });
-            this.closeModal('modal-form'); const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+            
+            const payload = { action: 'distribusi', sku: sku, outlet: targetOutlet, qty: qty };
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.closeModal('modal-form'); 
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+                this.refreshData(); 
+            }
+            this.setLoading(false);
         },
 
         // CRUD UNIVERSAL HELPERS
@@ -1211,23 +1385,29 @@
             let row = [], idVal = '';
             if(sheet === 'Master_Produk') { 
                 const fSku = document.getElementById('frm-mst-sku'); const fNama = document.getElementById('frm-mst-nama'); const fKat = document.getElementById('frm-mst-kat'); const fBahan = document.getElementById('frm-mst-bahan'); const fImg = document.getElementById('frm-mst-img');
-                if(!fSku || !fNama) return;
-                idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
+                if(!fSku || !fNama) return; idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
             } 
             else if(sheet === 'Daftar_Outlet') { 
                 const fId = document.getElementById('frm-out-id'); const fNama = document.getElementById('frm-out-nama'); const fAlamat = document.getElementById('frm-out-alamat');
-                if(!fId || !fNama) return;
-                idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
+                if(!fId || !fNama) return; idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
             }
             
             if(!idVal) return this.showToast("Gagal menyimpan form", "error"); this.setLoading(true, "Menyimpan...");
-            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'save', sheetName: sheet, id: oldId || idVal, rowData: row }) });
-            this.closeModal('modal-form'); const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+            const payload = { action: 'save', sheetName: sheet, id: oldId || idVal, rowData: row };
+            let res = await this.apiPost(payload);
+            if(res.status === 'sukses') {
+                this.closeModal('modal-form'); 
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+                this.refreshData(); 
+            }
+            this.setLoading(false);
         },
         deleteCrud: async function(sheet, id) {
             if(!confirm(`Yakin hapus data ini?`)) return; this.setLoading(true, "Menghapus...");
-            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'delete', sheetName: sheet, id: id }) });
-            const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+            const payload = { action: 'delete', sheetName: sheet, id: id };
+            let res = await this.apiPost(payload);
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+            this.setLoading(false);
         },
 
         // 8. STAF
