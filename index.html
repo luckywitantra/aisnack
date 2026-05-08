@@ -30,10 +30,51 @@
     .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
     .numpad-btn:active { transform: scale(0.95); }
     .item-empty { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+    
+    /* CFD Animations */
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
+    .animate-pulse-slow { animation: pulse-slow 3s infinite; }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
   </style>
   <script>tailwind.config = { darkMode: 'class', theme: { extend: { colors: { brand: { 500: '#f97316', 600: '#ea580c' } } } } }</script>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden relative transition-colors duration-300">
+
+  <div id="cfd-screen" class="fixed inset-0 bg-slate-900 z-[9999] hidden flex overflow-hidden">
+    <div class="w-2/3 bg-cover bg-center relative" style="background-image: url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1920');">
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-900/90 to-transparent flex flex-col justify-center p-16">
+            <div class="w-24 h-24 bg-brand-500 rounded-3xl flex items-center justify-center text-white font-black text-5xl shadow-2xl mb-8">Ai</div>
+            <h1 class="text-7xl font-black text-white mb-4 tracking-tight drop-shadow-lg">Ai-Snack</h1>
+            <p class="text-3xl text-brand-400 font-bold" id="cfd-outlet-name">Loading...</p>
+        </div>
+    </div>
+    
+    <div class="w-1/3 bg-white flex flex-col shadow-2xl relative z-10">
+        <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md">
+            <h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50" id="cfd-cart-list">
+            </div>
+        <div class="p-8 bg-white border-t-4 border-brand-500 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+            <p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p>
+            <p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p>
+        </div>
+    </div>
+    
+    <div id="cfd-standby" class="absolute inset-0 bg-brand-500 flex flex-col items-center justify-center z-50 transition-opacity duration-500">
+         <div class="w-48 h-48 bg-white rounded-full flex items-center justify-center text-brand-500 font-black text-7xl shadow-2xl mb-10 animate-pulse-slow">Ai</div>
+         <h1 class="text-7xl font-black text-white mb-6 text-center drop-shadow-lg">Ai-Snack</h1>
+         <p class="text-4xl text-brand-100 font-bold text-center">Silakan Lakukan Pemesanan di Kasir</p>
+    </div>
+
+    <div id="cfd-success" class="absolute inset-0 bg-green-500 flex flex-col items-center justify-center z-[60] hidden">
+         <div class="w-40 h-40 bg-white rounded-full flex items-center justify-center text-green-500 font-black text-6xl shadow-2xl mb-8 slide-up"><i class="fas fa-check"></i></div>
+         <h1 class="text-6xl font-black text-white mb-4 text-center drop-shadow-lg slide-up">Pembayaran Berhasil!</h1>
+         <p class="text-4xl text-green-100 font-bold text-center slide-up">Kembalian Anda: <span id="cfd-kembali" class="text-white font-black"></span></p>
+    </div>
+  </div>
+
 
   <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl flex flex-col items-center border border-slate-800">
@@ -120,7 +161,7 @@
     </div>
     <div class="px-6 mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
         <button onclick="superApp.promptTutupShift()" id="btn-tutup-shift" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift Hari Ini</button>
-        <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm"><i class="fas fa-power-off mr-2"></i>Keluar</button>
+        <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm"><i class="fas fa-power-off mr-2"></i>Keluar / Logout</button>
     </div>
   </aside>
 
@@ -134,6 +175,7 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
+        <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition"><i class="fas fa-display"></i> Layar Pelanggan</button>
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition"><i class="fas fa-moon" id="dark-icon"></i></button>
         <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
         <select id="select-outlet" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm outline-none shadow-sm focus:border-brand-500 hidden md:block text-slate-800" onchange="superApp.changeOutlet(this.value)"></select>
@@ -167,7 +209,7 @@
       <div id="view-opname" class="app-view hidden">
         <div class="bg-white p-6 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4">
-                <div><h3 class="font-extrabold text-xl">Opname Stok Harian</h3><p class="text-xs text-slate-500 font-bold mt-1">Hitung & catat kondisi fisik barang (Packaging, Saus, Bahan) di <span class="text-brand-500" id="lbl-opname-outlet"></span></p></div>
+                <div><h3 class="font-extrabold text-xl">Opname Fisik Stok</h3><p class="text-xs text-slate-500 font-bold mt-1">Sesuaikan fisik bahan baku di Cabang <span class="text-brand-500" id="lbl-opname-outlet"></span></p></div>
                 <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition"><i class="fas fa-save mr-2"></i>Simpan Opname</button>
             </div>
             
@@ -193,7 +235,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
                 <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-6 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-bold shadow-sm">Histori Transaksi</button>
-                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan Harian</button>
+                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan</button>
             </div>
             <div class="flex gap-2 flex-wrap items-center">
                 <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
@@ -220,13 +262,13 @@
             </div>
 
             <div id="report-content-rekap" class="hidden">
-                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">B. Rekapitulasi Penjualan per Produk</h3>
+                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">B. Rekapitulasi Produk Terjual</h3>
                 <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-8 text-slate-800">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Nama Menu / Varian</th><th class="pb-2 text-center">Total Terjual (Pcs)</th><th class="pb-2 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
-                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">C. Log Mutasi & Restok</h3>
+                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">C. Log Mutasi (Stok Masuk Gudang -> Cabang)</h3>
                 <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 text-slate-800">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">Nama Item (SKU)</th><th class="pb-2">Tujuan</th><th class="pb-2 text-right">Qty</th><th class="pb-2 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">SKU Bahan</th><th class="pb-2">Tujuan</th><th class="pb-2 text-right">Qty Kirim</th><th class="pb-2">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
         </div>
@@ -255,7 +297,7 @@
                     <div><h3 class="font-extrabold text-lg">Gudang Pusat</h3><p class="text-xs text-slate-500">Master Data Produk & Stok Induk</p></div>
                     <div class="flex gap-2">
                         <button onclick="superApp.openCrudBahan()" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800 shadow"><i class="fas fa-plus mr-1"></i>Bahan Baru</button>
-                        <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200 shadow"><i class="fas fa-boxes-packing mr-1"></i>Restok</button>
+                        <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200 shadow"><i class="fas fa-boxes-packing mr-1"></i>Restok Masuk</button>
                     </div>
                 </div>
                 <div class="overflow-y-auto max-h-[500px] no-scrollbar">
@@ -321,10 +363,10 @@
       
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
-              <button onclick="superApp.setCash(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
-              <button onclick="superApp.setCash(20000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
-              <button onclick="superApp.setCash(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
-              <button onclick="superApp.setCash(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
+              <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
+              <button onclick="superApp.addPayNumpad(20000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
+              <button onclick="superApp.addPayNumpad(50000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
+              <button onclick="superApp.addPayNumpad(100000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
               <button onclick="superApp.setCash('pas')" class="col-span-4 py-2 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition">UANG PAS</button>
           </div>
           <div class="flex items-center gap-2 mb-5">
@@ -353,7 +395,7 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800" id="modal-form-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
       <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
-      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan Perubahan</button>
+      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan</button>
     </div>
   </div>
 
@@ -368,7 +410,6 @@
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
 
-        // 1. UTILITAS DASAR
         showToast: function(msg, type = 'success') {
             const container = document.getElementById('toast-container');
             if(!container) return;
@@ -376,6 +417,9 @@
             const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3 toast-animate z-[999] dark:bg-slate-800 dark:border-slate-700`;
             t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
             container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+            
+            // Sync status ke CFD
+            this.syncStorage();
         },
         toggleSidebar: function() { 
             const sb = document.getElementById('sidebar'); const ov = document.getElementById('mobile-overlay');
@@ -404,8 +448,81 @@
             return new Date(dateStr); 
         },
 
-        // 2. INIT & LOGIN
+        // ============================
+        // CFD (CUSTOMER FACING DISPLAY)
+        // ============================
+        openCFD: function() {
+            window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', 'width=1024,height=768');
+        },
+        syncStorage: function(status = 'ordering') {
+            if(new URLSearchParams(window.location.search).get('mode') === 'cfd') return; // Don't sync if acting as CFD
+            localStorage.setItem('ai_snack_cfd', JSON.stringify({
+                outlet: this.outlet || 'Ai-Snack',
+                items: this.cart,
+                total: this.payTotal,
+                kembali: this.payChange,
+                status: status,
+                timestamp: new Date().getTime()
+            }));
+        },
+        initCFD: function() {
+            // Hide everything else
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('sidebar').classList.add('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+            
+            // Show CFD Screen
+            const cfdScreen = document.getElementById('cfd-screen');
+            if(cfdScreen) cfdScreen.classList.remove('hidden');
+
+            window.addEventListener('storage', (e) => {
+                if(e.key === 'ai_snack_cfd') {
+                    let data = JSON.parse(e.newValue);
+                    if(data) this.renderCFD(data);
+                }
+            });
+            // Initial render
+            let initialData = localStorage.getItem('ai_snack_cfd');
+            if(initialData) this.renderCFD(JSON.parse(initialData));
+        },
+        renderCFD: function(data) {
+            document.getElementById('cfd-outlet-name').innerText = `Cabang ${data.outlet}`;
+            const cfdStandby = document.getElementById('cfd-standby');
+            const cfdSuccess = document.getElementById('cfd-success');
+            
+            if(data.status === 'paid') {
+                cfdSuccess.classList.remove('hidden');
+                document.getElementById('cfd-kembali').innerText = `Rp ${data.kembali.toLocaleString('id-ID')}`;
+                setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 5000);
+            } else {
+                cfdSuccess.classList.add('hidden');
+            }
+
+            if(data.items.length === 0 && data.status !== 'paid') {
+                cfdStandby.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                cfdStandby.classList.add('opacity-0', 'pointer-events-none');
+                let html = '';
+                data.items.forEach(i => {
+                    html += `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div>
+                        <p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
+                    </div>`;
+                });
+                document.getElementById('cfd-cart-list').innerHTML = html;
+                document.getElementById('cfd-total').innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
+            }
+        },
+
+        // INIT & LOGIN
         init: async function() {
+            // Check if CFD Mode
+            if(new URLSearchParams(window.location.search).get('mode') === 'cfd') {
+                this.initCFD();
+                return;
+            }
+
             try {
                 const res = await fetch(API_URL, { redirect: 'follow' });
                 const data = await res.json();
@@ -418,7 +535,6 @@
 
                 this.db = data;
                 
-                // Set Auto Date Filter (Hari Ini)
                 let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
                 let todayStr = `${yyyy}-${mm}-${dd}`;
                 const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
@@ -486,7 +602,7 @@
             } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
         },
 
-        // 3. SHIFT VALIDATION
+        // SHIFT
         checkShiftStatus: function() {
             const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = this.outlet;
             let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
@@ -566,7 +682,7 @@
             } catch(e) { this.showToast("Gagal tutup shift", "error"); this.setLoading(false); }
         },
 
-        // OPNAME STOK
+        // OPNAME
         renderOpname: function() {
             document.getElementById('lbl-opname-outlet').innerText = this.outlet;
             const tbUtama = document.getElementById('opname-tbody-utama');
@@ -633,10 +749,9 @@
             this.setLoading(false);
         },
 
-        // 4. POS ENGINE
+        // POS ENGINE
         refreshData: function() {
             const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${this.outlet}`;
-            const lOutManage = document.getElementById('label-outlet-manage'); if(lOutManage) lOutManage.innerText = this.outlet;
             
             this.filteredProducts = [];
             if(this.db && this.db.masterProduk) {
@@ -715,6 +830,8 @@
             const totalEl = document.getElementById('total-price'); if(totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`; 
             const badge = document.getElementById('cart-badge'); if(badge) badge.innerText = `${items} Item`; 
             this.payTotal = total;
+            
+            this.syncStorage(); // Sync to CFD
         },
 
         // CHECKOUT & PAYMENT MODAL
@@ -734,18 +851,18 @@
             const sectTunai = document.getElementById('tunai-section');
 
             if(method === 'Tunai') {
-                btnTunai.className = 'py-3 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition';
-                btnQris.className = 'py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500';
-                sectTunai.classList.remove('hidden');
+                if(btnTunai) btnTunai.className = 'py-3 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition';
+                if(btnQris) btnQris.className = 'py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500';
+                if(sectTunai) sectTunai.classList.remove('hidden');
             } else {
-                btnQris.className = 'py-3 border-2 border-blue-500 bg-blue-50 text-blue-600 rounded-xl font-bold transition';
-                btnTunai.className = 'py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-brand-500 hover:text-brand-500';
-                sectTunai.classList.add('hidden');
+                if(btnQris) btnQris.className = 'py-3 border-2 border-blue-500 bg-blue-50 text-blue-600 rounded-xl font-bold transition';
+                if(btnTunai) btnTunai.className = 'py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-brand-500 hover:text-brand-500';
+                if(sectTunai) sectTunai.classList.add('hidden');
                 this.setCash('pas'); // QRIS otomatis pas
             }
         },
         addPayNumpad: function(val) {
-            this.setCash(val); // Sesuai instruksi: Menggantikan input, bukan akumulasi
+            this.setCash(val); // Replace
         },
         setCash: function(val) {
             let input = document.getElementById('pay-cash-input');
@@ -778,15 +895,18 @@
                         await this.printReceipt(data.trx_id, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses');
                     } catch(e) { this.showToast("Transaksi disimpan, Printer gagal/tidak terhubung", "success"); }
                     
+                    this.syncStorage('paid'); // Tell CFD it's paid
+                    
                     const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json();
                     this.refreshData();
                 }
             } catch(e) { this.showToast("Gagal menyimpan transaksi", "error"); }
+            this.cart = []; this.renderCart(); 
             this.closeModal('modal-payment');
             this.setLoading(false);
         },
 
-        // 5. REPORT
+        // REPORT
         toggleReportTab: function(tab) {
             const rt = document.getElementById('report-content-trx'); if(rt) rt.classList.add('hidden'); 
             const rr = document.getElementById('report-content-rekap'); if(rr) rr.classList.add('hidden');
@@ -836,7 +956,7 @@
                     }
                 }
             });
-            const rtt = document.getElementById('rep-total-trx'); if(rtt) rtt.innerText = (this.db.transactions||[]).length; 
+            const rtt = document.getElementById('rep-total-trx'); if(rtt) rtt.innerText = countTrx; 
             const rtrT = document.getElementById('rep-total-tunai'); if(rtrT) rtrT.innerText = `Rp ${totalTunai.toLocaleString('id-ID')}`;
             const rtrQ = document.getElementById('rep-total-qris'); if(rtrQ) rtrQ.innerText = `Rp ${totalQris.toLocaleString('id-ID')}`;
             const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || '<tr><td colspan="6" class="text-center py-4">Belum ada transaksi di rentang tanggal ini</td></tr>';
@@ -847,6 +967,7 @@
             }
             const rreb = document.getElementById('report-rekap-tbody'); if(rreb) rreb.innerHTML = rekapHtml || '<tr><td colspan="3" class="text-center py-4">Belum ada penjualan sukses</td></tr>';
             
+            // Log Mutasi
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
                 let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
@@ -917,13 +1038,12 @@
             } catch(e) { this.showToast("Gagal membatalkan transaksi", "error"); this.setLoading(false); }
         },
 
-        // 6. AI ASSISTANT (CONSUMABLES PREDICTION)
+        // AI ASSISTANT
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards');
             const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
 
-            // Hitung umur data
             let oldestDate = new Date();
             (this.db.transactions || []).forEach(t => { let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
             let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
@@ -931,25 +1051,21 @@
 
             let warnings = [];
 
-            // A. Evaluasi Barang Pendukung & Bahan (Berdasarkan Log Opname / Mutasi)
             (this.db.masterProduk || []).forEach(mp => {
                 if(mp.Kategori.toLowerCase() === 'pendukung' || mp.Kategori.toLowerCase() === 'bahan') {
-                    // Cari total mutasi masuk ke outlet terpilih
                     let totalMasuk = 0;
                     (this.db.mutasi || []).forEach(m => { if(m.SKU === mp.SKU && m.Outlet_Tujuan === this.outlet) totalMasuk += m.Qty; });
                     
-                    // Cari stok sisa saat ini
                     let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === this.outlet);
                     let sisa = sData ? sData.Stok_Toko : 0;
 
-                    // Estimasi Pemakaian Kasar = Total Masuk - Sisa
                     let pemakaian = totalMasuk - sisa;
-                    if(pemakaian < 0) pemakaian = 0; // Jika ada injeksi stok manual
+                    if(pemakaian < 0) pemakaian = 0; 
 
                     let velocity = pemakaian / daysActive;
                     let daysRem = velocity > 0 ? (sisa / velocity) : 999;
 
-                    if(daysRem < 4 && sisa > 0) { // Sisa sedikit, hampir habis
+                    if(daysRem < 4 && sisa > 0) { 
                         warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity.toFixed(1), stock: sisa, days: Math.floor(daysRem) });
                     } else if (sisa <= 0) {
                         warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity.toFixed(1), stock: 0, days: 0 });
@@ -957,7 +1073,6 @@
                 }
             });
 
-            // B. Evaluasi Produk Laris
             let productSales = {};
             (this.db.transactions || []).forEach(t => {
                 if(t.Status === 'Sukses' && t.Outlet === this.outlet) {
@@ -987,7 +1102,7 @@
             }
         },
 
-        // 7. GUDANG & MASTER (CRUD)
+        // GUDANG (AUTO SKU)
         renderGudang: function() {
             const gBody = document.getElementById('gudang-tbody'); const mOutBody = document.getElementById('outlet-manage-tbody');
             if(gBody) {
@@ -1097,18 +1212,20 @@
         // CRUD UNIVERSAL HELPERS
         openCrudOutlet: function(action, id='') {
             let o = action==='edit' ? (this.db.outlets || []).find(x=>x.ID_Outlet===id) : {};
-            let inputs = this.makeInput('ID Outlet Unik', 'out-id', o.ID_Outlet||'', 'text', '', action==='edit') + this.makeInput('Nama Outlet', 'out-nama', o.Nama_Outlet||'') + this.makeInput('Alamat', 'out-alamat', o.Alamat||'');
+            let inputs = this.makeInput('ID Outlet Unik', 'out-id', o.ID_Outlet||'', 'text', '', action==='edit') + this.makeInput('Nama Outlet', 'out-nama', o.Nama_Outlet||'') + this.makeInput('Alamat / Detail', 'out-alamat', o.Alamat||'');
             this.buildForm(action==='edit'?"Edit Outlet":"Tambah Outlet Baru", inputs, `superApp.executeCrud('Daftar_Outlet', '${action==='edit'?o.ID_Outlet:''}')`);
         },
         executeCrud: async function(sheet, oldId) {
             let row = [], idVal = '';
             if(sheet === 'Master_Produk') { 
                 const fSku = document.getElementById('frm-mst-sku'); const fNama = document.getElementById('frm-mst-nama'); const fKat = document.getElementById('frm-mst-kat'); const fBahan = document.getElementById('frm-mst-bahan'); const fImg = document.getElementById('frm-mst-img');
-                if(!fSku || !fNama) return; idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
+                if(!fSku || !fNama) return;
+                idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
             } 
             else if(sheet === 'Daftar_Outlet') { 
                 const fId = document.getElementById('frm-out-id'); const fNama = document.getElementById('frm-out-nama'); const fAlamat = document.getElementById('frm-out-alamat');
-                if(!fId || !fNama) return; idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
+                if(!fId || !fNama) return;
+                idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
             }
             
             if(!idVal) return this.showToast("Gagal menyimpan form", "error"); this.setLoading(true, "Menyimpan...");
@@ -1121,7 +1238,7 @@
             const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); this.setLoading(false);
         },
 
-        // 8. STAF
+        // STAF
         renderStaf: function() {
             const body = document.getElementById('staf-tbody'); if(!body) return;
             body.innerHTML = (this.db.users || []).map(u => {
@@ -1148,7 +1265,7 @@
             } catch (err) { btn.innerText = 'Printer'; }
         },
         printReceipt: async function(id, outlet, total, tunai, kembali, items, status) {
-            if (!this.printerChar) return; // Silent fail-safe
+            if (!this.printerChar) return; 
             try {
                 let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
                 let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
