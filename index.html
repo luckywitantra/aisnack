@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ai-Snack ERP & POS Ultimate</title>
+  <title>Ai-Snack ERP & POS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -20,13 +20,12 @@
     .blur-lock { filter: blur(8px); pointer-events: none; user-select: none; }
     .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
     
-    /* Dark Mode & UI Tools */
     .dark body { background-color: #0f172a; color: #f8fafc; }
     .dark .bg-white { background-color: #1e293b; border-color: #334155; }
     .dark .bg-slate-50 { background-color: #0f172a; }
     .dark .text-slate-800 { color: #f8fafc; }
     .dark .text-slate-500 { color: #94a3b8; }
-    .dark .border-slate-100 { border-color: #334155; }
+    .dark .border-slate-100, .dark .border-slate-200 { border-color: #334155; }
     .numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
     .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
     .numpad-btn:active { transform: scale(0.95); }
@@ -64,16 +63,15 @@
   <div id="modal-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-shift-content">
       <div class="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-clock"></i></div>
-      <h3 class="font-extrabold text-xl mb-2">Mulai Shift Baru</h3>
+      <h3 class="font-extrabold text-xl mb-2 text-slate-800">Mulai Shift Baru</h3>
       <p class="text-slate-500 font-medium text-sm mb-2">Kasir: <span id="shift-user-name" class="font-bold text-brand-500"></span></p>
       <p class="text-slate-500 font-medium text-sm mb-6">Cabang: <span id="shift-outlet-name" class="font-bold text-brand-500"></span></p>
       
       <div class="text-left mb-6">
-        <label class="text-xs font-bold text-slate-500 block mb-2">Tim Bantuan (Opsional)</label>
+        <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Tim Bantuan (Opsional)</label>
         <div id="shift-staff-list" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar border-y border-slate-100 py-2 mb-4"></div>
-        
         <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label>
-        <input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-slate-50" placeholder="Ketik nominal uang fisik laci">
+        <input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Ketik nominal uang fisik">
       </div>
       <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Validasi & Buka Kasir</button>
     </div>
@@ -81,11 +79,11 @@
 
   <div id="modal-tutup-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-tutup-shift-content">
-      <h3 class="font-extrabold text-xl mb-2">Tutup Laci & Rekap Shift</h3>
+      <h3 class="font-extrabold text-xl mb-2 text-slate-800">Tutup Laci & Rekap Shift</h3>
       <p class="text-slate-500 text-sm mb-6">Hitung uang fisik di laci kasir sekarang.</p>
       <div class="text-left mb-6">
         <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Rp)</label>
-        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-slate-50" placeholder="Ketik uang riil yang ada">
+        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Uang riil yang ada">
       </div>
       <div class="flex gap-2">
         <button onclick="superApp.closeModal('modal-tutup-shift')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200">Batal</button>
@@ -101,7 +99,7 @@
       <div class="flex items-center justify-between px-8 mb-8">
         <div class="flex items-center gap-4">
           <div class="w-10 h-10 bg-gradient-to-br from-brand-500 to-orange-400 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md">Ai</div>
-          <div><span class="font-extrabold text-lg tracking-tight block">Ai-Snack</span><span class="text-[9px] font-bold text-brand-500 uppercase tracking-widest" id="sb-role">Kasir</span></div>
+          <div><span class="font-extrabold text-lg tracking-tight block text-slate-800">Ai-Snack</span><span class="text-[9px] font-bold text-brand-500 uppercase tracking-widest" id="sb-role">Kasir</span></div>
         </div>
         <button class="lg:hidden text-slate-400 text-2xl" onclick="superApp.toggleSidebar()"><i class="fas fa-times"></i></button>
       </div>
@@ -113,14 +111,15 @@
         
         <div id="admin-menus" class="hidden">
             <p class="px-4 text-xs font-bold text-slate-400 uppercase mt-6 mb-2">Akses Admin (Owner)</p>
-            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-truck-loading w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Gudang & Distribusi</span></button>
+            <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Asisten AI & Analitik</span></button>
+            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-boxes-packing w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Gudang & Master Menu</span></button>
             <button onclick="superApp.switchMenu('outlet')" id="nav-outlet" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-store w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Cabang & Harga</span></button>
-            <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Kinerja & Validasi</span></button>
+            <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Kinerja Karyawan</span></button>
         </div>
       </nav>
     </div>
     <div class="px-6 mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
-        <button onclick="superApp.promptTutupShift()" id="btn-tutup-shift" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-clock mr-2"></i>Tutup Shift Hari Ini</button>
+        <button onclick="superApp.promptTutupShift()" id="btn-tutup-shift" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
         <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm"><i class="fas fa-power-off mr-2"></i>Keluar (Logout)</button>
     </div>
   </aside>
@@ -138,7 +137,7 @@
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition"><i class="fas fa-moon" id="dark-icon"></i></button>
         <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
         <select id="select-outlet" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm outline-none shadow-sm focus:border-brand-500 hidden md:block" onchange="superApp.changeOutlet(this.value)"></select>
-        <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-500 shadow-inner" id="header-initial">A</div>
+        <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shadow-inner" id="header-initial">A</div>
       </div>
     </header>
 
@@ -148,13 +147,15 @@
         <div class="flex-1 flex flex-col h-full">
           <div class="mb-4 relative">
              <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
-             <input type="text" placeholder="Pencarian Cepat Menu POS..." class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 font-bold text-sm shadow-sm outline-none focus:border-brand-500 text-slate-800" onkeyup="superApp.filterProducts(this.value)">
+             <input type="text" placeholder="Cari Produk & Varian..." class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 font-bold text-sm shadow-sm outline-none focus:border-brand-500 text-slate-800" onkeyup="superApp.filterProducts(this.value)">
           </div>
           <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-24 no-scrollbar" id="product-list"></div>
         </div>
         
         <aside class="w-full lg:w-[400px] bg-white border border-slate-200 rounded-[2rem] flex flex-col shadow-sm overflow-hidden h-[60vh] lg:h-auto mt-4 lg:mt-0">
-          <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50"><h2 class="font-extrabold text-lg text-slate-800">Keranjang</h2><span class="bg-brand-100 text-brand-600 px-3 py-1 rounded-full text-xs font-bold" id="cart-badge">0 Item</span></div>
+          <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h2 class="font-extrabold text-lg text-slate-800">Keranjang</h2><span class="bg-brand-100 text-brand-600 px-3 py-1 rounded-full text-xs font-bold" id="cart-badge">0 Item</span>
+          </div>
           <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar" id="cart-container"></div>
           <div class="p-5 bg-white border-t border-slate-100">
             <div class="flex justify-between items-center mb-4"><span class="text-slate-400 font-semibold">Total Tagihan</span><span class="text-2xl font-black text-brand-600" id="total-price">Rp 0</span></div>
@@ -167,10 +168,13 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
                 <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-6 py-2 bg-slate-100 text-slate-800 rounded-lg text-sm font-bold shadow-sm">Histori Transaksi</button>
-                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan Harian</button>
+                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-6 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold">Rekap Jualan</button>
             </div>
-            <div class="flex gap-2">
-                <select id="report-outlet-filter" class="bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm hidden" onchange="superApp.renderReport()"></select>
+            <div class="flex gap-2 flex-wrap items-center">
+                <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
+                <span class="text-slate-400 font-bold">-</span>
+                <input type="date" id="filter-end" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
+                <select id="report-outlet-filter" class="bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm outline-none shadow-sm hidden text-slate-800" onchange="superApp.renderReport()"></select>
                 <button onclick="superApp.exportPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800"><i class="fas fa-file-pdf mr-2 text-red-400"></i>Export PDF</button>
             </div>
         </div>
@@ -184,47 +188,62 @@
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Omset Bersih</p><h4 class="text-xl font-black text-green-600" id="rep-total-rev">Rp 0</h4></div>
                 </div>
                 <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">A. Histori Transaksi (Detail & Void)</h3>
-                <div class="overflow-x-auto mb-8 bg-slate-50 rounded-2xl p-4 border border-slate-100 text-slate-800">
-                    <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">Kasir</th><th class="pb-2">Status</th><th class="pb-2 text-right">Total Bayar</th><th class="pb-2 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <div class="overflow-x-auto mb-8 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">Kasir</th><th class="pb-2">Status</th><th class="pb-2 text-right">Total Bayar</th><th class="pb-2 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
 
             <div id="report-content-rekap" class="hidden">
-                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">B. Rekapitulasi Produk Terjual</h3>
-                <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-8 text-slate-800">
-                    <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Nama Menu / Varian</th><th class="pb-2 text-center">Terjual (Pcs)</th><th class="pb-2 text-right">Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">B. Rekapitulasi Penjualan per Produk</h3>
+                <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-8">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Nama Menu / Varian</th><th class="pb-2 text-center">Total Terjual (Pcs)</th><th class="pb-2 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
-                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">C. Log Mutasi (Masuk Gudang)</h3>
-                <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 text-slate-800">
-                    <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">SKU Bahan</th><th class="pb-2 text-right">Qty Masuk</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <h3 class="font-extrabold text-lg mb-4 text-brand-600 border-l-4 border-brand-500 pl-3">C. Log Mutasi (Stok Masuk Gudang -> Cabang)</h3>
+                <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Waktu</th><th class="pb-2">SKU Bahan</th><th class="pb-2 text-right">Qty Masuk</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
+            </div>
+        </div>
+      </div>
+
+      <div id="view-ai" class="app-view hidden">
+        <div class="bg-white p-6 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
+            <div class="flex items-center gap-4 mb-6 border-b border-slate-200 pb-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg"><i class="fas fa-robot"></i></div>
+                <div><h3 class="font-extrabold text-2xl">Asisten AI Owner</h3><p class="text-sm font-bold text-slate-500">Menganalisa kecepatan penjualan dan memprediksi sisa umur stok.</p></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" id="ai-insight-cards">
+                </div>
+
+            <h3 class="font-extrabold text-lg mb-4">Rekomendasi Cerdas Distribusi Cabang</h3>
+            <div class="overflow-x-auto bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200"><tr><th class="pb-2">Cabang</th><th class="pb-2">Item Kritis</th><th class="pb-2">Kecepatan (Pcs/Hari)</th><th class="pb-2">Prediksi Habis</th><th class="pb-2 text-center">Aksi (Cepat)</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
 
       <div id="view-gudang" class="app-view hidden">
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b border-slate-200 pb-4 gap-4">
-                <div><h3 class="font-extrabold text-lg">Stok Bahan Baku / Gudang Utama</h3><p class="text-xs text-slate-500 font-bold">Stok yang belum siap jual, dikelola pusat.</p></div>
-                <div class="flex gap-2">
-                    <button onclick="superApp.openCrudGudang('add')" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i>Bahan Baru</button>
-                    <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-200"><i class="fas fa-boxes-packing mr-1"></i>Beli dari Supplier</button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
+                <div class="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+                    <div><h3 class="font-extrabold text-lg">Stok Gudang Pusat</h3><p class="text-xs text-slate-500">Bahan baku yang dikelola pusat.</p></div>
+                    <div class="flex gap-2">
+                        <button onclick="superApp.openCrudBahan()" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i>Bahan Baru</button>
+                        <button onclick="superApp.openRestokModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200"><i class="fas fa-boxes-packing mr-1"></i>Restok</button>
+                    </div>
                 </div>
+                <table class="w-full text-left text-sm"><thead class="text-slate-400"><tr><th class="pb-2">Nama Bahan / Item</th><th class="pb-2 text-right">Sisa Gudang</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="gudang-tbody" class="divide-y divide-slate-50"></tbody></table>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Nama Bahan / Item Gudang</th><th class="pb-2">SKU (Auto)</th><th class="pb-2 text-right">Stok Induk Tersedia</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="gudang-tbody" class="divide-y divide-slate-100"></tbody></table>
-            </div>
-        </div>
-      </div>
-
-      <div id="view-master" class="app-view hidden">
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b border-slate-200 pb-4 gap-4">
-                <div><h3 class="font-extrabold text-lg">Master Menu POS (BOM)</h3><p class="text-xs text-slate-500 font-bold">Item yang akan tampil di layar kasir.</p></div>
-                <button onclick="superApp.openCrudMasterMenu('add')" class="bg-brand-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-600 shadow-md"><i class="fas fa-plus mr-1"></i>Menu Baru</button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Nama Menu di POS</th><th class="pb-2">Memotong Bahan Induk (BOM)</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="master-tbody" class="divide-y divide-slate-100"></tbody></table>
+            
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800 overflow-hidden">
+                <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+                    <div><h3 class="font-extrabold text-lg">Master Produk (BOM)</h3><p class="text-xs text-slate-500">Varian menu yang akan tampil di kasir.</p></div>
+                    <button onclick="superApp.openCrudMasterMenu()" class="bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-600 shadow-md"><i class="fas fa-plus mr-1"></i>Menu Baru</button>
+                </div>
+                <div class="overflow-y-auto max-h-96 no-scrollbar">
+                    <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Nama Menu</th><th class="pb-2">Memotong Bahan</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="master-tbody" class="divide-y divide-slate-50"></tbody></table>
+                </div>
             </div>
         </div>
       </div>
@@ -233,21 +252,22 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
                 <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><h3 class="font-extrabold text-lg">Daftar Cabang</h3><button onclick="superApp.openCrudOutlet('add')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i>Outlet Baru</button></div>
-                <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">ID</th><th class="pb-2">Nama Outlet</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="crud-outlet-tbody" class="divide-y divide-slate-100"></tbody></table></div>
+                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">ID</th><th class="pb-2">Nama Outlet</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="crud-outlet-tbody" class="divide-y divide-slate-50"></tbody></table>
             </div>
+            
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
-                <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><h3 class="font-extrabold text-lg">Distribusi: <span id="label-outlet-manage" class="text-brand-500">Penajam</span></h3><button onclick="superApp.openDistribusiModal()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200"><i class="fas fa-truck-fast mr-1"></i>Kirim Stok Gudang</button></div>
+                <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><h3 class="font-extrabold text-lg">Kelola Produk: <span id="label-outlet-manage" class="text-brand-500">Penajam</span></h3><button onclick="superApp.openAddOutletProduct()" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-200"><i class="fas fa-plus mr-1"></i>Tambah Jualan ke Cabang</button></div>
                 <div class="overflow-y-auto max-h-96 no-scrollbar">
-                    <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Menu/Varian</th><th class="pb-2 text-right">Harga Cabang</th><th class="pb-2 text-right">Sisa Stok</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="outlet-manage-tbody" class="divide-y divide-slate-100"></tbody></table>
+                    <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Menu Jualan</th><th class="pb-2 text-right">Harga Cabang</th><th class="pb-2 text-right">Stok Fisik Toko</th><th class="pb-2 text-center">Aksi</th></tr></thead><tbody id="outlet-manage-tbody" class="divide-y divide-slate-50"></tbody></table>
                 </div>
             </div>
         </div>
       </div>
-      
+
       <div id="view-staf" class="app-view hidden">
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800">
-            <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><h3 class="font-extrabold text-lg">Kinerja Operasional & Sales Keseluruhan</h3></div>
-            <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400"><tr><th class="pb-2">Username</th><th class="pb-2">Role</th><th class="pb-2">Cabang Penempatan</th><th class="pb-2 text-right">Akumulasi Sales</th></tr></thead><tbody id="staf-tbody" class="divide-y divide-slate-100"></tbody></table></div>
+          <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4"><h3 class="font-extrabold text-lg">Kinerja Operasional & Sales Keseluruhan</h3></div>
+          <table class="w-full text-left whitespace-nowrap"><thead class="text-slate-400 text-sm"><tr><th class="pb-3">Username</th><th class="pb-3">Role</th><th class="pb-3">Cabang (Penempatan)</th><th class="pb-3 text-right">Total Akumulasi Sales</th></tr></thead><tbody id="staf-tbody" class="text-sm font-bold divide-y divide-slate-50"></tbody></table>
         </div>
       </div>
 
@@ -259,7 +279,7 @@
 
   <div id="modal-payment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
-      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
+      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
       
       <div class="grid grid-cols-3 gap-2 mb-4">
@@ -271,27 +291,26 @@
         <input type="number" id="pay-cash-input" class="flex-1 border-2 border-slate-200 bg-white rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500" placeholder="Nominal manual..." oninput="superApp.calcChange()">
         <button onclick="superApp.setCash('')" class="p-3 bg-red-50 text-red-500 rounded-xl font-bold"><i class="fas fa-times"></i></button>
       </div>
-
       <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 text-slate-800"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan & Cetak</button>
     </div>
   </div>
 
   <div id="modal-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl modal-enter" id="modal-detail-content">
-      <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-lg text-slate-800">Detail Struk</h3><button onclick="superApp.closeModal('modal-detail')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl modal-enter text-slate-800" id="modal-detail-content">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-lg">Detail Struk</h3><button onclick="superApp.closeModal('modal-detail')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
       <div id="detail-struk-body" class="bg-slate-50 p-4 rounded-xl text-sm font-mono text-slate-700 h-64 overflow-y-auto mb-4 border border-slate-200"></div>
       <div class="flex flex-col gap-2">
-        <button onclick="superApp.executeReprint()" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold shadow-sm hover:bg-brand-600 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang Struk</button>
-        <button onclick="superApp.promptVoidTrx()" id="btn-void-trx" class="w-full bg-white border-2 border-red-100 text-red-500 py-3 rounded-xl font-extrabold hover:bg-red-50 transition"><i class="fas fa-ban mr-2"></i>Batalkan & Kembalikan Stok</button>
+        <button onclick="superApp.executeReprint()" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold shadow-sm hover:bg-brand-600 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang</button>
+        <button onclick="superApp.promptVoidTrx()" id="btn-void-trx" class="w-full bg-white border-2 border-red-100 text-red-500 py-3 rounded-xl font-extrabold hover:bg-red-50 transition"><i class="fas fa-ban mr-2"></i>Batal (Admin PIN)</button>
       </div>
     </div>
   </div>
 
   <div id="modal-form" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh]" id="modal-form-content">
-      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl text-slate-800" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
-      <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
+    <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800" id="modal-form-content">
+      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
+      <div id="modal-form-body" class="space-y-4"></div>
       <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan</button>
     </div>
   </div>
@@ -317,18 +336,11 @@
         toggleSidebar: function() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
         setLoading: function(show, text="Memproses...") { 
             const loader = document.getElementById('app-loader');
-            if(loader) {
-                document.getElementById('loader-text').innerText = text; 
-                show ? loader.classList.remove('hidden') : loader.classList.add('hidden'); 
-            }
+            if(loader) { document.getElementById('loader-text').innerText = text; show ? loader.classList.remove('hidden') : loader.classList.add('hidden'); }
         },
         closeModal: function(id) { 
-            const content = document.getElementById(id+'-content');
-            const modal = document.getElementById(id);
-            if(content && modal) {
-                content.classList.remove('modal-enter-active'); 
-                setTimeout(() => modal.classList.add('hidden'), 300); 
-            }
+            const content = document.getElementById(id+'-content'); const modal = document.getElementById(id);
+            if(content && modal) { content.classList.remove('modal-enter-active'); setTimeout(() => modal.classList.add('hidden'), 300); }
         },
         toggleDarkMode: function() { 
             document.documentElement.classList.toggle('dark'); 
@@ -337,21 +349,23 @@
             else { ic.classList.replace('fa-sun', 'fa-moon'); ic.classList.replace('text-yellow-400', 'text-slate-600'); }
         },
 
+        // PARSER TANGGAL (DD/MM/YYYY to Date object)
+        parseDateId: function(dateStr) {
+            if(!dateStr) return new Date(0);
+            let p = dateStr.split('/');
+            if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
+            return new Date(dateStr);
+        },
+
         // 1. INIT & PIN LOGIN (NULL SAFE)
         init: async function() {
             try {
                 const res = await fetch(API_URL); this.db = await res.json();
                 const logStat = document.getElementById('login-status');
-                if(logStat) {
-                    logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.';
-                    logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center';
-                }
+                if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
             } catch (err) { 
                 const logStat = document.getElementById('login-status');
-                if(logStat) {
-                    logStat.innerText = 'Gagal Terkoneksi API. Cek Jaringan / URL.';
-                    logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center';
-                }
+                if(logStat) { logStat.innerText = 'Gagal Terkoneksi API. Cek Jaringan / URL.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
             }
         },
 
@@ -359,20 +373,14 @@
             if(this.pinBuffer.length < 4) {
                 this.pinBuffer += num;
                 const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
-                if(dot) {
-                    dot.classList.replace('border-slate-300', 'bg-brand-500');
-                    dot.classList.replace('border-2', 'border-0');
-                }
+                if(dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); }
             }
             if(this.pinBuffer.length === 4) setTimeout(() => this.processLogin(), 200);
         },
         delPin: function() {
             if(this.pinBuffer.length > 0) {
                 const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
-                if(dot) {
-                    dot.classList.replace('bg-brand-500', 'border-slate-300');
-                    dot.classList.replace('border-0', 'border-2');
-                }
+                if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
                 this.pinBuffer = this.pinBuffer.slice(0, -1);
             }
         },
@@ -380,15 +388,12 @@
             this.pinBuffer = ''; 
             for(let i=1; i<=4; i++) { 
                 const dot = document.getElementById(`dot-${i}`);
-                if(dot) {
-                    dot.classList.replace('bg-brand-500', 'border-slate-300'); 
-                    dot.classList.replace('border-0', 'border-2'); 
-                }
+                if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
             } 
         },
         
         processLogin: function() {
-            if (!this.db || !this.db.users) { this.showToast('Gagal! Koneksi ke Database belum siap.', 'error'); this.clearPin(); return; }
+            if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); return; }
             let user = this.db.users.find(u => u.PIN == this.pinBuffer);
             if(user) {
                 this.currentUser = user; 
@@ -398,15 +403,10 @@
                 const hInit = document.getElementById('header-initial'); if(hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
                 
                 let isAdmin = user.Role.toLowerCase().includes('admin');
-                const adminMenus = document.getElementById('admin-menus');
-                const selOut = document.getElementById('select-outlet');
-                const repOut = document.getElementById('report-outlet-filter');
+                const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
 
                 if(isAdmin) {
-                    if(adminMenus) adminMenus.classList.remove('hidden'); 
-                    if(selOut) selOut.classList.remove('hidden');
-                    if(repOut) repOut.classList.remove('hidden');
-                    
+                    if(adminMenus) adminMenus.classList.remove('hidden'); if(selOut) selOut.classList.remove('hidden'); if(repOut) repOut.classList.remove('hidden');
                     let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                     this.db.outlets.forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
                     if(selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
@@ -417,18 +417,14 @@
                     if(repOut) repOut.classList.add('hidden');
                 }
                 
-                document.getElementById('login-screen').classList.add('hidden'); 
-                document.getElementById('sidebar').classList.remove('hidden'); 
-                document.getElementById('main-app').classList.remove('hidden');
-                
+                document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('main-app').classList.remove('hidden');
                 this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
             } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
         },
 
         // 2. SHIFT VALIDATION (NULL SAFE)
         checkShiftStatus: function() {
-            const shiftOutName = document.getElementById('shift-outlet-name');
-            if(shiftOutName) shiftOutName.innerText = this.outlet;
+            const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = this.outlet;
 
             let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
             const mainApp = document.getElementById('main-app');
@@ -450,18 +446,10 @@
                     staffHtml += `<label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100"><input type="checkbox" value="${u.Username}" data-role="${u.Role}" class="shift-cb w-5 h-5 text-brand-500 rounded"><div class="flex-1 font-bold text-sm text-slate-800">${u.Username}</div><span class="px-2 py-0.5 border rounded text-[10px] font-black uppercase ${badge}">${u.Role}</span></label>`;
                 });
                 
-                const staffListEl = document.getElementById('shift-staff-list');
-                if(staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar.</p>';
-                
-                const mAwal = document.getElementById('shift-modal-awal');
-                if(mAwal) mAwal.value = '';
-
-                const modalShift = document.getElementById('modal-shift');
-                const modalShiftContent = document.getElementById('modal-shift-content');
-                if(modalShift && modalShiftContent) {
-                    modalShift.classList.remove('hidden'); 
-                    setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10);
-                }
+                const staffListEl = document.getElementById('shift-staff-list'); if(staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar.</p>';
+                const mAwal = document.getElementById('shift-modal-awal'); if(mAwal) mAwal.value = '';
+                const modalShift = document.getElementById('modal-shift'); const modalShiftContent = document.getElementById('modal-shift-content');
+                if(modalShift && modalShiftContent) { modalShift.classList.remove('hidden'); setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); }
             }
         },
         executeBukaShift: async function() {
@@ -484,21 +472,15 @@
                 const data = await res.json();
                 this.activeShiftId = data.id_shift; this.activeStaffTeam = tim;
                 this.closeModal('modal-shift'); 
-                const mainApp = document.getElementById('main-app');
-                if(mainApp) mainApp.classList.remove('blur-lock');
+                const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('blur-lock');
                 this.showToast("Shift Dibuka! Laci siap digunakan.");
             } catch(e) { this.showToast("Gagal menyambung server", "error"); }
             this.setLoading(false);
         },
         promptTutupShift: function() {
-            const setAkhir = document.getElementById('shift-setoran-akhir');
-            if(setAkhir) setAkhir.value = '';
-            const modalTutup = document.getElementById('modal-tutup-shift');
-            const modalTutupContent = document.getElementById('modal-tutup-shift-content');
-            if(modalTutup && modalTutupContent) {
-                modalTutup.classList.remove('hidden'); 
-                setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10);
-            }
+            const setAkhir = document.getElementById('shift-setoran-akhir'); if(setAkhir) setAkhir.value = '';
+            const modalTutup = document.getElementById('modal-tutup-shift'); const modalTutupContent = document.getElementById('modal-tutup-shift-content');
+            if(modalTutup && modalTutupContent) { modalTutup.classList.remove('hidden'); setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10); }
         },
         executeTutupShift: async function() {
             let setor = document.getElementById('shift-setoran-akhir').value;
@@ -514,7 +496,7 @@
             this.setLoading(true, "Merekap Penjualan Hari Ini...");
             try {
                 await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'tutup_shift', id_shift: this.activeShiftId, setoran_akhir: parseInt(setor), selisih: selisih }) });
-                alert(`SHIFT DITUTUP!\nUang Sistem: Rp ${expected}\nUang Fisik (Setoran): Rp ${setor}\nSelisih: Rp ${selisih}`);
+                alert(`SHIFT DITUTUP!\nUang Sistem: Rp ${expected.toLocaleString('id-ID')}\nUang Fisik (Setoran): Rp ${parseInt(setor).toLocaleString('id-ID')}\nSelisih: Rp ${selisih.toLocaleString('id-ID')}`);
                 location.reload(); 
             } catch(e) { this.showToast("Gagal tutup shift", "error"); this.setLoading(false); }
         },
@@ -538,7 +520,7 @@
                     }
                 });
             }
-            this.renderProducts(); this.renderReport(); this.renderGudang(); this.renderStaf();
+            this.renderProducts(); this.renderReport(); this.renderGudang(); this.renderStaf(); this.generateAIReport();
         },
         changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
         switchMenu: function(menu) {
@@ -551,12 +533,13 @@
             const activeView = document.getElementById(`view-${menu}`);
             if(activeView) activeView.classList.remove('hidden');
 
-            const titles = { 'pos': 'Point of Sale', 'report': 'Laporan Terpadu', 'gudang': 'Bahan Baku Gudang', 'master': 'Master Menu Varian', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan' };
+            const titles = { 'pos': 'Point of Sale', 'report': 'Laporan Terpadu', 'ai': 'Asisten AI & Analitik', 'gudang': 'Bahan Baku Gudang', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan' };
             const pageTitle = document.getElementById('page-title');
             if(pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
             
             if(window.innerWidth < 1024) this.toggleSidebar();
             if(menu === 'report') this.renderReport();
+            if(menu === 'ai') this.generateAIReport();
         },
 
         filterProducts: function(key) {
@@ -580,7 +563,7 @@
         addToCart: function(sku, nama, price, maxStok, skuBahan) { 
             let currentStokBahanDiKeranjang = 0; let refBahan = skuBahan || sku;
             this.cart.forEach(i => { if((i.sku_bahan || i.sku) === refBahan) currentStokBahanDiKeranjang += i.qty; });
-            if(currentStokBahanDiKeranjang >= maxStok) return this.showToast(`Stok Bahan Induk Habis! (Sisa di Toko: ${maxStok - currentStokBahanDiKeranjang})`, 'error');
+            if(currentStokBahanDiKeranjang >= maxStok) return this.showToast(`Stok Induk Kurang! Sisa toko: ${maxStok - currentStokBahanDiKeranjang}`, 'error');
             
             let item = this.cart.find(i => i.sku === sku); 
             if(item) item.qty++; else this.cart.push({sku, nama, price, qty: 1, sku_bahan: skuBahan}); 
@@ -648,7 +631,7 @@
             this.setLoading(false);
         },
 
-        // 4. REPORT & BATAL (VOID)
+        // 4. REPORT DENGAN FILTER TANGGAL
         toggleReportTab: function(tab) {
             const rt = document.getElementById('report-content-trx'); if(rt) rt.classList.add('hidden'); 
             const rr = document.getElementById('report-content-rekap'); if(rr) rr.classList.add('hidden');
@@ -663,16 +646,25 @@
             let filterVal = rof ? rof.value : this.outlet;
             if(this.currentUser && this.currentUser.Role.toLowerCase().includes('admin') && rof) { filterVal = rof.value; } else { filterVal = this.outlet; }
             
+            // Date Filter Logic
+            let dStart = document.getElementById('filter-start') ? document.getElementById('filter-start').value : '';
+            let dEnd = document.getElementById('filter-end') ? document.getElementById('filter-end').value : '';
+            let dateStart = dStart ? new Date(dStart) : new Date(0);
+            let dateEnd = dEnd ? new Date(dEnd) : new Date(8640000000000000);
+            dateStart.setHours(0,0,0,0); dateEnd.setHours(23,59,59,999);
+
             const rdl = document.getElementById('report-date-label'); if(rdl) rdl.innerText = new Date().toLocaleString('id-ID');
-            const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal}`;
+            const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal} ${dStart ? `| Tgl: ${dStart} s/d ${dEnd}` : ''}`;
 
             let totalRev = 0, countTrx = 0, trxHtml = ''; let productSales = {};
             [...(this.db.transactions || [])].reverse().forEach((t, i) => {
-                if(filterVal === 'Semua' || t.Outlet === filterVal) {
+                let trxDate = this.parseDateId(t.Tanggal);
+                
+                if((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
                     if (t.Status === 'Sukses') { totalRev += t.Total_Bayar || 0; countTrx++; }
                     
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
-                    if(i < 50) trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-2">${t.Waktu || t.Tanggal}</td><td class="py-2 px-2 text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-2">${statBadge}</td><td class="py-2 px-2 text-right font-black ${t.Status==='Sukses'?'text-brand-500':'text-slate-400 line-through'}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-2 text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
+                    if(i < 500) trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-2">${t.Waktu || t.Tanggal}</td><td class="py-2 px-2 text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-2">${statBadge}</td><td class="py-2 px-2 text-right font-black ${t.Status==='Sukses'?'text-brand-500':'text-slate-400 line-through'}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-2 text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
                     
                     if (t.Status === 'Sukses') {
                         let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
@@ -685,7 +677,7 @@
             });
             const rtt = document.getElementById('rep-total-trx'); if(rtt) rtt.innerText = countTrx; 
             const rtr = document.getElementById('rep-total-rev'); if(rtr) rtr.innerText = `Rp ${totalRev.toLocaleString('id-ID')}`;
-            const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || '<tr><td colspan="5" class="text-center py-4">Belum ada transaksi</td></tr>';
+            const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || '<tr><td colspan="5" class="text-center py-4">Belum ada transaksi di rentang tanggal ini</td></tr>';
 
             let rekapHtml = '';
             for (const [nama, data] of Object.entries(productSales)) {
@@ -696,11 +688,12 @@
             // Log Mutasi
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
-                if(filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) {
-                    if(i < 50) mutasiHtml += `<tr><td class="py-2 px-2">${m.Waktu}</td><td class="py-2 px-2 text-brand-600">${m.SKU}</td><td class="py-2 px-2">${m.Outlet_Tujuan}</td><td class="py-2 px-2 text-right font-black">${m.Qty} Pcs</td></tr>`;
+                let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
+                if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
+                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-2">${m.Waktu}</td><td class="py-2 px-2 text-brand-600">${m.SKU}</td><td class="py-2 px-2">${m.Outlet_Tujuan}</td><td class="py-2 px-2 text-right font-black">${m.Qty} Pcs</td></tr>`;
                 }
             });
-            const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || '<tr><td colspan="4" class="text-center py-4">Belum ada data distribusi masuk</td></tr>';
+            const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || '<tr><td colspan="4" class="text-center py-4">Belum ada data distribusi di rentang tanggal ini</td></tr>';
         },
         exportPDF: function() {
             this.showToast("Mempersiapkan PDF Laporan...");
@@ -759,13 +752,85 @@
             } catch(e) { this.showToast("Gagal membatalkan transaksi", "error"); this.setLoading(false); }
         },
 
-        // 5. GUDANG (AUTO SKU)
+        // 5. ASISTEN AI (VELOCITY & RECOMMENDATION)
+        generateAIReport: function() {
+            const aiCards = document.getElementById('ai-insight-cards');
+            const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
+            if(!aiCards || !aiRekBody || !this.db) return;
+
+            let oldestDate = new Date();
+            let productStats = {}; // { SKU: { outlet: { sold: 0, currentStock: 0, name: '' } } }
+
+            // 1. Hitung total terjual per bahan per outlet
+            (this.db.transactions || []).forEach(t => {
+                if(t.Status === 'Sukses') {
+                    let tDate = this.parseDateId(t.Tanggal);
+                    if(tDate < oldestDate) oldestDate = tDate;
+                    
+                    let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                    items.forEach(item => {
+                        let bahanSKU = item.sku_bahan || item.sku;
+                        if(!productStats[bahanSKU]) productStats[bahanSKU] = {};
+                        if(!productStats[bahanSKU][t.Outlet]) productStats[bahanSKU][t.Outlet] = { sold: 0, currentStock: 0, name: '' };
+                        
+                        productStats[bahanSKU][t.Outlet].sold += item.qty;
+                    });
+                }
+            });
+
+            // 2. Petakan Stok Saat Ini dan Nama Item
+            (this.db.hargaStokOutlet || []).forEach(s => {
+                if(productStats[s.SKU] && productStats[s.SKU][s.ID_Outlet]) {
+                    productStats[s.SKU][s.ID_Outlet].currentStock = s.Stok_Toko;
+                    let m = this.db.masterProduk.find(x => x.SKU === s.SKU);
+                    if(m) productStats[s.SKU][s.ID_Outlet].name = m.Nama_Produk;
+                }
+            });
+
+            // 3. Kalkulasi Hari
+            let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
+            if(daysActive < 1) daysActive = 1;
+
+            let warnings = []; let topSellers = [];
+            for (const [sku, outlets] of Object.entries(productStats)) {
+                for (const [outName, stat] of Object.entries(outlets)) {
+                    let velocity = stat.sold / daysActive; // Pcs per hari
+                    let daysRem = velocity > 0 ? (stat.currentStock / velocity) : 999;
+                    
+                    topSellers.push({ name: stat.name, outlet: outName, vel: velocity });
+                    
+                    if(daysRem < 3 && stat.name) {
+                        warnings.push({ sku: sku, name: stat.name, outlet: outName, days: Math.floor(daysRem), vel: velocity.toFixed(1), stock: stat.currentStock });
+                    }
+                }
+            }
+
+            // Render Cards
+            topSellers.sort((a,b) => b.vel - a.vel);
+            let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', outlet: '-', vel: 0};
+            
+            aiCards.innerHTML = `
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100"><div class="text-brand-500 mb-2"><i class="fas fa-fire text-2xl"></i></div><p class="text-xs font-bold text-slate-400 uppercase">Produk Terlaris</p><h4 class="text-xl font-black">${top1.name}</h4><p class="text-sm font-bold text-slate-500">${top1.outlet} (${top1.vel.toFixed(1)} Pcs/hari)</p></div>
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100"><div class="text-red-500 mb-2"><i class="fas fa-triangle-exclamation text-2xl"></i></div><p class="text-xs font-bold text-slate-400 uppercase">Perhatian Stok</p><h4 class="text-xl font-black">${warnings.length} Item Kritis</h4><p class="text-sm font-bold text-slate-500">Prediksi habis < 3 hari</p></div>
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100"><div class="text-green-500 mb-2"><i class="fas fa-chart-line text-2xl"></i></div><p class="text-xs font-bold text-slate-400 uppercase">Data Analitik</p><h4 class="text-xl font-black">${daysActive} Hari</h4><p class="text-sm font-bold text-slate-500">Periode pembelajaran AI</p></div>
+            `;
+
+            // Render Tabel Rekomendasi
+            if(warnings.length > 0) {
+                warnings.sort((a,b) => a.days - b.days);
+                aiRekBody.innerHTML = warnings.map(w => `<tr><td class="py-3 px-2 font-bold">${w.outlet}</td><td class="py-3 px-2 text-red-500 font-bold">${w.name}<br><span class="text-[10px] text-slate-400">Sisa: ${w.stock} Pcs</span></td><td class="py-3 px-2">${w.vel}</td><td class="py-3 px-2 font-black text-slate-800">${w.days} Hari</td><td class="py-3 px-2 text-center"><button onclick="superApp.switchMenu('gudang')" class="bg-brand-100 text-brand-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-brand-200">Kirim Stok</button></td></tr>`).join('');
+            } else {
+                aiRekBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">Semua stok di cabang aman. Tidak ada prediksi krisis dalam 3 hari ke depan.</td></tr>`;
+            }
+        },
+
+        // 6. GUDANG (AUTO SKU & OUTLET MANAGE)
         renderGudang: function() {
             const gBody = document.getElementById('gudang-tbody'); const mOutBody = document.getElementById('outlet-manage-tbody');
             if(gBody) gBody.innerHTML = (this.db.stokGudang || []).map(g => {
                 let mp = (this.db.masterProduk || []).find(x => x.SKU === g.SKU);
                 if(mp && mp.Kategori.toLowerCase() === 'bahan') {
-                    return `<tr class="border-b border-slate-50"><td class="py-2 font-bold">${mp.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">Tersedia untuk didistribusikan</span></td><td class="py-2 text-right font-black text-brand-500">${g.Stok_Pusat} Pcs</td></tr>`;
+                    return `<tr class="border-b border-slate-50"><td class="py-2 font-bold">${mp.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">Sisa Pusat: ${g.Stok_Pusat}</span></td><td class="py-2 text-right font-black text-brand-500">${g.Stok_Pusat} Pcs</td></tr>`;
                 } return '';
             }).join('');
             
@@ -778,7 +843,7 @@
                         let refBahan = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                         let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
                         let stk = sData ? sData.Stok_Toko : 0;
-                        html += `<tr class="border-b border-slate-50"><td class="py-3 font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 text-right text-brand-500 font-bold">Rp ${hrg.toLocaleString('id-ID')}</td><td class="py-3 text-right font-black">${stk}</td><td class="py-3 text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Harga</button></td></tr>`;
+                        html += `<tr class="border-b border-slate-50"><td class="py-3 font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 text-right text-brand-500 font-bold">Rp ${hrg.toLocaleString('id-ID')}</td><td class="py-3 text-right font-black">${stk}</td><td class="py-3 text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Edit</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
                     }
                 });
                 mOutBody.innerHTML = html;
@@ -804,7 +869,7 @@
         openCrudBahan: function() {
             let nextId = 'RAW-' + Math.floor(Math.random()*9000+1000);
             let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
-                         this.makeInput('Nama Bahan Baku (Misal: Bahan Dimsum)', 'mst-nama', '') + 
+                         this.makeInput('Nama Bahan Baku (Gudang)', 'mst-nama', '') + 
                          `<input type="hidden" id="frm-mst-kat" value="Bahan"><input type="hidden" id="frm-mst-bahan" value=""><input type="hidden" id="frm-mst-img" value="">`;
             this.buildForm("Tambah Bahan Gudang", inputs, `superApp.executeCrud('Master_Produk')`);
         },
@@ -814,31 +879,44 @@
             (this.db.masterProduk || []).forEach(p => { if(p.Kategori.toLowerCase()==='bahan') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
             
             let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
-                         this.makeInput('Nama Menu POS (Misal: Dimsum Goreng)', 'mst-nama', '') + 
+                         this.makeInput('Nama Menu POS (Jualan)', 'mst-nama', '') + 
                          `<input type="hidden" id="frm-mst-kat" value="AISNACK">` +
                          `<div><label class="text-xs font-bold text-slate-500 block mb-1">Bahan yang Terpotong (BOM)</label><select id="frm-mst-bahan" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold text-sm bg-white outline-none text-slate-800">${opt}</select></div>` +
                          this.makeInput('URL Gambar (Opsional)', 'mst-img', '');
             this.buildForm("Tambah Menu Kasir POS", inputs, `superApp.executeCrud('Master_Produk')`);
         },
+        openAddOutletProduct: function() {
+            let opt = '';
+            (this.db.masterProduk || []).forEach(p => { if(p.Kategori.toLowerCase() !== 'bahan') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
+            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Produk Tersedia</label><select id="frm-add-out-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold text-sm bg-white outline-none text-slate-800">${opt}</select></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', '', 'number');
+            this.buildForm("Tambah Produk ke Outlet", inputs, `superApp.executeEditHarga(document.getElementById('frm-add-out-sku').value)`);
+        },
+
         openEditHargaOutlet: function(sku, nama, currHarga) {
-            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Produk</label><input type="text" disabled value="${nama}" class="w-full border-2 border-slate-200 bg-slate-100 rounded-xl px-3 py-2 font-bold text-sm outline-none text-slate-600"></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', currHarga, 'number');
+            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Produk</label><input type="text" disabled value="${nama}" class="w-full border-2 border-slate-200 bg-slate-100 rounded-xl px-3 py-2 font-bold text-sm outline-none text-slate-600"></div>` + this.makeInput(`Set Harga Baru di ${this.outlet} (Rp)`, 'edit-hrg', currHarga, 'number');
             this.buildForm("Pengaturan Harga Cabang", inputs, `superApp.executeEditHarga('${sku}')`);
         },
         executeEditHarga: async function(sku) {
             let editHrg = document.getElementById('frm-edit-hrg'); if(!editHrg) return;
-            let hrg = editHrg.value; this.setLoading(true, "Update Harga...");
+            let hrg = editHrg.value; this.setLoading(true, "Update Outlet...");
             await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'edit_harga_outlet', sku: sku, outlet: this.outlet, harga: hrg }) });
             this.closeModal('modal-form'); const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
         },
+        deleteOutletProduct: async function(sku) {
+            if(!confirm(`Yakin hapus produk ini dari menu POS cabang ${this.outlet}?`)) return;
+            this.setLoading(true, "Menghapus dari Cabang...");
+            await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'delete_outlet_product', sku: sku, outlet: this.outlet }) });
+            const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
+        },
+
         openRestokModal: function() {
             let opt = ''; (this.db.masterProduk || []).forEach(p => { if(p.Kategori.toLowerCase()==='bahan') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
-            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Induk</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number');
-            this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
+            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Gudang</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number');
+            this.buildForm("Restok / Pembelian Supplier", inputs, "superApp.executeRestok()");
         },
         executeRestok: async function() {
             const elSku = document.getElementById('frm-rstk-sku'); const elQty = document.getElementById('frm-rstk-qty');
-            if(!elSku || !elQty) return;
-            let sku = elSku.value; let qty = elQty.value; let n = elSku.options[elSku.selectedIndex].text;
+            if(!elSku || !elQty) return; let sku = elSku.value; let qty = elQty.value; let n = elSku.options[elSku.selectedIndex].text;
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Menyimpan Restok...");
             await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'restok_gudang', sku: sku, nama: n, qty: qty }) });
             this.closeModal('modal-form'); const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
@@ -850,12 +928,11 @@
                 if(m && m.Kategori.toLowerCase()==='bahan') opt += `<option value="${g.SKU}">${m.Nama_Produk} (Sisa Pusat: ${g.Stok_Pusat})</option>`; 
             });
             let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Kirim Bahan Baku</label><select id="frm-dist-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + this.makeInput('Ke Cabang', 'dist-out', this.outlet, 'text', '', true) + this.makeInput('Jumlah Kirim (Pcs)', 'dist-qty', '', 'number');
-            this.buildForm("Kirim Stok Gudang -> Cabang", inputs, "superApp.executeDistribusi()");
+            this.buildForm("Distribusi Gudang -> Cabang", inputs, "superApp.executeDistribusi()");
         },
         executeDistribusi: async function() {
             const elSku = document.getElementById('frm-dist-sku'); const elQty = document.getElementById('frm-dist-qty');
-            if(!elSku || !elQty) return;
-            let sku = elSku.value; let qty = elQty.value;
+            if(!elSku || !elQty) return; let sku = elSku.value; let qty = elQty.value;
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Distribusi Stok...");
             await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'distribusi', sku: sku, outlet: this.outlet, qty: qty }) });
             this.closeModal('modal-form'); const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
@@ -890,7 +967,7 @@
             const res = await fetch(API_URL); this.db = await res.json(); this.refreshData(); this.setLoading(false);
         },
 
-        // 6. STAF
+        // STAF
         renderStaf: function() {
             const body = document.getElementById('staf-tbody'); if(!body) return;
             body.innerHTML = (this.db.users || []).map(u => {
@@ -899,6 +976,7 @@
             }).join('');
         },
 
+        // HELPERS
         makeInput: function(label, id, val='', type='text', hint='', dis=false) { return `<div><label class="text-xs font-bold text-slate-500 block mb-1">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; },
         buildForm: function(title, inputsHtml, actionFunctionStr) {
             const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
