@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.nav-active { background-color: #f97316; color: white; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); }
+.nav-active i { color: white !important; }
+.modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.modal-enter-active { opacity: 1; transform: scale(1); }
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast-animate { animation: slideInRight 0.3s ease-out forwards; }
+.blur-lock { filter: blur(8px); pointer-events: none; user-select: none; }
+.pdf-container { background: white !important; color: black !important; padding: 20px !important; }
+
+.dark body { background-color: #0f172a; color: #f8fafc; }
+.dark .bg-white { background-color: #1e293b; border-color: #334155; }
+.dark .bg-slate-50 { background-color: #0f172a; }
+.dark .text-slate-800 { color: #f8fafc; }
+.dark .text-slate-500 { color: #94a3b8; }
+.dark .border-slate-100, .dark .border-slate-200 { border-color: #334155; }
+.numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
+.dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
+.numpad-btn:active { transform: scale(0.95); }
+.item-empty { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+
+@keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
+.animate-pulse-slow { animation: pulse-slow 3s infinite; }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.slide-up { animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+.skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
+.dark .skeleton { background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%); background-size: 200% 100%; }
+@keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; }
