@@ -49,6 +49,11 @@
 </head>
 <body class="bg-slate-50 text-slate-800 h-[100dvh] flex overflow-hidden relative transition-colors duration-300">
 
+  <div id="app-loader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[99999] hidden flex-col items-center justify-center">
+    <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+    <p id="loader-text" class="text-white font-bold tracking-widest uppercase text-sm drop-shadow-md">Memproses...</p>
+  </div>
+
   <div id="cfd-screen" class="fixed inset-0 bg-slate-900 z-[9999] hidden flex overflow-hidden">
     <div class="w-2/3 bg-cover bg-center relative" id="cfd-promo-bg" style="background-image: url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1920');">
         <div class="absolute inset-0 bg-gradient-to-r from-slate-900/90 to-transparent flex flex-col justify-center p-16">
@@ -505,19 +510,16 @@
   </div>
 
   <script>
-    // =========================================================================
-    // WAJIB DIGANTI: URL WEB APP GOOGLE APPS SCRIPT ANDA (BERAKHIRAN /exec)
-    // =========================================================================
     const API_URL = "https://script.google.com/macros/s/AKfycbzQ6G1wFjqAfmOz8kUF8-7wK3nKF-_XMBiOyxx1XChiez_OxiTTCcWAL65ZnbLibzkjrg/exec";
 
     const superApp = {
         outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-        offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false,
+        offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
 
         // =========================================================================
-        // PEMBERSIH ZONA WAKTU (AUTO-FORMATTER)
+        // PEMBERSIH ZONA WAKTU (AUTO-FORMATTER) & MUTEX LOCK
         // =========================================================================
         cleanDateOnly: function(str) {
             if(!str) return '';
@@ -535,7 +537,6 @@
             if(!str) return '';
             let s = String(str);
             if(s.includes('T') && s.includes('Z')) {
-                // Memaksa mengambil jam aslinya meskipun Google Sheets mengubahnya ke format Satelit
                 return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
             }
             let parts = s.split(' ');
@@ -564,7 +565,12 @@
         },
         setLoading: function(show, text="Memproses...") { 
             const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text');
-            if(loader && lText) { lText.innerText = text; show ? loader.classList.remove('hidden') : loader.classList.add('hidden'); }
+            if(show) this.isProcessing = true; else this.isProcessing = false;
+            if(loader && lText) { 
+                lText.innerText = text; 
+                if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } 
+                else { loader.classList.add('hidden'); loader.classList.remove('flex'); } 
+            }
         },
         closeModal: function(id) { 
             const content = document.getElementById(id+'-content'); const modal = document.getElementById(id);
@@ -647,7 +653,8 @@
             fileInput.type = 'file'; fileInput.accept = 'image/*';
             fileInput.onchange = (event) => {
                 const file = event.target.files[0]; if(!file) return;
-                this.showToast("Mengunggah Promo...", "warning");
+                if(this.isProcessing) return;
+                this.setLoading(true, "Mengunggah Promo...");
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
@@ -664,9 +671,10 @@
                             if(res.status === 'sukses') {
                                 localStorage.setItem('cfd_promo_url', base64);
                                 this.syncStorage(); 
+                                this.setLoading(false);
                                 this.showToast("Banner Promo Diperbarui & Disimpan ke Server!");
                             }
-                        });
+                        }).catch(() => this.setLoading(false));
                     };
                     img.src = e.target.result;
                 };
@@ -723,9 +731,9 @@
             try {
                 let cacheDb = localStorage.getItem('aisnack_db_cache'); if(cacheDb) { this.db = JSON.parse(cacheDb); }
 
-                this.isLoadingData = true; 
+                this.setLoading(true, "Menghubungkan Server..."); 
                 const res = await fetch(API_URL, { redirect: 'follow' }); const data = await res.json();
-                this.isLoadingData = false;
+                this.setLoading(false);
                 
                 if(data && data.status === 'error') throw new Error(data.pesan);
                 this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
@@ -741,7 +749,7 @@
                 const logStat = document.getElementById('login-status');
                 if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
             } catch (err) { 
-                this.isLoadingData = false;
+                this.setLoading(false);
                 const logStat = document.getElementById('login-status');
                 if(logStat && this.db) { logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; } 
                 else if (logStat) { logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
@@ -770,7 +778,9 @@
             } 
         },
         processLogin: function() {
-            if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); return; }
+            if(this.isProcessing) return;
+            this.isProcessing = true;
+            if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); this.isProcessing = false; return; }
             let user = this.db.users.find(u => u.PIN == this.pinBuffer);
             if(user) {
                 this.currentUser = user; 
@@ -803,6 +813,7 @@
                 this.updateNetworkUI(); this.syncOfflineQueue();
                 this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
             } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
+            this.isProcessing = false;
         },
 
         checkShiftStatus: function() {
@@ -835,6 +846,7 @@
             }
         },
         executeBukaShift: async function() {
+            if(this.isProcessing) return;
             let cbs = document.querySelectorAll('.shift-cb:checked');
             if(cbs.length === 0) return this.showToast("Pilih minimal 1 anggota tim!", "error");
             let mAwalEl = document.getElementById('shift-modal-awal'); let m_awal = mAwalEl ? mAwalEl.value : '0';
@@ -870,6 +882,7 @@
             if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
         },
         executeKasKeluar: async function() {
+            if(this.isProcessing) return;
             let nomEl = document.getElementById('kas-out-nominal'); let ketEl = document.getElementById('kas-out-ket');
             if(!nomEl || !ketEl) return; let nom = nomEl.value; let ket = ketEl.value;
             if(!nom || !ket) return this.showToast("Nominal dan Keterangan wajib diisi!", "error");
@@ -913,6 +926,7 @@
             if(modalTutup && modalTutupContent) { modalTutup.classList.remove('hidden'); setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10); }
         },
         executeTutupShift: async function() {
+            if(this.isProcessing) return;
             let setAkhirEl = document.getElementById('shift-setoran-akhir');
             let setor = setAkhirEl ? setAkhirEl.value : '0';
             if(setor === '') return this.showToast("Hitung uang fisik di laci!", "error");
@@ -938,11 +952,13 @@
             this.setLoading(false);
         },
 
-        // OPNAME
         renderOpname: function() {
             const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
+            const tbUtama = document.getElementById('opname-tbody-utama'); const tbPdk = document.getElementById('opname-tbody-pendukung');
+            if(!tbUtama || !tbPdk) return;
             
-            let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+            let htmlUtama = ''; let htmlPdk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+            
             let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
@@ -969,13 +985,13 @@
                         </div>
                     </div>`;
 
-                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
-                    else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
+                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtama += strHtml; htmlUtamaMobile += strMobile; }
+                    else { htmlPdk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
             
-            const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-            const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+            tbUtama.innerHTML = htmlUtama || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+            tbPdk.innerHTML = htmlPdk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
             
             const mobCards = document.getElementById('opname-mobile-cards'); 
             if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
@@ -1005,6 +1021,7 @@
             else selEl.className = 'font-black text-slate-400 text-lg';
         },
         submitOpname: async function() {
+            if(this.isProcessing) return;
             if(!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
             this.setLoading(true, "Menyimpan & Mengirim Audit...");
             let items = [];
@@ -1043,7 +1060,6 @@
             this.setLoading(false);
         },
 
-        // AUDIT (OWNER)
         toggleAuditTab: function(tab) {
             const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
             const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
@@ -1105,6 +1121,7 @@
             }
         },
         processApproval: async function(id1, sku, outlet, fisik, status, type) {
+            if(this.isProcessing) return;
             if(!confirm(`Anda yakin ingin ${status} laporan ini?`)) return;
             this.setLoading(true, "Memproses Audit...");
             try {
@@ -1151,6 +1168,7 @@
             if(tMob) tMob.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
         },
         submitTerimaBarang: async function() {
+            if(this.isProcessing) return;
             if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
             this.setLoading(true, "Menyimpan...");
             let items = [];
@@ -1184,7 +1202,6 @@
             this.setLoading(false);
         },
 
-        // REFRESH DATA & NAVIGATION
         refreshData: function() {
             const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${this.outlet}`;
             const lOutManage = document.getElementById('label-outlet-manage'); if(lOutManage) lOutManage.innerText = this.outlet;
@@ -1343,6 +1360,7 @@
             }
         },
         executeCheckout: async function() {
+            if(this.isProcessing) return;
             this.setLoading(true, "Memproses Transaksi...");
             let trxID = 'TRX' + new Date().getTime();
             const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam };
@@ -1532,6 +1550,7 @@
             if(adminUser) { this.executeVoidTrx(this.activeReprintTrx.ID_TRX); } else { this.showToast("PIN Salah atau Anda bukan Admin! Batal ditolak.", "error"); }
         },
         executeVoidTrx: async function(trxId) {
+            if(this.isProcessing) return;
             this.setLoading(true, "Membatalkan Transaksi...");
             const payload = { action: 'batal_trx', trx_id: trxId, tim_operasional: this.activeStaffTeam };
             let res = await this.apiPost(payload);
@@ -1549,7 +1568,7 @@
             this.setLoading(false);
         },
 
-        // 6. AI ASSISTANT 
+        // 6. AI ASSISTANT (FIXED NaN BUG)
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1771,6 +1790,7 @@
             this.buildForm("Pengaturan Harga Cabang", inputs, `superApp.executeEditHarga('${sku}')`);
         },
         executeEditHarga: async function(sku) {
+            if(this.isProcessing) return;
             let editHrg = document.getElementById('frm-edit-hrg'); if(!editHrg) return;
             let hrg = editHrg.value; this.setLoading(true, "Update Harga...");
             const payload = { action: 'edit_harga_outlet', sku: sku, outlet: this.outlet, harga: hrg };
@@ -1779,9 +1799,11 @@
                 this.closeModal('modal-form'); 
                 if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
                 this.refreshData(); 
-            } else { this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
         deleteOutletProduct: async function(sku) {
+            if(this.isProcessing) return;
             if(!confirm(`Yakin hapus produk ini dari menu POS cabang ${this.outlet}?`)) return;
             this.setLoading(true, "Menghapus dari Cabang...");
             const payload = { action: 'delete_outlet_product', sku: sku, outlet: this.outlet };
@@ -1797,6 +1819,7 @@
             this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
         },
         executeRestok: async function() {
+            if(this.isProcessing) return;
             const elSku = document.getElementById('frm-rstk-sku'); const elQty = document.getElementById('frm-rstk-qty');
             if(!elSku || !elQty) return; let sku = elSku.value; let qty = elQty.value; let n = elSku.options[elSku.selectedIndex].text;
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Menyimpan Restok...");
@@ -1807,7 +1830,8 @@
                 this.closeModal('modal-form'); 
                 if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
                 this.refreshData(); 
-            } else { this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
         openDistribusiModal: function(prefillSku = '', prefillOutlet = '') {
             let opt = ''; 
@@ -1837,6 +1861,7 @@
             this.buildForm("Kirim Stok Gudang -> Cabang", inputs, "superApp.executeDistribusi()");
         },
         executeDistribusi: async function() {
+            if(this.isProcessing) return;
             const elSku = document.getElementById('frm-dist-sku'); const elQty = document.getElementById('frm-dist-qty'); const elOut = document.getElementById('frm-dist-out');
             if(!elSku || !elQty || !elOut) return;
             let sku = elSku.value; let qty = elQty.value; let targetOutlet = elOut.value;
@@ -1848,7 +1873,8 @@
                 this.closeModal('modal-form'); 
                 if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
                 this.refreshData(); 
-            } else { this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
 
         openCrudOutlet: function(action, id='') {
@@ -1857,6 +1883,7 @@
             this.buildForm(action==='edit'?"Edit Outlet":"Tambah Outlet Baru", inputs, `superApp.executeCrud('Daftar_Outlet', '${action==='edit'?o.ID_Outlet:''}')`);
         },
         executeCrud: async function(sheet, oldId) {
+            if(this.isProcessing) return;
             let row = [], idVal = '';
             if(sheet === 'Master_Produk') { 
                 const fSku = document.getElementById('frm-mst-sku'); const fNama = document.getElementById('frm-mst-nama'); const fKat = document.getElementById('frm-mst-kat'); const fBahan = document.getElementById('frm-mst-bahan'); const fImg = document.getElementById('frm-mst-img');
@@ -1872,9 +1899,11 @@
                 this.closeModal('modal-form'); 
                 if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
                 this.refreshData(); 
-            } else { this.setLoading(false); }
+            }
+            this.setLoading(false);
         },
         deleteCrud: async function(sheet, id) {
+            if(this.isProcessing) return;
             if(!confirm(`Yakin hapus data ini?`)) return; this.setLoading(true, "Menghapus...");
             const payload = { action: 'delete', sheetName: sheet, id: id };
             let res = await this.apiPost(payload);
@@ -1882,7 +1911,7 @@
             this.setLoading(false);
         },
 
-        // STAF
+        // STAF (INTERACTIVE LEADERBOARD)
         renderStaf: function() {
             const filterEl = document.getElementById('staf-filter-outlet');
             if(filterEl && filterEl.options.length <= 1) {
