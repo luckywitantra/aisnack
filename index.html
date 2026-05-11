@@ -57,7 +57,6 @@
             <p class="text-3xl text-brand-400 font-bold" id="cfd-outlet-name">Loading...</p>
         </div>
     </div>
-    
     <div class="w-1/3 bg-white flex flex-col shadow-2xl relative z-10">
         <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md"><h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2></div>
         <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 min-h-0 no-scrollbar" id="cfd-cart-list"></div>
@@ -65,20 +64,17 @@
             <p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p><p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p>
         </div>
     </div>
-    
     <div id="cfd-standby" class="absolute inset-0 bg-brand-500 flex flex-col items-center justify-center z-50 transition-opacity duration-500">
          <div class="w-48 h-48 bg-white rounded-full flex items-center justify-center text-brand-500 font-black text-7xl shadow-2xl mb-10 animate-pulse-slow p-6"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-lg"></div>
          <h1 class="text-7xl font-black text-white mb-6 text-center drop-shadow-lg">Ai-Snack</h1>
          <p class="text-4xl text-brand-100 font-bold text-center">Silakan Lakukan Pemesanan di Kasir</p>
     </div>
-
     <div id="cfd-success" class="absolute inset-0 bg-green-500 flex flex-col items-center justify-center z-[60] hidden">
          <div class="w-40 h-40 bg-white rounded-full flex items-center justify-center text-green-500 font-black text-6xl shadow-2xl mb-8 slide-up"><i class="fas fa-check"></i></div>
          <h1 class="text-6xl font-black text-white mb-4 text-center drop-shadow-lg slide-up">Pembayaran Berhasil!</h1>
          <p class="text-4xl text-green-100 font-bold text-center slide-up">Kembalian Anda: <span id="cfd-kembali" class="text-white font-black"></span></p>
     </div>
   </div>
-
 
   <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 lg:p-8 shadow-2xl flex flex-col items-center border border-slate-800">
@@ -506,7 +502,7 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800" id="modal-form-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400"><i class="fas fa-times"></i></button></div>
       <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
-      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan</button>
+      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-3 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition">Simpan Perubahan</button>
     </div>
   </div>
 
@@ -518,6 +514,19 @@
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
         offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false,
+
+        formatDateStr: function(str, includeTime = false) {
+            if(!str) return '';
+            let s = String(str);
+            if(s.includes('T') && s.endsWith('Z')) {
+                let d = new Date(s);
+                let pad = (n) => n < 10 ? '0' + n : n;
+                let dateP = `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+                let timeP = `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`;
+                return includeTime ? `${dateP} ${timeP}` : dateP;
+            }
+            return s;
+        },
 
         getEmptyState: function(icon, title, desc) {
             return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70">
@@ -557,7 +566,7 @@
         },
         parseDateId: function(dateStr) {
             if(!dateStr) return new Date(0);
-            let p = dateStr.split('/');
+            let p = String(dateStr).split(' ')[0].split('/');
             if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
             return new Date(dateStr); 
         },
@@ -1001,8 +1010,7 @@
                         let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                         
                         items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                        let itemName = this.db.masterProduk.find(m => m.SKU === s.SKU)?.Nama_Produk || s.SKU;
-                        waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
+                        waText += `🔹 *${m.Nama_Produk}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
                     }
                 }
             });
@@ -1037,8 +1045,9 @@
                     if(op.Status_Approval === 'Pending') {
                         let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
                         let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
+                        let wStr = this.formatDateStr(op.Waktu, true);
                         html += `<tr class="border-b border-slate-50">
-                            <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Waktu}</td>
+                            <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td>
                             <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                             <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
@@ -1060,8 +1069,9 @@
                 (this.db.mutasi || []).forEach(mt => {
                     if(mt.Status_Approval === 'Pending') {
                         let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU;
+                        let wStr = this.formatDateStr(mt.Waktu, true);
                         html += `<tr class="border-b border-slate-50">
-                            <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Waktu}</td>
+                            <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td>
                             <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                             <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
@@ -1095,7 +1105,6 @@
             const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
             
             let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            
             let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
@@ -1382,7 +1391,7 @@
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
                     let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
                     
-                    let cleanDate = typeof t.Tanggal === 'string' && t.Tanggal.includes('T') ? t.Tanggal.split('T')[0] : t.Tanggal;
+                    let cleanDate = this.formatDateStr(t.Tanggal);
 
                     if(i < 500) {
                         trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${t.ID_TRX}</div><div class="text-[10px] text-slate-400">${cleanDate} ${t.Waktu || ''}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
@@ -1409,7 +1418,8 @@
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
                 let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${m.Waktu}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan}</td></tr>`;
+                    let mWaktuStr = this.formatDateStr(m.Waktu, true);
+                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan}</td></tr>`;
                 }
             });
             const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || `<tr><td colspan="5" class="text-center py-10 h-32">${this.getEmptyState('fa-truck', 'Belum Ada Mutasi', 'Tidak ada data distribusi di rentang ini')}</td></tr>`;
@@ -1419,7 +1429,8 @@
                 let kDate = this.parseDateId(k.Tanggal);
                 if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
                     totalKas += Number(k.Nominal);
-                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${k.Tanggal} ${k.Waktu}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
+                    let kDateStr = this.formatDateStr(k.Tanggal);
+                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${k.Waktu}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
                 }
             });
             const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
@@ -1435,10 +1446,12 @@
                     if(op.Status_Approval === 'Pending') badge = '<span class="bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded text-[10px]">Pending</span>';
                     else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Disetujui</span>';
                     else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Ditolak</span>';
+                    
+                    let opWaktuStr = this.formatDateStr(op.Waktu, true);
 
                     if(i < 500) {
                         selisihHtml += `<tr class="border-b border-slate-50">
-                            <td class="py-2 px-4 whitespace-nowrap text-xs">${op.Waktu}</td>
+                            <td class="py-2 px-4 whitespace-nowrap text-xs">${opWaktuStr}</td>
                             <td class="py-2 px-4 whitespace-normal min-w-[150px] font-bold text-brand-600">${itemName}</td>
                             <td class="py-2 px-4 whitespace-nowrap text-xs">${op.Outlet} (${op.Kasir})</td>
                             <td class="py-2 px-4 whitespace-nowrap text-center text-xs">Sys: ${op.Stok_Sistem} | Fis: ${op.Stok_Fisik}</td>
@@ -1470,7 +1483,7 @@
             this.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
             let statText = trx.Status === 'Sukses' ? '' : '<br><span style="color:red; font-size:16px;">*** DIBATALKAN ***</span>';
             
-            let cleanDate = typeof trx.Tanggal === 'string' && trx.Tanggal.includes('T') ? trx.Tanggal.split('T')[0] : trx.Tanggal;
+            let cleanDate = this.formatDateStr(trx.Tanggal);
 
             let strukHtml = `<div class="text-center font-bold mb-2 text-slate-800">=== Ai-Snack ===<br>Cabang: ${trx.Outlet}<br>No. Resi: ${trx.ID_TRX}<br>${cleanDate} ${trx.Waktu||''}${statText}</div><div class="border-b border-dashed border-slate-400 mb-2"></div>`;
             items.forEach(i => { strukHtml += `<div class="mb-1 text-slate-800">${i.nama}<br><div class="flex justify-between"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span>Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
@@ -1487,7 +1500,7 @@
         executeReprint: async function() {
             if(!this.activeReprintTrx) return; let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
             let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-            let cleanDate = typeof t.Tanggal === 'string' && t.Tanggal.includes('T') ? t.Tanggal.split('T')[0] : t.Tanggal;
+            let cleanDate = this.formatDateStr(t.Tanggal);
             try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + (t.Waktu||'')); } catch(e) {}
         },
         promptVoidTrx: function() {
@@ -1503,7 +1516,7 @@
                 this.showToast("Transaksi Dibatalkan!"); 
                 let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-                let cleanDate = typeof t.Tanggal === 'string' && t.Tanggal.includes('T') ? t.Tanggal.split('T')[0] : t.Tanggal;
+                let cleanDate = this.formatDateStr(t.Tanggal);
                 try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + (t.Waktu||'')); } catch(e){}
 
                 if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json(); }
@@ -1512,7 +1525,7 @@
             this.setLoading(false);
         },
 
-        // 6. AI ASSISTANT (FIXED NaN BUG)
+        // AI ASSISTANT (FIXED NaN BUG)
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1613,14 +1626,8 @@
                     if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
                     canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-                    
                     const base64 = canvas.toDataURL('image/jpeg', 0.5); 
-                    
-                    if(base64.length > 45000) {
-                        superApp.showToast("Ukuran foto terlalu besar. Silakan crop atau gunakan foto lain.", "error");
-                        return;
-                    }
-
+                    if(base64.length > 45000) { superApp.showToast("Ukuran foto terlalu besar. Silakan crop atau gunakan foto lain.", "error"); return; }
                     document.getElementById(inputId).value = base64;
                     const preview = document.getElementById(inputId + '-preview');
                     if (preview) { preview.src = base64; preview.classList.remove('hidden'); }
@@ -1812,6 +1819,7 @@
             if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Distribusi Stok...");
             const payload = { action: 'distribusi', sku: sku, outlet: targetOutlet, qty: qty };
             let res = await this.apiPost(payload);
+            
             if(res.status === 'sukses') {
                 this.closeModal('modal-form'); 
                 if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
@@ -1850,7 +1858,7 @@
             this.setLoading(false);
         },
 
-        // STAF (FIXED: FUNGSI DIKEMBALIKAN UTUH)
+        // STAF
         renderStaf: function() {
             const filterEl = document.getElementById('staf-filter-outlet');
             if(filterEl && filterEl.options.length <= 1) {
@@ -1910,7 +1918,6 @@
             if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
         },
 
-        // HELPERS
         makeInput: function(label, id, val='', type='text', hint='', dis=false) { return `<div><label class="text-xs font-bold text-slate-500 block mb-1">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; },
         buildForm: function(title, inputsHtml, actionFunctionStr) {
             const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
