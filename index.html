@@ -136,14 +136,12 @@
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center text-slate-800" id="modal-tutup-shift-content">
       <h3 class="font-extrabold text-xl mb-2">Tutup Laci & Rekap Shift</h3>
       <p class="text-slate-500 text-sm mb-6">Hitung uang fisik di laci kasir sekarang.</p>
-      
       <div class="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200">
           <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Modal Awal</span><span class="text-xs font-black" id="ts-modal">Rp 0</span></div>
           <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Sales Tunai</span><span class="text-xs font-black text-green-600" id="ts-sales">Rp 0</span></div>
           <div class="flex justify-between mb-3"><span class="text-xs font-bold text-slate-500">Kas Keluar</span><span class="text-xs font-black text-red-500" id="ts-kasout">Rp 0</span></div>
           <div class="flex justify-between border-t border-slate-200 pt-2"><span class="text-sm font-bold text-slate-800">Uang Laci (Sistem)</span><span class="text-sm font-black text-brand-600" id="ts-expected">Rp 0</span></div>
       </div>
-
       <div class="text-left mb-6">
         <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Uang Riil)</label>
         <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Masukkan total uang laci">
@@ -507,6 +505,9 @@
   </div>
 
   <script>
+    // =========================================================================
+    // WAJIB DIGANTI: URL WEB APP GOOGLE APPS SCRIPT ANDA (BERAKHIRAN /exec)
+    // =========================================================================
     const API_URL = "https://script.google.com/macros/s/AKfycbzQ6G1wFjqAfmOz8kUF8-7wK3nKF-_XMBiOyxx1XChiez_OxiTTCcWAL65ZnbLibzkjrg/exec";
 
     const superApp = {
@@ -515,17 +516,30 @@
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
         offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false,
 
-        formatDateStr: function(str, includeTime = false) {
+        // =========================================================================
+        // PEMBERSIH ZONA WAKTU (AUTO-FORMATTER)
+        // =========================================================================
+        cleanDateOnly: function(str) {
             if(!str) return '';
             let s = String(str);
-            if(s.includes('T') && s.endsWith('Z')) {
+            if(s.includes('T')) {
                 let d = new Date(s);
-                let pad = (n) => n < 10 ? '0' + n : n;
-                let dateP = `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
-                let timeP = `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`;
-                return includeTime ? `${dateP} ${timeP}` : dateP;
+                if(!isNaN(d)) {
+                    let pad = n => n < 10 ? '0' + n : n;
+                    return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+                }
             }
-            return s;
+            return s.split(' ')[0];
+        },
+        cleanTimeOnly: function(str) {
+            if(!str) return '';
+            let s = String(str);
+            if(s.includes('T') && s.includes('Z')) {
+                // Memaksa mengambil jam aslinya meskipun Google Sheets mengubahnya ke format Satelit
+                return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
+            }
+            let parts = s.split(' ');
+            return parts.length > 1 ? parts[1] : s;
         },
 
         getEmptyState: function(icon, title, desc) {
@@ -566,9 +580,11 @@
         },
         parseDateId: function(dateStr) {
             if(!dateStr) return new Date(0);
-            let p = String(dateStr).split(' ')[0].split('/');
+            let s = String(dateStr);
+            if(s.includes('T')) return new Date(s);
+            let p = s.split(' ')[0].split('/');
             if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
-            return new Date(dateStr); 
+            return new Date(s); 
         },
 
         apiPost: async function(payload) {
@@ -922,13 +938,11 @@
             this.setLoading(false);
         },
 
+        // OPNAME
         renderOpname: function() {
             const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
-            const tbUtama = document.getElementById('opname-tbody-utama'); const tbPdk = document.getElementById('opname-tbody-pendukung');
-            if(!tbUtama || !tbPdk) return;
             
-            let htmlUtama = ''; let htmlPdk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            
+            let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
             let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
@@ -955,13 +969,13 @@
                         </div>
                     </div>`;
 
-                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtama += strHtml; htmlUtamaMobile += strMobile; }
-                    else { htmlPdk += strHtml; htmlPdkMobile += strMobile; }
+                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
             
-            tbUtama.innerHTML = htmlUtama || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-            tbPdk.innerHTML = htmlPdk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+            const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+            const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
             
             const mobCards = document.getElementById('opname-mobile-cards'); 
             if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
@@ -1010,7 +1024,8 @@
                         let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                         
                         items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                        waText += `🔹 *${m.Nama_Produk}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
+                        let itemName = this.db.masterProduk.find(m => m.SKU === s.SKU)?.Nama_Produk || s.SKU;
+                        waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
                     }
                 }
             });
@@ -1028,6 +1043,7 @@
             this.setLoading(false);
         },
 
+        // AUDIT (OWNER)
         toggleAuditTab: function(tab) {
             const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
             const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
@@ -1045,7 +1061,8 @@
                     if(op.Status_Approval === 'Pending') {
                         let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
                         let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
-                        let wStr = this.formatDateStr(op.Waktu, true);
+                        let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
+
                         html += `<tr class="border-b border-slate-50">
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td>
@@ -1069,7 +1086,8 @@
                 (this.db.mutasi || []).forEach(mt => {
                     if(mt.Status_Approval === 'Pending') {
                         let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU;
-                        let wStr = this.formatDateStr(mt.Waktu, true);
+                        let wStr = String(mt.Waktu).includes('T') ? this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu) : mt.Waktu;
+
                         html += `<tr class="border-b border-slate-50">
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td>
@@ -1166,6 +1184,7 @@
             this.setLoading(false);
         },
 
+        // REFRESH DATA & NAVIGATION
         refreshData: function() {
             const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${this.outlet}`;
             const lOutManage = document.getElementById('label-outlet-manage'); if(lOutManage) lOutManage.innerText = this.outlet;
@@ -1391,10 +1410,11 @@
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
                     let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
                     
-                    let cleanDate = this.formatDateStr(t.Tanggal);
+                    let cleanDate = this.cleanDateOnly(t.Tanggal);
+                    let cleanTime = this.cleanTimeOnly(t.Waktu);
 
                     if(i < 500) {
-                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${t.ID_TRX}</div><div class="text-[10px] text-slate-400">${cleanDate} ${t.Waktu || ''}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
+                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${t.ID_TRX}</div><div class="text-[10px] text-slate-400">${cleanDate} ${cleanTime}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
                     }
                     if (t.Status === 'Sukses') {
                         let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
@@ -1418,7 +1438,7 @@
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
                 let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    let mWaktuStr = this.formatDateStr(m.Waktu, true);
+                    let mWaktuStr = String(m.Waktu).includes('T') ? this.cleanDateOnly(m.Waktu) + ' ' + this.cleanTimeOnly(m.Waktu) : m.Waktu;
                     if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan}</td></tr>`;
                 }
             });
@@ -1429,8 +1449,9 @@
                 let kDate = this.parseDateId(k.Tanggal);
                 if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
                     totalKas += Number(k.Nominal);
-                    let kDateStr = this.formatDateStr(k.Tanggal);
-                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${k.Waktu}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
+                    let kDateStr = this.cleanDateOnly(k.Tanggal);
+                    let kTimeStr = this.cleanTimeOnly(k.Waktu);
+                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${kTimeStr}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
                 }
             });
             const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
@@ -1447,7 +1468,7 @@
                     else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Disetujui</span>';
                     else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Ditolak</span>';
                     
-                    let opWaktuStr = this.formatDateStr(op.Waktu, true);
+                    let opWaktuStr = String(op.Waktu).includes('T') ? this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu) : op.Waktu;
 
                     if(i < 500) {
                         selisihHtml += `<tr class="border-b border-slate-50">
@@ -1483,9 +1504,10 @@
             this.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
             let statText = trx.Status === 'Sukses' ? '' : '<br><span style="color:red; font-size:16px;">*** DIBATALKAN ***</span>';
             
-            let cleanDate = this.formatDateStr(trx.Tanggal);
+            let cleanDate = this.cleanDateOnly(trx.Tanggal);
+            let cleanTime = this.cleanTimeOnly(trx.Waktu);
 
-            let strukHtml = `<div class="text-center font-bold mb-2 text-slate-800">=== Ai-Snack ===<br>Cabang: ${trx.Outlet}<br>No. Resi: ${trx.ID_TRX}<br>${cleanDate} ${trx.Waktu||''}${statText}</div><div class="border-b border-dashed border-slate-400 mb-2"></div>`;
+            let strukHtml = `<div class="text-center font-bold mb-2 text-slate-800">=== Ai-Snack ===<br>Cabang: ${trx.Outlet}<br>No. Resi: ${trx.ID_TRX}<br>${cleanDate} ${cleanTime}${statText}</div><div class="border-b border-dashed border-slate-400 mb-2"></div>`;
             items.forEach(i => { strukHtml += `<div class="mb-1 text-slate-800">${i.nama}<br><div class="flex justify-between"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span>Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
             strukHtml += `<div class="border-t border-dashed border-slate-400 mt-2 pt-2 flex justify-between font-bold text-slate-800"><span>TOTAL</span><span>Rp ${Number(trx.Total_Bayar).toLocaleString('id-ID')}</span></div>`;
             let tunaiVal = trx.Tunai !== undefined ? trx.Tunai : (trx.Dibayar || 0);
@@ -1500,8 +1522,9 @@
         executeReprint: async function() {
             if(!this.activeReprintTrx) return; let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
             let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-            let cleanDate = this.formatDateStr(t.Tanggal);
-            try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + (t.Waktu||'')); } catch(e) {}
+            let cleanDate = this.cleanDateOnly(t.Tanggal);
+            let cleanTime = this.cleanTimeOnly(t.Waktu);
+            try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + cleanTime); } catch(e) {}
         },
         promptVoidTrx: function() {
             let pin = prompt("Masukkan PIN Super Admin (Owner) untuk Membatalkan & Mengembalikan Stok:");
@@ -1516,8 +1539,9 @@
                 this.showToast("Transaksi Dibatalkan!"); 
                 let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-                let cleanDate = this.formatDateStr(t.Tanggal);
-                try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + (t.Waktu||'')); } catch(e){}
+                let cleanDate = this.cleanDateOnly(t.Tanggal);
+                let cleanTime = this.cleanTimeOnly(t.Waktu);
+                try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + cleanTime); } catch(e){}
 
                 if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json(); }
                 this.refreshData(); this.closeModal('modal-detail');
@@ -1525,7 +1549,7 @@
             this.setLoading(false);
         },
 
-        // AI ASSISTANT (FIXED NaN BUG)
+        // 6. AI ASSISTANT 
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1918,6 +1942,7 @@
             if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
         },
 
+        // HELPERS
         makeInput: function(label, id, val='', type='text', hint='', dis=false) { return `<div><label class="text-xs font-bold text-slate-500 block mb-1">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; },
         buildForm: function(title, inputsHtml, actionFunctionStr) {
             const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
