@@ -4,46 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ai-Snack ERP & POS Ultimate</title>
-  
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#f97316">
-  
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .nav-active { background-color: #f97316; color: white; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); }
-    .nav-active i { color: white !important; }
-    .modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .modal-enter-active { opacity: 1; transform: scale(1); }
-    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .toast-animate { animation: slideInRight 0.3s ease-out forwards; }
-    .blur-lock { filter: blur(8px); pointer-events: none; user-select: none; }
-    .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
-    
-    .dark body { background-color: #0f172a; color: #f8fafc; }
-    .dark .bg-white { background-color: #1e293b; border-color: #334155; }
-    .dark .bg-slate-50 { background-color: #0f172a; }
-    .dark .text-slate-800 { color: #f8fafc; }
-    .dark .text-slate-500 { color: #94a3b8; }
-    .dark .border-slate-100, .dark .border-slate-200 { border-color: #334155; }
-    .numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
-    .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
-    .numpad-btn:active { transform: scale(0.95); }
-    .item-empty { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
-    
-    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
-    .animate-pulse-slow { animation: pulse-slow 3s infinite; }
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .slide-up { animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    
-    .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
-    .dark .skeleton { background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%); background-size: 200% 100%; }
-    @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; }
+    body{font-family:'Plus Jakarta Sans',sans-serif;-webkit-tap-highlight-color:transparent}
+    .no-scrollbar::-webkit-scrollbar{display:none}
+    .nav-active{background-color:#f97316;color:white;box-shadow:0 4px 15px rgba(249,115,22,0.3)}
+    .nav-active i{color:white !important}
+    .modal-enter{opacity:0;transform:scale(0.95);transition:all 0.3s cubic-bezier(0.4,0,0.2,1)}
+    .modal-enter-active{opacity:1;transform:scale(1)}
+    @keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+    .toast-animate{animation:slideInRight 0.3s ease-out forwards}
+    .blur-lock{filter:blur(8px);pointer-events:none;user-select:none}
+    .pdf-container{background:white !important;color:black !important;padding:20px !important}
+    .dark body{background-color:#0f172a;color:#f8fafc}
+    .dark .bg-white{background-color:#1e293b;border-color:#334155}
+    .dark .bg-slate-50{background-color:#0f172a}
+    .dark .text-slate-800{color:#f8fafc}
+    .dark .text-slate-500{color:#94a3b8}
+    .dark .border-slate-100,.dark .border-slate-200{border-color:#334155}
+    .numpad-btn{background:var(--tw-bg-opacity,#f8fafc);border-radius:1rem;font-size:1.5rem;font-weight:800;padding:1rem;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;transition:all 0.1s;cursor:pointer}
+    .dark .numpad-btn{background:#334155;border-color:#475569;color:white}
+    .numpad-btn:active{transform:scale(0.95)}
+    .item-empty{opacity:0.4;filter:grayscale(1);pointer-events:none}
+    @keyframes pulse-slow{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+    .animate-pulse-slow{animation:pulse-slow 3s infinite}
+    @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    .slide-up{animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) forwards}
+    .skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#cbd5e1 50%,#e2e8f0 75%);background-size:200% 100%;animation:skeletonLoading 1.5s infinite}
+    .dark .skeleton{background:linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%);background-size:200% 100%}
+    @keyframes skeletonLoading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .fly-dot{position:fixed;width:20px;height:20px;background-color:#f97316;border-radius:50%;z-index:9999;pointer-events:none;transition:transform 0.5s cubic-bezier(0.2,1,0.3,1),opacity 0.5s ease-in}
   </style>
   <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{500:'#f97316',600:'#ea580c'}}}}}</script>
 </head>
@@ -65,9 +60,7 @@
     <div class="w-1/3 bg-white flex flex-col shadow-2xl relative z-10">
         <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md"><h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2></div>
         <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 min-h-0 no-scrollbar" id="cfd-cart-list"></div>
-        <div class="p-8 bg-white border-t-4 border-brand-500 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] shrink-0">
-            <p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p><p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p>
-        </div>
+        <div class="p-8 bg-white border-t-4 border-brand-500 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] shrink-0"><p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p><p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p></div>
     </div>
     <div id="cfd-standby" class="absolute inset-0 bg-brand-500 flex flex-col items-center justify-center z-50 transition-opacity duration-500">
          <div class="w-48 h-48 bg-white rounded-full flex items-center justify-center text-brand-500 font-black text-7xl shadow-2xl mb-10 animate-pulse-slow p-6"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-lg"></div>
@@ -83,24 +76,18 @@
 
   <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 lg:p-8 shadow-2xl flex flex-col items-center border border-slate-800">
-      <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-3xl flex items-center justify-center shadow-lg mb-4 lg:mb-6 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
+      <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-3xl flex items-center justify-center shadow-lg mb-4 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
       <h2 class="text-xl lg:text-2xl font-black text-slate-800 mb-1">Masuk Sistem</h2>
       <p class="text-xs lg:text-sm font-bold text-slate-400 mb-6">Masukkan PIN Otorisasi</p>
-      
       <div class="flex gap-4 mb-6">
-        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-1"></div>
-        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-2"></div>
-        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-3"></div>
-        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-4"></div>
+        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-1"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-2"></div>
+        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-3"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-4"></div>
       </div>
-
       <div class="grid grid-cols-3 gap-2 lg:gap-3 w-full mb-4">
         <button class="numpad-btn" onclick="superApp.addPin('1')">1</button><button class="numpad-btn" onclick="superApp.addPin('2')">2</button><button class="numpad-btn" onclick="superApp.addPin('3')">3</button>
         <button class="numpad-btn" onclick="superApp.addPin('4')">4</button><button class="numpad-btn" onclick="superApp.addPin('5')">5</button><button class="numpad-btn" onclick="superApp.addPin('6')">6</button>
         <button class="numpad-btn" onclick="superApp.addPin('7')">7</button><button class="numpad-btn" onclick="superApp.addPin('8')">8</button><button class="numpad-btn" onclick="superApp.addPin('9')">9</button>
-        <button class="numpad-btn text-slate-400 text-lg" onclick="superApp.clearPin()"><i class="fas fa-times"></i></button>
-        <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
-        <button class="numpad-btn text-red-500 text-lg" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
+        <button class="numpad-btn text-slate-400 text-lg" onclick="superApp.clearPin()"><i class="fas fa-times"></i></button><button class="numpad-btn" onclick="superApp.addPin('0')">0</button><button class="numpad-btn text-red-500 text-lg" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
       </div>
       <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center" id="login-status">Sistem Offline. Menyinkronkan API...</p>
     </div>
@@ -113,22 +100,19 @@
       <p class="text-slate-500 font-medium text-sm mb-2">Kasir: <span id="shift-user-name" class="font-bold text-brand-500"></span></p>
       <p class="text-slate-500 font-medium text-sm mb-6">Cabang: <span id="shift-outlet-name" class="font-bold text-brand-500"></span></p>
       <div class="text-left mb-6">
-        <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Tim Bantuan (Opsional)</label>
-        <div id="shift-staff-list" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar border-y border-slate-100 py-2 mb-4"></div>
-        <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label>
-        <input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Ketik nominal uang fisik">
+        <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Tim Bantuan (Opsional)</label><div id="shift-staff-list" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar border-y border-slate-100 py-2 mb-4"></div>
+        <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label><input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white">
       </div>
-      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Buka Kasir</button>
+      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition">Buka Kasir</button>
     </div>
   </div>
 
   <div id="modal-kas-keluar" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-slate-800" id="modal-kas-keluar-content">
       <h3 class="font-extrabold text-xl mb-2 border-b pb-3">Input Kas Keluar</h3>
-      <p class="text-slate-500 text-sm mb-4">Catat pengeluaran darurat dari uang laci.</p>
       <div class="space-y-4 mb-6">
-        <div><label class="text-xs font-bold text-slate-500 block mb-1">Nominal (Rp)</label><input type="number" id="kas-out-nominal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white" placeholder="Contoh: 15000"></div>
-        <div><label class="text-xs font-bold text-slate-500 block mb-1">Keterangan / Keperluan</label><input type="text" id="kas-out-ket" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white" placeholder="Beli es batu, dll"></div>
+        <div><label class="text-xs font-bold text-slate-500 block mb-1">Nominal (Rp)</label><input type="number" id="kas-out-nominal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white"></div>
+        <div><label class="text-xs font-bold text-slate-500 block mb-1">Keterangan / Keperluan</label><input type="text" id="kas-out-ket" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white"></div>
       </div>
       <div class="flex gap-2">
         <button onclick="superApp.closeModal('modal-kas-keluar')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200">Batal</button>
@@ -140,7 +124,6 @@
   <div id="modal-tutup-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center text-slate-800" id="modal-tutup-shift-content">
       <h3 class="font-extrabold text-xl mb-2">Tutup Laci & Rekap Shift</h3>
-      <p class="text-slate-500 text-sm mb-6">Hitung uang fisik di laci kasir sekarang.</p>
       <div class="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200">
           <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Modal Awal</span><span class="text-xs font-black" id="ts-modal">Rp 0</span></div>
           <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Sales Tunai</span><span class="text-xs font-black text-green-600" id="ts-sales">Rp 0</span></div>
@@ -149,7 +132,7 @@
       </div>
       <div class="text-left mb-6">
         <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Uang Riil)</label>
-        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Masukkan total uang laci">
+        <input type="number" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white">
       </div>
       <div class="flex gap-2">
         <button onclick="superApp.closeModal('modal-tutup-shift')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200">Batal</button>
@@ -178,7 +161,7 @@
         <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Riwayat & Rekap</span></button>
         
         <div id="admin-menus" class="hidden flex-col gap-1 shrink-0">
-            <p class="px-4 text-xs font-bold text-slate-400 uppercase mt-6 mb-2">Akses Admin (Owner)</p>
+            <p class="px-4 text-xs font-bold text-slate-400 uppercase mt-6 mb-2">Akses Admin</p>
             <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-user-check w-8 text-blue-500 group-hover:text-blue-600"></i><span class="font-bold text-sm text-blue-600">Audit & Approval</span></button>
             <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Asisten AI Owner</span></button>
             <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-warehouse w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Gudang & Master</span></button>
@@ -186,9 +169,8 @@
             <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Kinerja Karyawan</span></button>
         </div>
     </nav>
-
     <div class="px-6 mt-2 pt-4 border-t border-slate-100 flex flex-col gap-2 shrink-0 pb-6">
-        <button onclick="superApp.promptTutupShift()" id="btn-tutup-shift" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
+        <button onclick="superApp.promptTutupShift()" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
         <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm"><i class="fas fa-power-off mr-2"></i>Keluar / Logout</button>
     </div>
   </aside>
@@ -204,11 +186,9 @@
       </div>
       <div class="flex items-center gap-2 lg:gap-3 overflow-x-auto no-scrollbar">
         <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 shrink-0 cursor-pointer" onclick="superApp.syncOfflineQueue()">
-            <span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span>
-            <span id="net-text" class="text-[10px] font-bold text-green-600 hidden md:inline">Online</span>
+            <span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span><span id="net-text" class="text-[10px] font-bold text-green-600 hidden md:inline">Online</span>
         </div>
-        
-        <button id="btn-ubah-promo" onclick="superApp.changePromoImage()" class="hidden lg:flex bg-slate-100 text-slate-600 border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-slate-200 transition shrink-0" title="Ganti Foto Layar Pelanggan"><i class="fas fa-image"></i> Ubah Promo</button>
+        <button id="btn-ubah-promo" onclick="superApp.changePromoImage()" class="hidden lg:flex bg-slate-100 text-slate-600 border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-slate-200 transition shrink-0"><i class="fas fa-image"></i> Ubah Promo</button>
         <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition shrink-0"><i class="fas fa-desktop"></i> Layar Pelanggan</button>
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition shrink-0"><i class="fas fa-moon" id="dark-icon"></i></button>
         <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 shrink-0"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
@@ -227,7 +207,6 @@
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pb-6 content-start flex-1 min-h-0 no-scrollbar" id="product-list"></div>
         </div>
-        
         <aside class="w-full lg:w-[350px] bg-white border border-slate-200 rounded-3xl flex flex-col shadow-sm h-[45dvh] lg:h-full shrink-0">
           <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
             <h2 class="font-extrabold text-lg text-slate-800">Keranjang</h2><span class="bg-brand-100 text-brand-600 px-3 py-1 rounded-full text-xs font-bold" id="cart-badge">0 Item</span>
@@ -243,20 +222,18 @@
       <div id="view-terima" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 shrink-0">
-                <div><h3 class="font-extrabold text-xl">Penerimaan Barang Pusat</h3><p class="text-xs text-slate-500 font-bold mt-1">Input barang yang tiba dari gudang ke cabang <span class="text-brand-500" id="lbl-terima-outlet"></span></p></div>
+                <div><h3 class="font-extrabold text-xl">Penerimaan Barang</h3><p class="text-xs text-slate-500 font-bold mt-1">Input barang masuk <span class="text-brand-500" id="lbl-terima-outlet"></span></p></div>
                 <div class="flex gap-2 w-full md:w-auto">
-                    <button onclick="superApp.openTransferModal()" class="flex-1 md:flex-none bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition"><i class="fas fa-exchange-alt mr-2"></i>Transfer Antar Toko</button>
+                    <button onclick="superApp.openDistribusiModal('', superApp.outlet)" class="flex-1 md:flex-none bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition"><i class="fas fa-exchange-alt mr-2"></i>Minta Stok Toko Lain</button>
                     <button onclick="superApp.submitTerimaBarang()" class="flex-1 md:flex-none bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition"><i class="fas fa-paper-plane mr-2"></i>Lapor Datang</button>
                 </div>
             </div>
-            
             <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative no-scrollbar">
                 <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10">A. Bahan Baku Utama</h4>
-                <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku / Produk</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-100"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku</th><th class="pb-3 px-4 text-center">Jumlah (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan / Kondisi</th></tr></thead><tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-100"></tbody></table>
                 <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10">B. Barang Pendukung</h4>
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-100"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 px-4 text-center">Jumlah (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan / Kondisi</th></tr></thead><tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-100"></tbody></table>
             </div>
-
             <div class="grid grid-cols-1 gap-4 md:hidden flex-1 overflow-y-auto min-h-0 no-scrollbar content-start" id="terima-mobile-cards"></div>
         </div>
       </div>
@@ -265,16 +242,14 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 shrink-0">
                 <div><h3 class="font-extrabold text-xl">Opname Fisik Stok</h3><p class="text-xs text-slate-500 font-bold mt-1">Sesuaikan fisik bahan baku di Cabang <span class="text-brand-500" id="lbl-opname-outlet"></span></p></div>
-                <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Lapor Audit Owner (WA)</button>
+                <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Lapor Audit Owner</button>
             </div>
-            
             <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative no-scrollbar">
                 <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10">A. Bahan Baku Utama</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-utama" class="font-bold divide-y divide-slate-100"></tbody></table>
                 <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10">B. Barang Pendukung</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-pendukung" class="font-bold divide-y divide-slate-100"></tbody></table>
             </div>
-
             <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 no-scrollbar content-start" id="opname-mobile-cards"></div>
         </div>
       </div>
@@ -283,20 +258,17 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex items-center gap-4 mb-6 border-b border-slate-200 pb-4 shrink-0">
                 <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 text-2xl shadow-sm"><i class="fas fa-user-check"></i></div>
-                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan penyesuaian stok cabang dari laporan kasir.</p></div>
+                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan stok cabang.</p></div>
             </div>
-            
             <div class="flex gap-2 bg-slate-50 p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4 shrink-0">
                 <button onclick="superApp.toggleAuditTab('opname')" id="tab-audit-opname" class="px-4 py-2 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-slate-200">Audit Opname Fisik</button>
-                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk & Transfer</button>
+                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk</button>
             </div>
-
             <div id="audit-content-opname" class="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Alasan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
-
             <div id="audit-content-terima" class="hidden flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
@@ -310,7 +282,7 @@
                 <button onclick="superApp.toggleReportTab('selisih')" id="tab-selisih" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Selisih</button>
             </div>
             <div class="flex gap-2 flex-wrap items-center w-full md:w-auto">
-                <input type="text" id="filter-search-trx" placeholder="Cari No. Resi..." class="flex-1 md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm focus:border-brand-500" onkeyup="superApp.renderReport()">
+                <input type="text" id="filter-search-trx" placeholder="Cari Resi..." class="flex-1 md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm focus:border-brand-500" onkeyup="superApp.renderReport()">
                 <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
                 <span class="text-slate-400 font-bold">-</span>
                 <input type="date" id="filter-end" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
@@ -318,10 +290,8 @@
                 <button onclick="superApp.exportPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800"><i class="fas fa-file-pdf mr-2 text-red-400"></i></button>
             </div>
         </div>
-        
         <div id="pdf-export-area" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 lg:p-8 flex-1 flex flex-col min-h-0 relative">
             <div class="text-center mb-8 border-b border-slate-200 pb-4 shrink-0"><h2 class="text-2xl font-black uppercase tracking-widest text-slate-800">Laporan Operasional</h2><p class="text-slate-500 font-bold" id="report-title-label"></p><p class="text-xs text-slate-400" id="report-date-label"></p></div>
-
             <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 shrink-0">
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Total Transaksi</p><h4 class="text-xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
@@ -334,7 +304,6 @@
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Resi & Waktu</th><th class="py-3 px-4">Kasir / Outlet</th><th class="py-3 px-4">Metode</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Total Bayar</th><th class="py-3 px-4 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
-
             <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-brand-600 border-l-4 border-brand-500 pl-3 shrink-0">B. Rekapitulasi Penjualan per Produk</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
@@ -345,14 +314,12 @@
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">SKU Item</th><th class="py-3 px-4">Tujuan</th><th class="py-3 px-4 text-right">Qty Kirim</th><th class="py-3 px-4 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
-
             <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-red-500 border-l-4 border-red-500 pl-3 shrink-0">D. Log Kas Keluar (Pengeluaran Laci)</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Cabang & Kasir</th><th class="py-3 px-4">Keterangan</th><th class="py-3 px-4 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
-
             <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-purple-600 border-l-4 border-purple-500 pl-3 shrink-0">E. Riwayat Audit Selisih Stok (Opname)</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
@@ -379,7 +346,7 @@
 
             <h3 class="font-extrabold text-lg mb-4 shrink-0 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-500"></i> Rekomendasi Distribusi & Tindakan</h3>
             <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 min-h-[300px] lg:min-h-0 relative no-scrollbar">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10"><tr><th class="py-3 px-4">Cabang Target</th><th class="py-3 px-4">Item Berstatus Kritis</th><th class="py-3 px-4 text-center">Avg. Terjual/Hari</th><th class="py-3 px-4 text-center">Prediksi Sisa Umur Stok</th><th class="py-3 px-4 text-center">Aksi (Cepat)</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10"><tr><th class="py-3 px-4">Cabang Target</th><th class="py-3 px-4">Item Kritis</th><th class="py-3 px-4 text-center">Avg. Terjual/Hari</th><th class="py-3 px-4 text-center">Prediksi Sisa Umur Stok</th><th class="py-3 px-4 text-center">Aksi (Cepat)</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
@@ -393,16 +360,13 @@
                     <button onclick="superApp.openRestokModal()" class="flex-1 lg:flex-none bg-brand-100 text-brand-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-brand-200 shadow"><i class="fas fa-boxes-packing mr-1"></i>Restok</button>
                 </div>
             </div>
-            
             <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 no-scrollbar relative flex flex-col">
                 <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10 shrink-0">A. Bahan Baku Utama</h4>
                 <table class="w-full text-left text-sm mb-6"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-2 px-4 whitespace-nowrap">Nama Bahan</th><th class="pb-2 px-4 text-right whitespace-nowrap">Sisa Pusat</th><th class="pb-2 px-4 text-center whitespace-nowrap">Aksi</th></tr></thead><tbody id="gudang-tbody-utama" class="divide-y divide-slate-50"></tbody></table>
-                
                 <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10 shrink-0">B. Barang Pendukung</h4>
                 <table class="w-full text-left text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-2 px-4 whitespace-nowrap">Nama Barang</th><th class="pb-2 px-4 text-right whitespace-nowrap">Sisa Pusat</th><th class="pb-2 px-4 text-center whitespace-nowrap">Aksi</th></tr></thead><tbody id="gudang-tbody-pendukung" class="divide-y divide-slate-50"></tbody></table>
             </div>
         </div>
-        
         <div class="flex-1 bg-white p-4 lg:p-6 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[50vh] lg:min-h-0">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-200 pb-3 mb-4 gap-4 shrink-0">
                 <div><h3 class="font-extrabold text-lg">Master Produk (Menu Jual)</h3><p class="text-xs text-slate-500">Varian menu di kasir yang memotong BOM.</p></div>
@@ -459,13 +423,10 @@
     </div>
   </main>
 
-  <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none"></div>
-
   <div id="modal-payment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
-      
       <div class="mb-4">
           <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Metode Pembayaran</label>
           <div class="grid grid-cols-2 gap-2">
@@ -473,7 +434,6 @@
               <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS/TRANSFER</button>
           </div>
       </div>
-      
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
               <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
@@ -488,7 +448,6 @@
           </div>
           <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 text-slate-800"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       </div>
-
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan & Cetak</button>
     </div>
   </div>
@@ -512,6 +471,8 @@
     </div>
   </div>
 
+  <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none"></div>
+
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbyLsF7L_W2ZbQDP8S54rsR5vy9v9Gf0t3x-oyzLV-5XwODQnG1tl7pjGevozMWAYim7ug/exec";
 
@@ -521,9 +482,6 @@
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
         offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
 
-        // =========================================================================
-        // PEMBERSIH ZONA WAKTU (AUTO-FORMATTER) & MUTEX LOCK
-        // =========================================================================
         cleanDateOnly: function(str) {
             if(!str) return '';
             let s = String(str);
@@ -539,19 +497,11 @@
         cleanTimeOnly: function(str) {
             if(!str) return '';
             let s = String(str);
-            if(s.includes('T') && s.includes('Z')) {
-                return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
-            }
-            let parts = s.split(' ');
-            return parts.length > 1 ? parts[1] : s;
+            if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
+            let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
         },
-
         getEmptyState: function(icon, title, desc) {
-            return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70">
-                <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div>
-                <h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4>
-                <p class="text-xs font-bold text-slate-400">${desc}</p>
-            </div>`;
+            return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`;
         },
         showToast: function(msg, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -569,11 +519,7 @@
         setLoading: function(show, text="Memproses...") { 
             const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text');
             if(show) this.isProcessing = true; else this.isProcessing = false;
-            if(loader && lText) { 
-                lText.innerText = text; 
-                if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } 
-                else { loader.classList.add('hidden'); loader.classList.remove('flex'); } 
-            }
+            if(loader && lText) { lText.innerText = text; if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } else { loader.classList.add('hidden'); loader.classList.remove('flex'); } }
         },
         closeModal: function(id) { 
             const content = document.getElementById(id+'-content'); const modal = document.getElementById(id);
@@ -589,10 +535,8 @@
         },
         parseDateId: function(dateStr) {
             if(!dateStr) return new Date(0);
-            let s = String(dateStr);
-            if(s.includes('T')) return new Date(s);
-            let p = s.split(' ')[0].split('/');
-            if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
+            let s = String(dateStr); if(s.includes('T')) return new Date(s);
+            let p = s.split(' ')[0].split('/'); if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
             return new Date(s); 
         },
 
@@ -734,9 +678,9 @@
             try {
                 let cacheDb = localStorage.getItem('aisnack_db_cache'); if(cacheDb) { this.db = JSON.parse(cacheDb); }
 
-                this.setLoading(true, "Menghubungkan Server..."); 
+                this.isLoadingData = true; 
                 const res = await fetch(API_URL, { redirect: 'follow' }); const data = await res.json();
-                this.setLoading(false);
+                this.isLoadingData = false;
                 
                 if(data && data.status === 'error') throw new Error(data.pesan);
                 this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
@@ -752,7 +696,7 @@
                 const logStat = document.getElementById('login-status');
                 if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
             } catch (err) { 
-                this.setLoading(false);
+                this.isLoadingData = false;
                 const logStat = document.getElementById('login-status');
                 if(logStat && this.db) { logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; } 
                 else if (logStat) { logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
@@ -957,11 +901,8 @@
 
         renderOpname: function() {
             const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
-            const tbUtama = document.getElementById('opname-tbody-utama'); const tbPdk = document.getElementById('opname-tbody-pendukung');
-            if(!tbUtama || !tbPdk) return;
             
-            let htmlUtama = ''; let htmlPdk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            
+            let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
             let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
@@ -988,13 +929,13 @@
                         </div>
                     </div>`;
 
-                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtama += strHtml; htmlUtamaMobile += strMobile; }
-                    else { htmlPdk += strHtml; htmlPdkMobile += strMobile; }
+                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
             
-            tbUtama.innerHTML = htmlUtama || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-            tbPdk.innerHTML = htmlPdk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+            const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+            const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
             
             const mobCards = document.getElementById('opname-mobile-cards'); 
             if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
@@ -1139,6 +1080,58 @@
             this.setLoading(false);
         },
 
+        // TRANSFER & TERIMA BARANG (KASIR)
+        openTransferModal: function() {
+            let opt = ''; 
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            
+            sortedMaster.forEach(m => {
+                if(m.Kategori.toLowerCase()==='bahan' || m.Kategori.toLowerCase()==='pendukung') {
+                    let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+                    let sisa = sData ? Number(sData.Stok_Toko) : 0;
+                    if(sisa > 0) { opt += `<option value="${m.SKU}">${m.Nama_Produk} (Sisa: ${sisa})</option>`; }
+                }
+            });
+            
+            if(opt === '') return this.showToast("Tidak ada stok bahan/barang di cabang Anda yang bisa ditransfer.", "error");
+
+            let outletOpts = '';
+            (this.db.outlets || []).forEach(o => {
+                if(o.ID_Outlet !== this.outlet) outletOpts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`;
+            });
+
+            if(outletOpts === '') return this.showToast("Tidak ada cabang lain terdaftar.", "error");
+
+            let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Barang yang Mau Dikirim</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + 
+                         `<div><label class="text-xs font-bold text-slate-500 block mb-1">Cabang Tujuan</label><select id="frm-trf-out" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${outletOpts}</select></div>` +
+                         this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number');
+            this.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransfer()");
+        },
+        executeTransfer: async function() {
+            if(this.isProcessing) return;
+            const elSku = document.getElementById('frm-trf-sku'); const elQty = document.getElementById('frm-trf-qty'); const elOut = document.getElementById('frm-trf-out');
+            if(!elSku || !elQty || !elOut) return;
+            let sku = elSku.value; let qty = elQty.value; let targetOutlet = elOut.value;
+            if(!qty || parseInt(qty) <= 0) return this.showToast("Qty tidak valid", "error"); 
+            
+            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku && x.ID_Outlet === this.outlet);
+            let sisa = sData ? Number(sData.Stok_Toko) : 0;
+            if(parseInt(qty) > sisa) return this.showToast("Qty melebihi sisa fisik di toko Anda!", "error");
+
+            if(!confirm(`Kirim barang ini ke ${targetOutlet}? Stok Anda akan langsung terpotong.`)) return;
+
+            this.setLoading(true, "Memproses Transfer...");
+            const payload = { action: 'transfer_stok', sku: sku, outlet_asal: this.outlet, outlet_tujuan: targetOutlet, qty: parseInt(qty), kasir: this.currentUser.Username };
+            let res = await this.apiPost(payload);
+            
+            if(res.status === 'sukses') {
+                this.closeModal('modal-form'); 
+                this.showToast("Transfer dikirim! Menunggu konfirmasi Audit Owner.");
+                if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+                this.refreshData(); 
+            } else { this.setLoading(false); }
+        },
+
         renderTerimaBarang: function() {
             const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
             
@@ -1175,7 +1168,7 @@
             if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
             this.setLoading(true, "Menyimpan...");
             let items = [];
-            let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+            let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
             
             (this.db.masterProduk || []).forEach(m => {
                 if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
@@ -1392,7 +1385,7 @@
             const rk = document.getElementById('report-content-kas'); if(rk) rk.classList.add('hidden');
             const rs = document.getElementById('report-content-selisih'); if(rs) rs.classList.add('hidden');
             
-            const tt = document.getElementById('tab-trx'); if(tt) tt.className = 'flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent';
+            const tt = document.getElementById('tab-trx'); if(tt) tt.className = 'flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-slate-200';
             const tr = document.getElementById('tab-rekap'); if(tr) tr.className = 'flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent';
             const tk = document.getElementById('tab-kas'); if(tk) tk.className = 'flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent';
             const ts = document.getElementById('tab-selisih'); if(ts) ts.className = 'flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent';
@@ -1571,7 +1564,7 @@
             this.setLoading(false);
         },
 
-        // 6. AI ASSISTANT (FIXED NaN BUG)
+        // 6. AI ASSISTANT 
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1914,7 +1907,7 @@
             this.setLoading(false);
         },
 
-        // STAF (INTERACTIVE LEADERBOARD)
+        // STAF
         renderStaf: function() {
             const filterEl = document.getElementById('staf-filter-outlet');
             if(filterEl && filterEl.options.length <= 1) {
@@ -1924,18 +1917,13 @@
             }
             let selOut = filterEl ? filterEl.value : 'Semua';
 
-            let outletSales = {};
-            let staffSales = {};
-            let maxOutletSales = 0;
-            let maxStaffSales = 0;
+            let outletSales = {}; let staffSales = {}; let maxOutletSales = 0; let maxStaffSales = 0;
 
             (this.db.transactions || []).forEach(t => {
                 if (t.Status === 'Sukses') {
                     let out = t.Outlet; let kasir = t.Kasir; let bayar = Number(t.Total_Bayar) || 0;
-                    if(!outletSales[out]) outletSales[out] = 0;
-                    outletSales[out] += bayar;
-                    if(!staffSales[kasir]) staffSales[kasir] = { outlet: out, sales: 0 };
-                    staffSales[kasir].sales += bayar;
+                    if(!outletSales[out]) outletSales[out] = 0; outletSales[out] += bayar;
+                    if(!staffSales[kasir]) staffSales[kasir] = { outlet: out, sales: 0 }; staffSales[kasir].sales += bayar;
                 }
             });
 
@@ -1946,4 +1934,62 @@
             let outArr = Object.keys(outletSales).map(k => ({name: k, sales: outletSales[k]})).sort((a,b) => b.sales - a.sales);
             outArr.forEach((o, i) => {
                 let pct = maxOutletSales > 0 ? (o.sales / maxOutletSales) * 100 : 0;
-                let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-7
+                let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-700');
+                outHtml += `<div class="flex flex-col gap-1 mb-3"><div class="flex justify-between text-xs font-bold text-slate-700"><span><i class="fas fa-medal ${medal} mr-1"></i> ${o.name}</span><span>Rp ${o.sales.toLocaleString('id-ID')}</span></div><div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden"><div class="bg-brand-500 h-2.5 rounded-full" style="width: ${pct}%"></div></div></div>`;
+            });
+            const outListEl = document.getElementById('staf-outlet-leaderboard');
+            if(outListEl) outListEl.innerHTML = outHtml || this.getEmptyState('fa-store', 'Belum Ada Data', 'Belum ada transaksi terekam.');
+
+            let stafHtml = '';
+            let stafArr = Object.keys(staffSales).map(k => ({name: k, ...staffSales[k]})).filter(s => selOut === 'Semua' || s.outlet === selOut).sort((a,b) => b.sales - a.sales);
+            stafArr.forEach((s, i) => {
+                let pct = maxStaffSales > 0 ? (s.sales / maxStaffSales) * 100 : 0;
+                stafHtml += `<div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-2"><div class="flex justify-between items-center"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400">Cabang: ${s.outlet}</p></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-sm">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-blue-500 h-1.5 rounded-full" style="width: ${pct}%"></div></div></div>`;
+            });
+            const stafListEl = document.getElementById('staf-employee-list');
+            if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
+        },
+
+        makeInput: function(label, id, val='', type='text', hint='', dis=false) { return `<div><label class="text-xs font-bold text-slate-500 block mb-1">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; },
+        buildForm: function(title, inputsHtml, actionFunctionStr) {
+            const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
+            const bodyEl = document.getElementById('modal-form-body'); if(bodyEl) bodyEl.innerHTML = inputsHtml;
+            const btnEl = document.getElementById('modal-form-btn'); if(btnEl) btnEl.setAttribute('onclick', actionFunctionStr);
+            const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
+            if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
+        },
+        connectBluetooth: async function() {
+            const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
+            try {
+                if(!navigator.bluetooth) throw new Error("Bluetooth API tidak didukung");
+                const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
+                const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); const chars = await services[0].getCharacteristics();
+                for (let char of chars) { if (char.properties.write || char.properties.writeWithoutResponse) { this.printerChar = char; break; } }
+                if(this.printerChar) { btn.innerText = 'Connected'; document.getElementById('btn-printer').classList.add('text-green-600', 'border-green-200'); this.showToast(`Printer Terhubung`); }
+            } catch (err) { btn.innerText = 'Printer'; this.showToast('Batal mencari printer', 'error'); }
+        },
+        printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate) {
+            if (!this.printerChar) return; 
+            try {
+                let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
+                let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
+                
+                let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
+                str += `Cabang: ${outlet}\nNo. Resi: ${id}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00`;
+                items.forEach(i => {
+                    str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
+                });
+                str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
+                const data = new TextEncoder().encode(str);
+                for (let i = 0; i < data.length; i += 100) await this.printerChar.writeValue(data.slice(i, i + 100));
+            } catch(e) { throw e; }
+        }
+    };
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Error:', err)); });
+    }
+    window.onload = () => superApp.init();
+  </script>
+</body>
+</html>
