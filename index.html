@@ -118,7 +118,7 @@
         <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label>
         <input type="number" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white" placeholder="Ketik nominal uang fisik">
       </div>
-      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Validasi & Buka Kasir</button>
+      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition"><i class="fas fa-unlock mr-2"></i>Buka Kasir</button>
     </div>
   </div>
 
@@ -244,7 +244,10 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 shrink-0">
                 <div><h3 class="font-extrabold text-xl">Penerimaan Barang Pusat</h3><p class="text-xs text-slate-500 font-bold mt-1">Input barang yang tiba dari gudang ke cabang <span class="text-brand-500" id="lbl-terima-outlet"></span></p></div>
-                <button onclick="superApp.submitTerimaBarang()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Kirim Laporan WA</button>
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="superApp.openTransferModal()" class="flex-1 md:flex-none bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition"><i class="fas fa-exchange-alt mr-2"></i>Transfer Antar Toko</button>
+                    <button onclick="superApp.submitTerimaBarang()" class="flex-1 md:flex-none bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition"><i class="fas fa-paper-plane mr-2"></i>Lapor Datang</button>
+                </div>
             </div>
             
             <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative no-scrollbar">
@@ -285,7 +288,7 @@
             
             <div class="flex gap-2 bg-slate-50 p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4 shrink-0">
                 <button onclick="superApp.toggleAuditTab('opname')" id="tab-audit-opname" class="px-4 py-2 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-slate-200">Audit Opname Fisik</button>
-                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk</button>
+                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk & Transfer</button>
             </div>
 
             <div id="audit-content-opname" class="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
@@ -1041,7 +1044,7 @@
                         let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                         
                         items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                        let itemName = this.db.masterProduk.find(m => m.SKU === s.SKU)?.Nama_Produk || s.SKU;
+                        let itemName = m.Nama_Produk;
                         waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
                     }
                 }
@@ -1943,75 +1946,4 @@
             let outArr = Object.keys(outletSales).map(k => ({name: k, sales: outletSales[k]})).sort((a,b) => b.sales - a.sales);
             outArr.forEach((o, i) => {
                 let pct = maxOutletSales > 0 ? (o.sales / maxOutletSales) * 100 : 0;
-                let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-700');
-                outHtml += `<div class="flex flex-col gap-1 mb-3">
-                    <div class="flex justify-between text-xs font-bold text-slate-700"><span><i class="fas fa-medal ${medal} mr-1"></i> ${o.name}</span><span>Rp ${o.sales.toLocaleString('id-ID')}</span></div>
-                    <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden"><div class="bg-brand-500 h-2.5 rounded-full" style="width: ${pct}%"></div></div>
-                </div>`;
-            });
-            const outListEl = document.getElementById('staf-outlet-leaderboard');
-            if(outListEl) outListEl.innerHTML = outHtml || this.getEmptyState('fa-store', 'Belum Ada Data', 'Belum ada transaksi terekam.');
-
-            let stafHtml = '';
-            let stafArr = Object.keys(staffSales).map(k => ({name: k, ...staffSales[k]})).filter(s => selOut === 'Semua' || s.outlet === selOut).sort((a,b) => b.sales - a.sales);
-            stafArr.forEach((s, i) => {
-                let pct = maxStaffSales > 0 ? (s.sales / maxStaffSales) * 100 : 0;
-                stafHtml += `<div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-2">
-                    <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs">${i+1}</div>
-                            <div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400">Cabang: ${s.outlet}</p></div>
-                        </div>
-                        <div class="text-right"><h4 class="font-black text-brand-600 text-sm">Rp ${s.sales.toLocaleString('id-ID')}</h4></div>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-blue-500 h-1.5 rounded-full" style="width: ${pct}%"></div></div>
-                </div>`;
-            });
-            const stafListEl = document.getElementById('staf-employee-list');
-            if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
-        },
-
-        // HELPERS
-        makeInput: function(label, id, val='', type='text', hint='', dis=false) { return `<div><label class="text-xs font-bold text-slate-500 block mb-1">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; },
-        buildForm: function(title, inputsHtml, actionFunctionStr) {
-            const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
-            const bodyEl = document.getElementById('modal-form-body'); if(bodyEl) bodyEl.innerHTML = inputsHtml;
-            const btnEl = document.getElementById('modal-form-btn'); if(btnEl) btnEl.setAttribute('onclick', actionFunctionStr);
-            const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
-            if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
-        },
-        connectBluetooth: async function() {
-            const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
-            try {
-                if(!navigator.bluetooth) throw new Error("Bluetooth API tidak didukung");
-                const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
-                const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); const chars = await services[0].getCharacteristics();
-                for (let char of chars) { if (char.properties.write || char.properties.writeWithoutResponse) { this.printerChar = char; break; } }
-                if(this.printerChar) { btn.innerText = 'Connected'; document.getElementById('btn-printer').classList.add('text-green-600', 'border-green-200'); this.showToast(`Printer Terhubung`); }
-            } catch (err) { btn.innerText = 'Printer'; this.showToast('Batal mencari printer', 'error'); }
-        },
-        printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate) {
-            if (!this.printerChar) return; 
-            try {
-                let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
-                let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
-                
-                let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
-                str += `Cabang: ${outlet}\nNo. Resi: ${id}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00`;
-                items.forEach(i => {
-                    str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
-                });
-                str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
-                const data = new TextEncoder().encode(str);
-                for (let i = 0; i < data.length; i += 100) await this.printerChar.writeValue(data.slice(i, i + 100));
-            } catch(e) { throw e; }
-        }
-    };
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Error:', err)); });
-    }
-    window.onload = () => superApp.init();
-  </script>
-</body>
-</html>
+                let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-7
