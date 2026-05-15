@@ -466,7 +466,6 @@ const superApp = {
                 }
             }
 
-            // Panggil API di background tanpa mengunci PIN
             let fetchPromise = (async () => {
                 let data = null;
                 for (let i = 0; i < 3; i++) {
@@ -1507,7 +1506,8 @@ const superApp = {
         
         let mutasiHtml = '';
         [...(superApp.db.mutasi || [])].reverse().forEach((m, i) => {
-            let safeWaktu = String(m.Waktu || ''); let mDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
+            let safeWaktu = String(m.Waktu || '');
+            let mDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
                 let mWaktuStr = safeWaktu.includes('T') ? superApp.cleanDateOnly(safeWaktu) + ' ' + superApp.cleanTimeOnly(safeWaktu) : safeWaktu;
                 if(i < 100) mutasiHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-500">${mWaktuStr}</td><td class="py-4 px-5 whitespace-nowrap text-slate-700 font-bold">${m.SKU || '-'}</td><td class="py-4 px-5 whitespace-nowrap font-bold text-brand-600"><i class="fas fa-location-dot mr-1"></i>${m.Outlet_Tujuan || '-'}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black bg-blue-50/30 text-blue-700">${m.Qty || 0} Pcs</td><td class="py-4 px-5 whitespace-normal min-w-[150px] text-xs italic text-slate-500">${m.Keterangan || '-'}</td></tr>`;
@@ -1520,7 +1520,8 @@ const superApp = {
             let kDate = superApp.parseDateId(k.Tanggal);
             if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
                 totalKas += Number(k.Nominal) || 0;
-                let kDateStr = superApp.cleanDateOnly(k.Tanggal); let kTimeStr = superApp.cleanTimeOnly(k.Waktu);
+                let kDateStr = superApp.cleanDateOnly(k.Tanggal);
+                let kTimeStr = superApp.cleanTimeOnly(k.Waktu);
                 if(i < 100) kasHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-500">${kDateStr} ${kTimeStr}</td><td class="py-4 px-5 whitespace-nowrap font-bold text-slate-700">${k.Outlet} <span class="text-xs text-slate-400">(${k.Kasir})</span></td><td class="py-4 px-5 whitespace-normal min-w-[150px] font-medium text-slate-600">${k.Keterangan}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black text-red-500 bg-red-50/30">- Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td></tr>`;
             }
         });
@@ -1529,7 +1530,8 @@ const superApp = {
         
         let selisihHtml = '';
         [...(superApp.db.opname || [])].reverse().forEach((op, i) => {
-            let safeWaktu = String(op.Waktu || ''); let opDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
+            let safeWaktu = String(op.Waktu || '');
+            let opDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
                 let itemName = superApp.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
                 let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
@@ -1551,10 +1553,12 @@ const superApp = {
         superApp.showToast("Mempersiapkan PDF Laporan...");
         const element = document.getElementById('pdf-export-area'); if(!element) return;
         element.classList.add('pdf-container'); 
+        
         const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
         const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
         const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
         const rcs = document.getElementById('report-content-selisih'); if(rcs) rcs.classList.remove('hidden');
+        
         const opt = { margin: 0.3, filename: `Laporan_ERP_${new Date().getTime()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
         html2pdf().set(opt).from(element).save().then(()=> { 
             element.classList.remove('pdf-container'); superApp.toggleReportTab('trx'); superApp.showToast("PDF Diunduh!"); 
@@ -1564,7 +1568,9 @@ const superApp = {
         let trx = (superApp.db.transactions || []).find(x => x.ID_TRX === trxId); if(!trx) return;
         superApp.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
         let statText = trx.Status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
-        let cleanDate = superApp.cleanDateOnly(trx.Tanggal); let cleanTime = superApp.cleanTimeOnly(trx.Waktu);
+        
+        let cleanDate = superApp.cleanDateOnly(trx.Tanggal);
+        let cleanTime = superApp.cleanTimeOnly(trx.Waktu);
 
         let strukHtml = `<div class="text-center font-bold mb-4 text-slate-800 border-b-2 border-slate-800 pb-2">=== Ai-Snack ===\nCabang: ${trx.Outlet}\nNo. Resi: ${trx.ID_TRX}\n${cleanDate} ${cleanTime}${statText}</div>`;
         items.forEach(i => { strukHtml += `<div class="mb-2 text-slate-800 font-bold">${i.nama}\n<div class="flex justify-between font-normal text-slate-600"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span class="font-bold text-slate-800">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
@@ -1580,7 +1586,9 @@ const superApp = {
     },
     executeReprint: async function() {
         if(!superApp.activeReprintTrx) return; let t = superApp.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); let cleanDate = superApp.cleanDateOnly(t.Tanggal); let cleanTime = superApp.cleanTimeOnly(t.Waktu);
+        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
+        let cleanDate = superApp.cleanDateOnly(t.Tanggal);
+        let cleanTime = superApp.cleanTimeOnly(t.Waktu);
         try { await superApp.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + cleanTime); } catch(e) {}
     },
     promptVoidTrx: function() {
@@ -1589,13 +1597,16 @@ const superApp = {
         if(adminUser) { superApp.executeVoidTrx(superApp.activeReprintTrx.ID_TRX); } else { superApp.showToast("PIN Salah atau Anda bukan Admin! Batal ditolak.", "error"); }
     },
     executeVoidTrx: async function(trxId) {
-        if(superApp.isProcessing) return; superApp.setLoading(true, "Membatalkan Transaksi...");
+        if(superApp.isProcessing) return;
+        superApp.setLoading(true, "Membatalkan Transaksi...");
         const payload = { action: 'batal_trx', trx_id: trxId, tim_operasional: superApp.activeStaffTeam };
         let res = await superApp.apiPost(payload);
         if(res.status === 'sukses') {
             superApp.showToast("Transaksi Dibatalkan!"); 
             let t = superApp.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-            let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); let cleanDate = superApp.cleanDateOnly(t.Tanggal); let cleanTime = superApp.cleanTimeOnly(t.Waktu);
+            let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
+            let cleanDate = superApp.cleanDateOnly(t.Tanggal);
+            let cleanTime = superApp.cleanTimeOnly(t.Waktu);
             try { await superApp.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + cleanTime); } catch(e){}
 
             if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await refreshRes.json(); }
@@ -1615,23 +1626,31 @@ const superApp = {
         if(filterEl && filterEl.options.length <= 1) {
             let opts = '<option value="Semua">Semua Cabang Terpantau</option>';
             (superApp.db.outlets || []).forEach(o => opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`);
-            filterEl.innerHTML = opts; filterEl.value = superApp.outlet;
+            filterEl.innerHTML = opts;
+            filterEl.value = superApp.outlet;
         }
         let aiOutlet = filterEl ? filterEl.value : superApp.outlet;
 
         let oldestDate = new Date();
         (superApp.db.transactions || []).forEach(t => { let d = superApp.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
-        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)); if(daysActive < 1) daysActive = 1;
+        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
+        if(daysActive < 1) daysActive = 1;
 
         let warnings = [];
         (superApp.db.masterProduk || []).forEach(mp => {
             if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
                 let totalMasuk = 0;
-                (superApp.db.mutasi || []).forEach(m => { if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; });
+                (superApp.db.mutasi || []).forEach(m => { 
+                    if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; 
+                });
                 
                 let sisa = 0;
-                if(aiOutlet === 'Semua') { (superApp.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; }); } 
-                else { let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet); sisa = sData ? Number(sData.Stok_Toko)||0 : 0; }
+                if(aiOutlet === 'Semua') {
+                    (superApp.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; });
+                } else {
+                    let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet);
+                    sisa = sData ? Number(sData.Stok_Toko)||0 : 0;
+                }
 
                 let pemakaian = totalMasuk - sisa; if(pemakaian < 0) pemakaian = 0; 
                 let velocity = pemakaian / daysActive; velocity = Number(velocity) || 0; 
@@ -1646,20 +1665,47 @@ const superApp = {
         (superApp.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                items.forEach(item => { let safeNama = item.nama || 'Unknown'; if(!productSales[safeNama]) productSales[safeNama] = 0; productSales[safeNama] += Number(item.qty)||0; });
+                items.forEach(item => { 
+                    let safeNama = item.nama || 'Unknown';
+                    if(!productSales[safeNama]) productSales[safeNama] = 0; 
+                    productSales[safeNama] += Number(item.qty)||0; 
+                });
             }
         });
         let topSellers = []; 
-        for (const [nama, qty] of Object.entries(productSales)) { let v = Number(qty)/daysActive; topSellers.push({ name: nama, vel: Number(v)||0 }); }
-        topSellers.sort((a,b) => b.vel - a.vel); let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
+        for (const [nama, qty] of Object.entries(productSales)) { 
+            let v = Number(qty)/daysActive;
+            topSellers.push({ name: nama, vel: Number(v)||0 }); 
+        }
+        topSellers.sort((a,b) => b.vel - a.vel); 
+        let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
 
         let lblCabang = aiOutlet === 'Semua' ? 'Keseluruhan Cabang' : `Cabang ${aiOutlet}`;
+
         let trendHtml = top1.vel > 5 ? `<span class="text-green-300 text-sm ml-2 bg-green-900/30 px-2 py-1 rounded-lg"><i class="fas fa-arrow-trend-up"></i> Naik</span>` : `<span class="text-orange-200 text-sm ml-2 bg-orange-900/30 px-2 py-1 rounded-lg"><i class="fas fa-minus"></i> Stabil</span>`;
 
         aiCards.innerHTML = `
-            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div><p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p><h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4><p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p></div>
-            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div><p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p><h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4><p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p></div>
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div><p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p><h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4><p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p></div>
+            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div>
+                <p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p>
+                <h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4>
+                <p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p>
+            </div>
+            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div>
+                <p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p>
+                <h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4>
+                <p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div>
+                <p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p>
+                <h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4>
+                <p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p>
+            </div>
         `;
 
         if(warnings.length > 0) {
@@ -1894,40 +1940,6 @@ const superApp = {
             if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await r.json(); }
             superApp.refreshData(); 
         }
-        superApp.setLoading(false);
-    },
-
-    openCrudOutlet: function(action, id='') {
-        let o = action==='edit' ? (superApp.db.outlets || []).find(x=>x.ID_Outlet===id) : {};
-        let inputs = superApp.makeInput('ID Outlet Unik', 'out-id', o.ID_Outlet||'', 'text', '', action==='edit') + superApp.makeInput('Nama Outlet', 'out-nama', o.Nama_Outlet||'') + superApp.makeInput('Alamat / Detail', 'out-alamat', o.Alamat||'');
-        superApp.buildForm(action==='edit'?"Edit Outlet":"Tambah Outlet Baru", inputs, `superApp.executeCrud('Daftar_Outlet', '${action==='edit'?o.ID_Outlet:''}')`);
-    },
-    executeCrud: async function(sheet, oldId) {
-        if(superApp.isProcessing) return;
-        let row = [], idVal = '';
-        if(sheet === 'Master_Produk') { 
-            const fSku = document.getElementById('frm-mst-sku'); const fNama = document.getElementById('frm-mst-nama'); const fKat = document.getElementById('frm-mst-kat'); const fBahan = document.getElementById('frm-mst-bahan'); const fImg = document.getElementById('frm-mst-img');
-            if(!fSku || !fNama) return; idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
-        } else if(sheet === 'Daftar_Outlet') { 
-            const fId = document.getElementById('frm-out-id'); const fNama = document.getElementById('frm-out-nama'); const fAlamat = document.getElementById('frm-out-alamat');
-            if(!fId || !fNama) return; idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
-        }
-        if(!idVal) return superApp.showToast("Gagal menyimpan form", "error"); superApp.setLoading(true, "Menyimpan...");
-        const payload = { action: 'save', sheetName: sheet, id: oldId || idVal, rowData: row };
-        let res = await superApp.apiPost(payload);
-        if(res.status === 'sukses') {
-            superApp.closeModal('modal-form'); 
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await r.json(); }
-            superApp.refreshData(); 
-        }
-        superApp.setLoading(false);
-    },
-    deleteCrud: async function(sheet, id) {
-        if(superApp.isProcessing) return;
-        if(!confirm(`Yakin hapus data ini?`)) return; superApp.setLoading(true, "Menghapus...");
-        const payload = { action: 'delete', sheetName: sheet, id: id };
-        let res = await superApp.apiPost(payload);
-        if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await r.json(); superApp.refreshData(); }
         superApp.setLoading(false);
     },
 
