@@ -46,7 +46,7 @@ const superApp = {
             const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); const data = await res.json();
             if(data && data.status === 'sukses') { superApp.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); superApp.refreshData(); superApp.showToast("Data berhasil diperbarui!"); } 
             else throw new Error("Gagal");
-        } catch (e) { superApp.showToast("Gagal menarik data. Periksa internet Anda.", "error"); }
+        } catch (e) { superApp.showToast("Gagal menarik data. Periksa internet.", "error"); }
         superApp.setLoading(false);
     },
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
@@ -74,7 +74,7 @@ const superApp = {
     },
     syncOfflineQueue: async function() {
         if(!superApp.isOnline || superApp.offlineQueue.length === 0) return;
-        superApp.showToast("Menyinkronkan data offline ke Server...", "warning"); let failedQueue = [];
+        superApp.showToast("Menyinkronkan data offline...", "warning"); let failedQueue = [];
         for (let i = 0; i < superApp.offlineQueue.length; i++) { try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(superApp.offlineQueue[i]) }); } catch(e) { failedQueue.push(superApp.offlineQueue[i]); } }
         superApp.offlineQueue = failedQueue; localStorage.setItem('aisnack_offline_queue', JSON.stringify(superApp.offlineQueue));
         if(superApp.offlineQueue.length === 0) { superApp.showToast("Semua data tersinkronisasi!"); try { const res = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await res.json(); superApp.refreshData(); } catch(e){} }
@@ -226,15 +226,15 @@ const superApp = {
     checkShiftStatus: function() {
         const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = superApp.outlet;
         let openShift = (superApp.db.shifts || []).find(s => s.Outlet === superApp.outlet && s.Waktu_Tutup === '');
-        const posView = document.getElementById('view-pos'); // FIX: BLUR HANYA UNTUK POS SAJA
+        const mainApp = document.getElementById('main-app');
 
         if(openShift) {
             superApp.activeShiftId = openShift.ID_Shift;
             try { superApp.activeStaffTeam = JSON.parse(openShift.Tim_Operasional); } catch(e){ superApp.activeStaffTeam = []; }
-            if(posView) posView.classList.remove('blur-lock');
+            if(mainApp) mainApp.classList.remove('blur-lock');
         } else {
             superApp.activeShiftId = null; superApp.activeStaffTeam = [];
-            if(posView) posView.classList.add('blur-lock');
+            if(mainApp) mainApp.classList.add('blur-lock');
             
             const shiftUserName = document.getElementById('shift-user-name');
             if(shiftUserName && superApp.currentUser) shiftUserName.innerText = superApp.currentUser.Username;
@@ -246,7 +246,7 @@ const superApp = {
             });
             
             const staffListEl = document.getElementById('shift-staff-list'); if(staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar di cabang ini.</p>';
-            const mAwal = document.getElementById('shift-modal-awal'); if(mAwal) { mAwal.value = ''; }
+            const mAwal = document.getElementById('shift-modal-awal'); if(mAwal) { mAwal.value = ''; mAwal.setAttribute('type', 'text'); mAwal.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
 
             const modalShift = document.getElementById('modal-shift'); const modalShiftContent = document.getElementById('modal-shift-content');
             if(modalShift && modalShiftContent) { modalShift.classList.remove('hidden'); setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); }
@@ -277,16 +277,16 @@ const superApp = {
                 let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
                 superApp.db.shifts.push({ID_Shift: shiftID, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Outlet: superApp.outlet, Waktu_Tutup: '', Tim_Operasional: JSON.stringify(tim), Modal_Awal: m_awal});
             }
-            superApp.closeModal('modal-shift'); const posView = document.getElementById('view-pos'); if(posView) posView.classList.remove('blur-lock');
+            superApp.closeModal('modal-shift'); const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('blur-lock');
             superApp.showToast(res.is_offline ? "Shift Dibuka (Mode Offline)" : "Shift Dibuka! Laci siap digunakan.");
         }
         superApp.setLoading(false);
     },
     openKasKeluar: function() {
-        const nom = document.getElementById('kas-out-nominal'); if(nom) { nom.value = ''; }
+        const nom = document.getElementById('kas-out-nominal'); if(nom) { nom.value = ''; nom.setAttribute('type', 'text'); nom.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
         const ket = document.getElementById('kas-out-ket'); if(ket) ket.value = '';
         const mod = document.getElementById('modal-kas-keluar'); const modc = document.getElementById('modal-kas-keluar-content');
-        if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => { modc.classList.add('modal-enter-active'); if(nom) nom.focus(); }, 100); }
+        if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
     },
     executeKasKeluar: async function() {
         if(superApp.isProcessing) return;
@@ -311,7 +311,7 @@ const superApp = {
         superApp.setLoading(false);
     },
     promptTutupShift: function() {
-        const setAkhir = document.getElementById('shift-setoran-akhir'); if(setAkhir) { setAkhir.value = ''; }
+        const setAkhir = document.getElementById('shift-setoran-akhir'); if(setAkhir) { setAkhir.value = ''; setAkhir.setAttribute('type', 'text'); setAkhir.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
         let shiftData = (superApp.db.shifts || []).find(s => s.ID_Shift === superApp.activeShiftId);
         let modal = shiftData ? Number(shiftData.Modal_Awal) : 0;
         let salesTunai = 0; let totalKasKeluar = 0;
@@ -330,7 +330,7 @@ const superApp = {
         const tExp = document.getElementById('ts-expected'); if(tExp) tExp.innerText = `Rp ${expected.toLocaleString('id-ID')}`;
 
         const modalTutup = document.getElementById('modal-tutup-shift'); const modalTutupContent = document.getElementById('modal-tutup-shift-content');
-        if(modalTutup && modalTutupContent) { modalTutup.classList.remove('hidden'); setTimeout(() => { modalTutupContent.classList.add('modal-enter-active'); if(setAkhir) setAkhir.focus(); }, 100); }
+        if(modalTutup && modalTutupContent) { modalTutup.classList.remove('hidden'); setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10); }
     },
     executeTutupShift: async function() {
         if(superApp.isProcessing) return;
@@ -358,7 +358,7 @@ const superApp = {
     },
 
     // ==========================================
-    // 6. POS & MAIN NAVIGATION
+    // 6. POS CORE (REFRESH, RENDER & CART)
     // ==========================================
     refreshData: function() {
         const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${superApp.outlet}`;
@@ -380,6 +380,7 @@ const superApp = {
         }
         superApp.filteredProducts.sort((a,b) => String(a.nama||'').localeCompare(String(b.nama||'')));
         
+        // Render semua view yang mungkin butuh update
         if(document.getElementById('product-list')) superApp.renderProducts(); 
         if(document.getElementById('report-trx-tbody')) superApp.renderReport(); 
         if(document.getElementById('gudang-tbody-utama')) superApp.renderGudang(); 
@@ -402,7 +403,7 @@ const superApp = {
         
         if(window.innerWidth < 1024) superApp.toggleSidebar();
         
-        if(menu === 'pos' && !superApp.activeShiftId) superApp.checkShiftStatus();
+        // Panggil render manual saat menu diklik (keamanan ekstra)
         if(menu === 'report') superApp.renderReport(); 
         if(menu === 'opname') superApp.renderOpname(); 
         if(menu === 'audit') superApp.renderAudit();
@@ -471,7 +472,7 @@ const superApp = {
         const pt = document.getElementById('pay-total'); if(pt) pt.innerText = `Rp ${superApp.payTotal.toLocaleString('id-ID')}`;
         superApp.setPaymentMethod('Tunai'); superApp.setCash(''); 
         const mp = document.getElementById('modal-payment'); const mpc = document.getElementById('modal-payment-content');
-        if(mp && mpc) { mp.classList.remove('hidden'); setTimeout(() => { mpc.classList.add('modal-enter-active'); document.getElementById('pay-cash-input').focus(); }, 100); }
+        if(mp && mpc) { mp.classList.remove('hidden'); setTimeout(() => mpc.classList.add('modal-enter-active'), 10); }
     },
     setPaymentMethod: function(method) {
         superApp.payMethod = method;
@@ -542,8 +543,8 @@ const superApp = {
 
         sortedMaster.forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="text" inputmode="numeric" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
-                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="text" inputmode="numeric" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
+                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
 
                 if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; } else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
             }
@@ -557,7 +558,7 @@ const superApp = {
         if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
         superApp.setLoading(true, "Menyimpan...");
         let items = [];
-        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${superApp.outlet}\n👤 Kasir: ${superApp.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+        let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${superApp.outlet}\n👤 Kasir: ${superApp.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
         
         (superApp.db.masterProduk || []).forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
@@ -599,14 +600,10 @@ const superApp = {
             <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
             <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl text-sm font-bold mb-2 hidden shadow-inner border border-blue-100 flex items-center justify-between" id="trf-stok-info-box"><span><i class="fas fa-box-open mr-2"></i> Stok Tersedia</span> <span id="trf-stok-info" class="text-xl font-black">0</span></div>
             <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
-            ${superApp.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'text')}
+            ${superApp.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number')}
         `;
-        // We use text to prevent up/down arrows natively and force numbers
         superApp.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransferOwner()");
-        setTimeout(() => {
-            document.getElementById('frm-trf-qty').setAttribute('inputmode', 'numeric');
-            superApp.updateTransferStokInfo();
-        }, 100);
+        setTimeout(() => superApp.updateTransferStokInfo(), 100);
     },
     updateTransferStokInfo: function() {
         const asal = document.getElementById('frm-trf-out-asal'); const sku = document.getElementById('frm-trf-sku');
@@ -623,7 +620,7 @@ const superApp = {
         const elQty = document.getElementById('frm-trf-qty'); const elTujuan = document.getElementById('frm-trf-out-tujuan');
 
         if(!elSku || !elQty || !elTujuan) return;
-        let sku = elSku.value; let qty = superApp.getNumericValue(elQty.value); let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : superApp.outlet; 
+        let sku = elSku.value; let qty = elQty.value; let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : superApp.outlet; 
         
         if(asalOutlet === targetOutlet) return superApp.showToast("Toko asal dan tujuan tidak boleh sama", "error");
         if(!qty || parseInt(qty) <= 0) return superApp.showToast("Qty tidak valid", "error"); 
@@ -650,37 +647,38 @@ const superApp = {
     // ==========================================
     renderOpname: function() {
         const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = superApp.outlet;
-        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
-        
-        [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||''))).forEach(m => {
+        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+        let sortedMaster = [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+
+        sortedMaster.forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                 let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === superApp.outlet);
                 let sys = sData ? Number(sData.Stok_Toko) : 0;
                 
-                let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td><td class="py-3 px-4 text-center"><input type="text" inputmode="numeric" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
-                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="text" inputmode="numeric" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
+                let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td><td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
+                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
 
-                if (String(m.Kategori||'').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
+                if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += desk; htmlUtamaMobile += mob; } else { htmlPdkDesk += desk; htmlPdkMobile += mob; }
             }
         });
         
-        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = hu || superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
-        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = hp || superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
-        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
+        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
     },
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = superApp.getNumericValue(fisikEl?fisikEl.value:0);
+        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
         let selEl = document.getElementById(`opn-selisih-${sku}`); if(!selEl) return;
-        if(isNaN(fisik) || (fisikEl && fisikEl.value === '')) { selEl.innerText = '-'; selEl.className = 'py-3 px-4 text-right font-black text-slate-300'; return; }
+        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'py-3 px-4 text-right font-black text-slate-300'; return; }
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
         if(selisih < 0) selEl.className = 'py-3 px-4 text-right text-red-500 font-black'; else if(selisih > 0) selEl.className = 'py-3 px-4 text-right text-green-500 font-black'; else selEl.className = 'py-3 px-4 text-right text-slate-400 font-black';
     },
     calcOpnameMob: function(sku) {
         const sysEl = document.getElementById(`opn-sys-mob-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = superApp.getNumericValue(fisikEl?fisikEl.value:0);
+        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
         let selEl = document.getElementById(`opn-selisih-mob-${sku}`); if(!selEl) return;
-        if(isNaN(fisik) || (fisikEl && fisikEl.value === '')) { selEl.innerText = '-'; selEl.className = 'font-black text-slate-300 text-lg'; return; }
+        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'font-black text-slate-300 text-lg'; return; }
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
         if(selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if(selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
     },
@@ -699,7 +697,7 @@ const superApp = {
                 if(fisikStr !== '') {
                     let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
                     let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
-                    let fisik = superApp.getNumericValue(fisikStr);
+                    let fisik = parseInt(fisikStr);
                     let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                     
@@ -929,7 +927,6 @@ const superApp = {
         let btnVoid = document.getElementById('btn-void-trx');
         if(btnVoid) { if(trx.Status === 'Sukses') { btnVoid.classList.remove('hidden'); } else { btnVoid.classList.add('hidden'); } }
         const md = document.getElementById('modal-detail'); const mdc = document.getElementById('modal-detail-content');
-        if(md && mdc) { md.classList.remove('hidden'); setTimeout(() => modalTutupContent.classList.add('modal-enter-active'), 10); } // intentionally ignored because modal-enter-active logic below
         if(md && mdc) { md.classList.remove('hidden'); setTimeout(() => mdc.classList.add('modal-enter-active'), 10); }
     },
     executeReprint: async function() {
@@ -1359,4 +1356,51 @@ const superApp = {
         let stafArr = Object.keys(staffSales).map(k => ({name: k, ...staffSales[k]})).filter(s => selOut === 'Semua' || s.outlet === selOut).sort((a,b) => b.sales - a.sales);
         stafArr.forEach((s, i) => {
             let pct = maxStaffSales > 0 ? (s.sales / maxStaffSales) * 100 : 0;
-            stafHtml += `<div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:-translate-y-1 transition duration-300"><div class="flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-100">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5"><i class="fas fa-location-dot text-brand-500 mr-1"></i>${s.outlet}</p></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-lg">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner"><div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="
+            stafHtml += `<div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:-translate-y-1 transition duration-300"><div class="flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-100">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5"><i class="fas fa-location-dot text-brand-500 mr-1"></i>${s.outlet}</p></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-lg">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner"><div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
+        });
+        const stafListEl = document.getElementById('staf-employee-list');
+        if(stafListEl) stafListEl.innerHTML = stafHtml || superApp.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
+    },
+
+    // ==========================================
+    // 15. SYSTEM UTILS (UI & BLUETOOTH)
+    // ==========================================
+    makeInput: function(label, id, val='', type='text', hint='', dis=false, customEvent='') { 
+        return `<div><label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} ${customEvent?'oninput="'+customEvent+'"':''} class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 transition ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; 
+    },
+    buildForm: function(title, inputsHtml, actionFunctionStr) {
+        const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
+        const bodyEl = document.getElementById('modal-form-body'); if(bodyEl) bodyEl.innerHTML = inputsHtml;
+        const btnEl = document.getElementById('modal-form-btn'); if(btnEl) btnEl.setAttribute('onclick', actionFunctionStr);
+        const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
+        if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
+    },
+    connectBluetooth: async function() {
+        const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
+        try {
+            if(!navigator.bluetooth) throw new Error("Bluetooth API tidak didukung");
+            const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
+            const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); const chars = await services[0].getCharacteristics();
+            for (let char of chars) { if (char.properties.write || char.properties.writeWithoutResponse) { superApp.printerChar = char; break; } }
+            if(superApp.printerChar) { btn.innerText = 'Connected'; document.getElementById('btn-printer').classList.add('text-green-600', 'border-green-200'); superApp.showToast(`Printer Terhubung`); }
+        } catch (err) { btn.innerText = 'Printer'; superApp.showToast('Batal mencari printer', 'error'); }
+    },
+    printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate) {
+        if (!superApp.printerChar) return; 
+        try {
+            let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
+            let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
+            
+            let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
+            str += `Cabang: ${outlet}\nNo. Resi: ${id}${statStr}\nKasir: ${superApp.currentUser.Username}\nMetode: ${superApp.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
+            items.forEach(i => {
+                str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
+            });
+            str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
+            const data = new TextEncoder().encode(str);
+            for (let i = 0; i < data.length; i += 100) await superApp.printerChar.writeValue(data.slice(i, i + 100));
+        } catch(e) { throw e; }
+    }
+}; // END OF SUPERAPP OBJECT
+
+window.onload = () => superApp.init();
