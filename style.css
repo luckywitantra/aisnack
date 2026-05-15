@@ -1,10 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-body { 
-    font-family: 'Plus Jakarta Sans', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
-    background-color: #f4f7fa;
-}
+body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f4f7fa; }
 
 /* Custom Modern Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -14,17 +10,9 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Navigation & Glassmorphism */
-.nav-active { 
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-    color: white; 
-    box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.4); 
-}
+.nav-active { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.4); }
 .nav-active i { color: white !important; }
-.glass-header { 
-    background: rgba(255, 255, 255, 0.85); 
-    backdrop-filter: blur(12px); 
-    -webkit-backdrop-filter: blur(12px);
-}
+.glass-header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
 /* Modals & Animations */
 .modal-enter { opacity: 0; transform: scale(0.95) translateY(10px); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
@@ -33,10 +21,10 @@ body {
 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .toast-animate { animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 
-.blur-lock { filter: blur(8px); pointer-events: none; user-select: none; transition: filter 0.3s ease; }
+.blur-lock { filter: blur(8px); pointer-events: none; user-select: none; transition: filter 0.3s ease, opacity 0.3s ease; }
 .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
 
-/* Dark Mode (Opsional) */
+/* Dark Mode */
 .dark body { background-color: #0f172a; color: #f8fafc; }
 .dark .bg-white { background-color: #1e293b; border-color: #334155; }
 .dark .bg-slate-50 { background-color: #0f172a; }
@@ -46,19 +34,12 @@ body {
 .dark .glass-header { background: rgba(30, 41, 59, 0.85); }
 
 /* Numpad Kasir */
-.numpad-btn { 
-    background: white; border-radius: 1.2rem; font-size: 1.5rem; font-weight: 800; 
-    padding: 1rem; display: flex; align-items: center; justify-content: center; 
-    border: 1px solid #e2e8f0; transition: all 0.15s ease; cursor: pointer; 
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
+.numpad-btn { background: white; border-radius: 1.2rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.15s ease; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 .numpad-btn:hover { border-color: #f97316; color: #f97316; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(249,115,22,0.1); }
 .numpad-btn:active { transform: scale(0.95) translateY(0); }
 .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
 
 .item-empty { opacity: 0.5; filter: grayscale(1); pointer-events: none; }
-
-/* Status Highlights */
 .row-void { background-color: rgba(254, 226, 226, 0.6) !important; border-left: 4px solid #ef4444; }
 .row-void:hover { background-color: rgba(254, 202, 202, 0.8) !important; }
 
@@ -73,3 +54,17 @@ body {
 @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 .fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; box-shadow: 0 4px 10px rgba(249,115,22,0.5); }
+
+/* VIRTUAL KEYBOARD STYLES */
+.vk-row { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.vk-key { background: white; border-radius: 0.8rem; padding: 1rem; font-weight: 800; font-size: 1.2rem; cursor: pointer; box-shadow: 0 3px 0 #cbd5e1; user-select: none; transition: transform 0.1s, box-shadow 0.1s; display: flex; align-items: center; justify-content: center; min-width: 3.5rem; color: #334155; }
+.vk-key:active { transform: translateY(3px); box-shadow: 0 0 0 #cbd5e1; }
+.vk-key.wide { min-width: 6rem; }
+.vk-key.extra-wide { min-width: 20rem; }
+.vk-key.dark { background: #64748b; color: white; box-shadow: 0 3px 0 #475569; }
+.vk-key.dark:active { box-shadow: 0 0 0 #475569; }
+.dark .vk-key { background: #334155; box-shadow: 0 3px 0 #1e293b; color: white;}
+.dark .vk-key.dark { background: #0f172a; box-shadow: 0 3px 0 #000; }
+
+/* Custom Checkbox */
+.audit-cb { width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: #f97316; }
