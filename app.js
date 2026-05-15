@@ -30,7 +30,7 @@ const superApp = {
     cleanTimeOnly: function(str) {
         if(!str) return ''; let s = String(str);
         let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { let pad = n => n.length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3]}`; }
+        if (match) { let pad = n => n.length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; }
         if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
         let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
     },
