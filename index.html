@@ -1,347 +1,435 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbycEigk_ContohUbahDenganURLAnda_39E/exec"; // <-- GANTI DENGAN URL API ANDA
+<!DOCTYPE html>
+<html lang="id" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ai-Snack ERP & POS Ultimate</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f97316">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
+  <link rel="stylesheet" href="style.css">
+  <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{500:'#f97316',600:'#ea580c'}}}}}</script>
+</head>
+<body class="text-slate-800 h-[100dvh] flex overflow-hidden relative transition-colors duration-300 bg-slate-50">
 
-const superApp = {
-    outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
-    payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
-    activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
-    vnActiveInputId: '', vnIsCalcChange: false,
+  <div id="app-loader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[99999] hidden flex-col items-center justify-center transition-all duration-300">
+    <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_rgba(249,115,22,0.5)]"></div>
+    <p id="loader-text" class="text-white font-bold tracking-widest uppercase text-sm drop-shadow-md">Memproses...</p>
+  </div>
 
-    // ==========================================
-    // 1. FORMATTER & VIRTUAL NUMPAD ENGINE
-    // ==========================================
-    formatRupiahInput: function(el) {
-        let val = el.value.replace(/[^0-9]/g, '');
-        if(val !== '') el.value = parseInt(val, 10).toLocaleString('id-ID'); else el.value = '';
-    },
-    getNumericValue: function(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; },
-    cleanDateOnly: function(str) {
-        if(!str) return ''; let s = String(str);
-        let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; }
-        if (s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; } }
-        return s.split(' ')[0];
-    },
-    cleanTimeOnly: function(str) {
-        if(!str) return ''; let s = String(str);
-        let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; }
-        if(s.includes('T') && s.includes('Z')) { let d = new Date(s); if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; } } 
-        let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
-    },
-    parseDateId: function(dateStr) {
-        if(!dateStr) return new Date(0); let s = String(dateStr);
-        let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
-        if(s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; } }
-        let fPart = s.split(' ')[0]; let d2 = new Date(fPart); if (!isNaN(d2.getTime())) { d2.setHours(0,0,0,0); return d2; }
-        return new Date(0);
-    },
-    openVirtualNumpad: function(inputId, title, calcChange = false) {
-        superApp.vnActiveInputId = inputId; superApp.vnIsCalcChange = calcChange;
-        let titleEl = document.getElementById('vnumpad-title'); if(titleEl) titleEl.innerText = title;
-        let el = document.getElementById(inputId); let currentVal = el ? superApp.getNumericValue(el.value) : 0;
-        let displayEl = document.getElementById('vnumpad-display'); if(displayEl) displayEl.innerText = currentVal > 0 ? currentVal.toLocaleString('id-ID') : '0';
-        const np = document.getElementById('virtual-numpad'); if(np) np.classList.remove('translate-y-full');
-    },
-    closeVirtualNumpad: function() { const np = document.getElementById('virtual-numpad'); if(np) np.classList.add('translate-y-full'); },
-    vnumpadAdd: function(val) {
-        let display = document.getElementById('vnumpad-display'); if(!display) return;
-        let currentRaw = String(superApp.getNumericValue(display.innerText)); if(currentRaw === '0') currentRaw = '';
-        let newVal = currentRaw + val; if(newVal.length > 11) return;
-        display.innerText = parseInt(newVal, 10).toLocaleString('id-ID');
-    },
-    vnumpadDel: function() {
-        let display = document.getElementById('vnumpad-display'); if(!display) return;
-        let currentRaw = String(superApp.getNumericValue(display.innerText));
-        if(currentRaw.length > 1) { let newVal = currentRaw.slice(0, -1); display.innerText = parseInt(newVal, 10).toLocaleString('id-ID'); } 
-        else { display.innerText = '0'; }
-    },
-    vnumpadClear: function() { let disp = document.getElementById('vnumpad-display'); if(disp) disp.innerText = '0'; },
-    vnumpadDone: function() {
-        let display = document.getElementById('vnumpad-display'); if(!display) return;
-        let displayVal = display.innerText; let el = document.getElementById(superApp.vnActiveInputId);
-        if(el) {
-            el.value = displayVal === '0' ? '' : displayVal;
-            if(superApp.vnIsCalcChange) { superApp.payCash = superApp.getNumericValue(displayVal); superApp.calcChange(); }
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        superApp.closeVirtualNumpad();
-    },
+  <div id="cfd-screen" class="fixed inset-0 bg-slate-900 z-[9999] hidden flex overflow-hidden">
+    <div class="w-2/3 bg-cover bg-center relative" id="cfd-promo-bg" style="background-image: url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1920');">
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-900/90 to-transparent flex flex-col justify-center p-16">
+            <div class="w-24 h-24 bg-brand-500 rounded-3xl flex items-center justify-center text-white font-black text-5xl shadow-2xl mb-8 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
+            <h1 class="text-7xl font-black text-white mb-4 tracking-tight drop-shadow-lg">Ai-Snack</h1>
+            <p class="text-3xl text-brand-400 font-bold" id="cfd-outlet-name">Loading...</p>
+        </div>
+    </div>
+    <div class="w-1/3 bg-white flex flex-col shadow-2xl relative z-10">
+        <div class="h-24 bg-slate-900 flex items-center justify-center shadow-md"><h2 class="text-2xl font-black text-white uppercase tracking-widest">Pesanan Anda</h2></div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 min-h-0" id="cfd-cart-list"></div>
+        <div class="p-8 bg-white border-t-4 border-brand-500 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] shrink-0"><p class="text-slate-500 font-bold text-lg mb-1">Total Pembayaran</p><p class="text-5xl font-black text-slate-800" id="cfd-total">Rp 0</p></div>
+    </div>
+    <div id="cfd-standby" class="absolute inset-0 bg-brand-500 flex flex-col items-center justify-center z-50 transition-opacity duration-500">
+         <div class="w-48 h-48 bg-white rounded-full flex items-center justify-center text-brand-500 font-black text-7xl shadow-2xl mb-10 animate-pulse-slow p-6"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-lg"></div>
+         <h1 class="text-7xl font-black text-white mb-6 text-center drop-shadow-lg">Ai-Snack</h1>
+         <p class="text-4xl text-brand-100 font-bold text-center">Silakan Lakukan Pemesanan di Kasir</p>
+    </div>
+    <div id="cfd-success" class="absolute inset-0 bg-green-500 flex flex-col items-center justify-center z-[60] hidden">
+         <div class="w-40 h-40 bg-white rounded-full flex items-center justify-center text-green-500 font-black text-6xl shadow-2xl mb-8 slide-up"><i class="fas fa-check"></i></div>
+         <h1 class="text-6xl font-black text-white mb-4 text-center drop-shadow-lg slide-up">Pembayaran Berhasil!</h1>
+         <p class="text-4xl text-green-100 font-bold text-center slide-up">Kembalian Anda: <span id="cfd-kembali" class="text-white font-black"></span></p>
+    </div>
+  </div>
 
-    // ==========================================
-    // 2. GLOBAL UTILS & API SYNC
-    // ==========================================
-    pullFreshData: async function() {
-        if(superApp.isProcessing) return; superApp.setLoading(true, "Menarik Data Terbaru...");
-        try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); const data = await res.json();
-            if(data && data.status === 'sukses') { superApp.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); superApp.refreshData(); superApp.showToast("Data berhasil diperbarui!"); } 
-            else throw new Error("Gagal");
-        } catch (e) { superApp.showToast("Gagal menarik data. Periksa internet Anda.", "error"); }
-        superApp.setLoading(false);
-    },
-    getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
-    showToast: function(msg, type = 'success') {
-        const container = document.getElementById('toast-container'); if(!container) return;
-        const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' : (type === 'warning' ? '<i class="fas fa-cloud-arrow-up text-orange-500 text-xl"></i>' : '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>');
-        const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-2xl shadow-slate-200 flex items-center gap-3 toast-animate z-[999] dark:bg-slate-800 dark:border-slate-700 pointer-events-auto`;
-        t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
-        container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000); superApp.syncStorage();
-    },
-    toggleSidebar: function() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('mobile-overlay'); if(sb && ov) { sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); } },
-    setLoading: function(show, text="Memproses...") { 
-        const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text'); superApp.isProcessing = show;
-        if(loader && lText) { lText.innerText = text; if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } else { loader.classList.add('hidden'); loader.classList.remove('flex'); } }
-    },
-    closeModal: function(id) { const content = document.getElementById(id+'-content'); const modal = document.getElementById(id); if(content && modal) { content.classList.remove('modal-enter-active'); setTimeout(() => modal.classList.add('hidden'), 300); } },
-    toggleDarkMode: function() { 
-        document.documentElement.classList.toggle('dark'); let ic = document.getElementById('dark-icon'); 
-        if(ic) { if(document.documentElement.classList.contains('dark')) { ic.classList.replace('fa-moon', 'fa-sun'); ic.classList.replace('text-slate-600', 'text-yellow-400'); } else { ic.classList.replace('fa-sun', 'fa-moon'); ic.classList.replace('text-yellow-400', 'text-slate-600'); } }
-    },
-    apiPost: async function(payload) {
-        if(!superApp.isOnline) { superApp.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(superApp.offlineQueue)); superApp.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
-        try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
-        catch(e) { superApp.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(superApp.offlineQueue)); superApp.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
-    },
-    syncOfflineQueue: async function() {
-        if(!superApp.isOnline || superApp.offlineQueue.length === 0) return;
-        superApp.showToast("Menyinkronkan data offline ke Server...", "warning"); let failedQueue = [];
-        for (let i = 0; i < superApp.offlineQueue.length; i++) { try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(superApp.offlineQueue[i]) }); } catch(e) { failedQueue.push(superApp.offlineQueue[i]); } }
-        superApp.offlineQueue = failedQueue; localStorage.setItem('aisnack_offline_queue', JSON.stringify(superApp.offlineQueue));
-        if(superApp.offlineQueue.length === 0) { superApp.showToast("Semua data tersinkronisasi!"); try { const res = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await res.json(); superApp.refreshData(); } catch(e){} }
-        superApp.updateNetworkUI();
-    },
-    updateNetworkUI: function() {
-        const ind = document.getElementById('network-indicator'); const dot = document.getElementById('net-dot'); const txt = document.getElementById('net-text'); if(!ind || !dot || !txt) return;
-        if(superApp.isOnline) {
-            if(superApp.offlineQueue.length > 0) { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200 cursor-pointer transition'; dot.className = 'w-2 h-2 rounded-full bg-orange-500 animate-pulse'; txt.className = 'text-[10px] font-bold text-orange-600 hidden md:inline'; txt.innerText = `Menyinkron ${superApp.offlineQueue.length} data...`; } 
-            else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-green-500'; txt.className = 'text-[10px] font-bold text-green-600 hidden md:inline'; txt.innerText = 'Online & Sinkron'; }
-        } else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-red-500'; txt.className = 'text-[10px] font-bold text-red-600 hidden md:inline'; txt.innerText = `Offline (${superApp.offlineQueue.length} Pending)`; }
-    },
+  <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-6 lg:p-8 shadow-2xl flex flex-col items-center border border-slate-800">
+      <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-[1.5rem] flex items-center justify-center shadow-lg mb-4 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
+      <h2 class="text-xl lg:text-2xl font-black text-slate-800 mb-1">Masuk Sistem</h2>
+      <p class="text-xs lg:text-sm font-bold text-slate-400 mb-6">Masukkan PIN Otorisasi</p>
+      
+      <div id="pin-numpad-container" class="w-full transition-all duration-300">
+          <div class="flex gap-4 mb-6 justify-center">
+            <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-1"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-2"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-3"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-4"></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 lg:gap-3 w-full mb-4">
+            <button class="numpad-btn" onclick="superApp.addPin('1')">1</button><button class="numpad-btn" onclick="superApp.addPin('2')">2</button><button class="numpad-btn" onclick="superApp.addPin('3')">3</button>
+            <button class="numpad-btn" onclick="superApp.addPin('4')">4</button><button class="numpad-btn" onclick="superApp.addPin('5')">5</button><button class="numpad-btn" onclick="superApp.addPin('6')">6</button>
+            <button class="numpad-btn" onclick="superApp.addPin('7')">7</button><button class="numpad-btn" onclick="superApp.addPin('8')">8</button><button class="numpad-btn" onclick="superApp.addPin('9')">9</button>
+            <button class="numpad-btn text-slate-400 text-lg border-transparent shadow-none hover:bg-slate-100" onclick="superApp.clearPin()"><i class="fas fa-times"></i></button>
+            <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
+            <button class="numpad-btn text-red-500 text-lg border-transparent shadow-none hover:bg-red-50" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
+          </div>
+      </div>
+      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2" id="login-status">Mempersiapkan Sistem...</p>
+    </div>
+  </div>
 
-    // ==========================================
-    // 3. DUAL MONITOR (CFD)
-    // ==========================================
-    openCFD: async function() {
-        try { if ('getScreenDetails' in window) { const screens = await window.getScreenDetails(); const extScreen = screens.screens.find(s => s !== screens.currentScreen); if (extScreen) { superApp.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; } } } catch(e) {}
-        superApp.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${window.screen.width},top=0,width=1024,height=768`);
-    },
-    changePromoImage: function() {
-        let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
-        fileInput.onchange = (event) => {
-            const file = event.target.files[0]; if(!file) return; if(superApp.isProcessing) return; superApp.setLoading(true, "Mengunggah Promo...");
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas'); let w = img.width; let h = img.height; const maxW = 1920; 
-                    if(w > maxW) { h = Math.round((h * maxW) / w); w = maxW; } canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h); const base64 = canvas.toDataURL('image/jpeg', 0.8);
-                    const payload = { action: 'update_promo', url: base64 };
-                    superApp.apiPost(payload).then(res => { if(res.status === 'sukses') { localStorage.setItem('cfd_promo_url', base64); superApp.syncStorage(); superApp.setLoading(false); superApp.showToast("Banner Promo Diperbarui!"); } }).catch(() => superApp.setLoading(false));
-                }; img.src = e.target.result;
-            }; reader.readAsDataURL(file);
-        }; fileInput.click();
-    },
-    syncStorage: function(status = 'ordering') {
-        if(new URLSearchParams(window.location.search).get('mode') === 'cfd') return; 
-        localStorage.setItem('ai_snack_cfd', JSON.stringify({ outlet: superApp.outlet || 'Ai-Snack', items: superApp.cart, total: superApp.payTotal, kembali: superApp.payChange, status: status, timestamp: new Date().getTime(), promoUrl: localStorage.getItem('cfd_promo_url') }));
-    },
-    initCFD: function() {
-        document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
-        const cfdScreen = document.getElementById('cfd-screen'); if(cfdScreen) cfdScreen.classList.remove('hidden');
-        window.addEventListener('storage', (e) => { if(e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url') { let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if(data.outlet) superApp.renderCFD(data); } });
-        let initialData = localStorage.getItem('ai_snack_cfd'); if(initialData) superApp.renderCFD(JSON.parse(initialData));
-        let savedBg = localStorage.getItem('cfd_promo_url'); if(savedBg) { const bg = document.getElementById('cfd-promo-bg'); if(bg) bg.style.backgroundImage = `url('${savedBg}')`; }
-    },
-    renderCFD: function(data) {
-        const outNameEl = document.getElementById('cfd-outlet-name'); if(outNameEl) outNameEl.innerText = `Cabang ${data.outlet}`;
-        if(data.promoUrl) { const bg = document.getElementById('cfd-promo-bg'); if(bg) bg.style.backgroundImage = `url('${data.promoUrl}')`; }
-        const cfdStandby = document.getElementById('cfd-standby'); const cfdSuccess = document.getElementById('cfd-success');
-        if(data.status === 'paid') { cfdSuccess.classList.remove('hidden'); document.getElementById('cfd-kembali').innerText = `Rp ${data.kembali.toLocaleString('id-ID')}`; setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 5000); } 
-        else { cfdSuccess.classList.add('hidden'); }
-        if(data.items.length === 0 && data.status !== 'paid') { cfdStandby.classList.remove('opacity-0', 'pointer-events-none'); } 
-        else {
-            cfdStandby.classList.add('opacity-0', 'pointer-events-none'); let html = '';
-            data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div>`; });
-            const listEl = document.getElementById('cfd-cart-list'); if(listEl) listEl.innerHTML = html; 
-            const totEl = document.getElementById('cfd-total'); if(totEl) totEl.innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
-        }
-    },
+  <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity" onclick="superApp.toggleSidebar()"></div>
 
-    // ==========================================
-    // 4. STARTUP & LOGIN
-    // ==========================================
-    init: async function() {
-        if(new URLSearchParams(window.location.search).get('mode') === 'cfd') { superApp.initCFD(); return; }
-
-        window.addEventListener('beforeunload', () => { if(superApp.cfdWindow && !superApp.cfdWindow.closed) superApp.cfdWindow.close(); });
-        window.addEventListener('online', () => { superApp.isOnline = true; superApp.syncOfflineQueue(); });
-        window.addEventListener('offline', () => { superApp.isOnline = false; superApp.updateNetworkUI(); });
+  <aside id="sidebar" class="fixed lg:static top-0 left-0 h-[100dvh] w-72 bg-white border-r border-slate-100 flex flex-col pt-6 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl lg:shadow-none shrink-0">
+    <div class="flex items-center justify-between px-8 mb-6 shrink-0">
+        <div class="flex items-center gap-4">
+        <div class="w-10 h-10 bg-gradient-to-br from-brand-500 to-orange-400 rounded-xl flex items-center justify-center p-2 shadow-[0_4px_10px_rgba(249,115,22,0.3)]"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-sm"></div>
+        <div><span class="font-extrabold text-lg tracking-tight block text-slate-800">Ai-Snack</span><span class="text-[9px] font-bold text-brand-500 uppercase tracking-widest" id="sb-role">Kasir</span></div>
+        </div>
+        <button class="lg:hidden text-slate-400 text-2xl" onclick="superApp.toggleSidebar()"><i class="fas fa-times"></i></button>
+    </div>
+    <nav class="space-y-1 px-4 overflow-y-auto flex-1 custom-scroll flex flex-col gap-1" id="sidebar-nav">
+        <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 mb-2 shrink-0">Aplikasi Kasir</p>
+        <button onclick="superApp.switchMenu('pos')" id="nav-pos" class="nav-btn nav-active w-full flex items-center p-3 rounded-2xl transition group shrink-0"><i class="fas fa-cash-register w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Point of Sale</span></button>
+        <button onclick="superApp.openKasKeluar()" class="w-full flex items-center p-3 rounded-2xl text-red-500 hover:bg-red-50 transition group shrink-0"><i class="fas fa-money-bill-transfer w-8 group-hover:text-red-600 transition"></i><span class="font-bold text-sm ml-3">Input Kas Keluar</span></button>
+        <button onclick="superApp.switchMenu('terima')" id="nav-terima" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-boxes-packing w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Penerimaan Barang</span></button>
+        <button onclick="superApp.switchMenu('opname')" id="nav-opname" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-clipboard-check w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Opname Fisik Stok</span></button>
+        <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Riwayat & Rekap</span></button>
         
-        try { let queue = localStorage.getItem('aisnack_offline_queue'); superApp.offlineQueue = queue ? JSON.parse(queue) : []; } 
-        catch(e) { superApp.offlineQueue = []; }
+        <div id="admin-menus" class="hidden flex-col gap-1 shrink-0">
+            <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-6 mb-2">Akses Admin (Owner)</p>
+            <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-user-check w-8 text-blue-500 group-hover:text-blue-600 transition"></i><span class="font-bold text-sm text-blue-600 ml-3">Audit & Approval</span></button>
+            <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Asisten AI Owner</span></button>
+            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-warehouse w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Gudang & Master</span></button>
+            <button onclick="superApp.switchMenu('outlet')" id="nav-outlet" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-store w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Cabang & Harga</span></button>
+            <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Kinerja Karyawan</span></button>
+        </div>
+    </nav>
+    <div class="px-6 mt-2 pt-4 border-t border-slate-100 flex flex-col gap-2 shrink-0 pb-6">
+        <button onclick="superApp.promptTutupShift()" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm shadow-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
+        <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm shadow-sm"><i class="fas fa-power-off mr-2"></i>Keluar / Logout</button>
+    </div>
+  </aside>
+
+  <main id="main-app" class="flex-1 flex flex-col h-[100dvh] relative overflow-hidden hidden min-w-0">
+    <header class="h-16 lg:h-20 glass-header border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 z-10 shrink-0">
+      <div class="flex items-center gap-4">
+        <button class="lg:hidden text-slate-600 text-2xl" onclick="superApp.toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <div>
+          <h1 class="text-lg lg:text-2xl font-extrabold tracking-tight text-slate-800" id="page-title">Point of Sale</h1>
+          <div class="flex items-center gap-2 hidden md:flex"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span><p class="text-xs font-bold text-slate-500">Cabang: <span id="header-subtitle" class="text-brand-500">Penajam</span></p></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 lg:gap-3 overflow-x-auto no-scrollbar">
+        <button onclick="superApp.pullFreshData()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 cursor-pointer hover:bg-blue-100 transition text-[10px] font-bold text-blue-600 shrink-0"><i class="fas fa-cloud-download-alt"></i><span class="hidden md:inline">Tarik Data</span></button>
+        <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 shrink-0 cursor-pointer" onclick="superApp.syncOfflineQueue()">
+            <span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span><span id="net-text" class="text-[10px] font-bold text-green-600 hidden md:inline">Online</span>
+        </div>
+        <button id="btn-ubah-promo" onclick="superApp.changePromoImage()" class="hidden lg:flex bg-slate-100 text-slate-600 border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-slate-200 transition shrink-0"><i class="fas fa-image"></i> Ubah Promo</button>
+        <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition shrink-0"><i class="fas fa-desktop"></i> Layar</button>
+        <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition shrink-0"><i class="fas fa-moon" id="dark-icon"></i></button>
+        <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 shrink-0 transition"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
+        <select id="select-outlet" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm outline-none shadow-sm focus:border-brand-500 hidden md:block text-slate-800 shrink-0 transition" onchange="superApp.changeOutlet(this.value)"></select>
+        <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shadow-inner shrink-0" id="header-initial">A</div>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-y-auto w-full relative p-4 lg:p-6 custom-scroll" id="main-content-scroll">
+      
+      <div id="view-pos" class="app-view flex flex-col md:flex-row h-full gap-4 lg:gap-6 min-h-0 transition-all duration-300 blur-lock">
+        <div class="flex-1 flex flex-col min-h-0">
+          <div class="mb-4 relative shrink-0">
+             <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+             <input type="text" placeholder="Cari Produk & Varian (Urut Abjad)..." class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 text-slate-800 transition" onkeyup="superApp.filterProducts(this.value)">
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pb-6 content-start flex-1 min-h-0 custom-scroll" id="product-list"></div>
+        </div>
         
-        try {
-            const logStat = document.getElementById('login-status');
-            
-            let cacheDb = localStorage.getItem('aisnack_db_cache'); 
-            if(cacheDb) { 
-                superApp.db = JSON.parse(cacheDb); 
-                if(logStat) { logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; }
-            } else {
-                if(logStat) { logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; }
-            }
-            
-            // Panggil API di background
-            let fetchPromise = (async () => {
-                let data = null;
-                for (let i = 0; i < 3; i++) {
-                    try { const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); data = await res.json(); if(data && data.status === 'sukses') break; } 
-                    catch (e) { if(logStat && !superApp.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; await new Promise(r => setTimeout(r, 2000)); }
-                }
-                if(!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
+        <aside class="w-full md:w-[320px] lg:w-[380px] bg-white border border-slate-200 rounded-[2rem] flex flex-col shadow-lg h-[50dvh] md:h-full shrink-0">
+          <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-[2rem] shrink-0">
+            <h2 class="font-extrabold text-lg text-slate-800">Keranjang</h2><span class="bg-brand-100 text-brand-600 px-3 py-1 rounded-full text-xs font-black shadow-sm" id="cart-badge">0 Item</span>
+          </div>
+          <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll min-h-0 scroll-smooth" id="cart-container"></div>
+          <div class="p-5 bg-white border-t border-slate-100 rounded-b-[2rem] shrink-0">
+            <div class="flex justify-between items-center mb-4"><span class="text-slate-400 font-semibold text-sm">Total Tagihan</span><span class="text-2xl font-black text-brand-600" id="total-price">Rp 0</span></div>
+            <button onclick="superApp.openPaymentModal()" class="w-full bg-brand-500 text-white py-3.5 rounded-xl font-extrabold shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition-all text-lg"><i class="fas fa-wallet mr-2"></i> Bayar</button>
+          </div>
+        </aside>
+      </div>
+
+      <div id="view-terima" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-4 gap-4 shrink-0">
+                <div><h3 class="font-extrabold text-2xl">Penerimaan Barang</h3><p class="text-sm text-slate-500 font-medium mt-1">Input barang masuk ke <span class="text-brand-500 font-bold" id="lbl-terima-outlet"></span></p></div>
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="superApp.submitTerimaBarang()" class="flex-1 md:flex-none bg-brand-500 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition hover:-translate-y-1"><i class="fas fa-paper-plane mr-2"></i>Lapor Datang</button>
+                </div>
+            </div>
+            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll">
+                <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10 shadow-sm">A. Bahan Baku Utama</h4>
+                <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku / Produk</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-50"></tbody></table>
+                <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10 shadow-sm">B. Barang Pendukung</h4>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-50"></tbody></table>
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:hidden flex-1 overflow-y-auto min-h-0 custom-scroll content-start" id="terima-mobile-cards"></div>
+        </div>
+      </div>
+
+      <div id="view-opname" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-4 gap-4 shrink-0">
+                <div><h3 class="font-extrabold text-2xl">Opname Fisik Stok</h3><p class="text-sm text-slate-500 font-medium mt-1">Sesuaikan fisik bahan baku di Cabang <span class="text-brand-500 font-bold" id="lbl-opname-outlet"></span></p></div>
+                <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition hover:-translate-y-1 w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Lapor Audit Owner</button>
+            </div>
+            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll">
+                <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10 shadow-sm">A. Bahan Baku Utama</h4>
+                <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-utama" class="font-bold divide-y divide-slate-50"></tbody></table>
+                <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10 shadow-sm">B. Barang Pendukung</h4>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-pendukung" class="font-bold divide-y divide-slate-50"></tbody></table>
+            </div>
+            <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 custom-scroll content-start" id="opname-mobile-cards"></div>
+        </div>
+      </div>
+
+      <div id="view-audit" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
+            <div class="flex items-center gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
+                <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-3xl shadow-inner"><i class="fas fa-user-check"></i></div>
+                <div class="flex-1"><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-medium text-slate-500">Otorisasi massal laporan kasir.</p></div>
                 
-                superApp.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
-                let promoData = (superApp.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD'); if(promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
+                <div id="bulk-action-bar" class="hidden flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+                    <button onclick="superApp.processBulkApproval('Disetujui')" class="flex-1 bg-green-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-green-600 transition"><i class="fas fa-check-double mr-1"></i> Setuju Terpilih</button>
+                    <button onclick="superApp.processBulkApproval('Ditolak')" class="flex-1 bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-red-600 transition"><i class="fas fa-ban mr-1"></i> Tolak Terpilih</button>
+                </div>
+            </div>
 
-                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
-                let todayStr = `${yyyy}-${mm}-${dd}`; const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
-                if(fs && !fs.value) fs.value = todayStr; if(fe && !fe.value) fe.value = todayStr;
-
-                if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
-            })();
-
-            // Jika tidak ada cache, tunggu proses API
-            if (!cacheDb) await fetchPromise;
-
-        } catch (err) { 
-            const logStat = document.getElementById('login-status');
-            if(logStat && superApp.db) { 
-                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
-            } else if (logStat) { 
-                logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; 
-            }
-        }
-    },
-    addPin: function(num) {
-        if(superApp.pinBuffer.length < 4) { superApp.pinBuffer += num; const dot = document.getElementById(`dot-${superApp.pinBuffer.length}`); if(dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); } }
-        if(superApp.pinBuffer.length === 4) setTimeout(() => superApp.processLogin(), 200);
-    },
-    delPin: function() {
-        if(superApp.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${superApp.pinBuffer.length}`); if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } superApp.pinBuffer = superApp.pinBuffer.slice(0, -1); }
-    },
-    clearPin: function() { 
-        superApp.pinBuffer = ''; 
-        for(let i=1; i<=4; i++) { const dot = document.getElementById(`dot-${i}`); if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } } 
-    },
-    processLogin: function() {
-        if(superApp.isProcessing) return; superApp.isProcessing = true;
-        if (!superApp.db || !superApp.db.users) { superApp.showToast('Koneksi ke Database belum siap. Tunggu Sebentar.', 'error'); superApp.clearPin(); superApp.isProcessing = false; return; }
-        
-        let user = superApp.db.users.find(u => String(u.PIN) === String(superApp.pinBuffer));
-        if(user) {
-            superApp.currentUser = user; superApp.outlet = user.Outlet === 'Pusat' ? ((superApp.db.outlets||[])[0]?.ID_Outlet || 'Penajam') : user.Outlet;
-            const sbRole = document.getElementById('sb-role'); if(sbRole) sbRole.innerText = user.Role; 
-            const hInit = document.getElementById('header-initial'); if(hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
+            <div class="flex gap-2 bg-slate-50 p-1.5 rounded-xl shadow-inner border border-slate-200 overflow-x-auto mb-4 shrink-0">
+                <button onclick="superApp.toggleAuditTab('opname')" id="tab-audit-opname" class="px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition">Audit Opname Fisik</button>
+                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Audit Barang Masuk</button>
+            </div>
             
-            let isAdmin = String(user.Role).toLowerCase().includes('admin');
-            const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
+            <div id="audit-content-opname" class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-3 px-4 text-center"><input type="checkbox" class="w-5 h-5 rounded cursor-pointer accent-brand-500" onchange="superApp.toggleAllAuditCb('opname', this.checked)"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item</th><th class="py-3 px-4 text-center">Sys vs Fisik</th><th class="py-3 px-4 text-right">Selisih</th><th class="py-3 px-4">Alasan Kasir</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+            </div>
+            <div id="audit-content-terima" class="hidden flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-3 px-4 text-center"><input type="checkbox" class="w-5 h-5 rounded cursor-pointer accent-brand-500" onchange="superApp.toggleAllAuditCb('terima', this.checked)"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item Masuk</th><th class="py-3 px-4 text-center">Qty Diterima</th><th class="py-3 px-4">Catatan Kasir</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+            </div>
+        </div>
+      </div>
 
-            if(isAdmin) {
-                if(adminMenus) adminMenus.classList.remove('hidden'); if(selOut) selOut.classList.remove('hidden'); if(repOut) repOut.classList.remove('hidden');
-                let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
-                (superApp.db.outlets||[]).forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
-                if(selOut) { selOut.innerHTML = outOptions; selOut.value = superApp.outlet; selOut.disabled = false; }
-                if(repOut) repOut.innerHTML = outFilters;
-                const btnPromo = document.getElementById('btn-ubah-promo'); if(btnPromo) btnPromo.style.display = 'flex';
-            } else {
-                if(adminMenus) adminMenus.classList.add('hidden'); 
-                if(selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${superApp.outlet}">📍 ${superApp.outlet}</option>`; selOut.disabled = true; }
-                if(repOut) repOut.classList.add('hidden');
-                const btnPromo = document.getElementById('btn-ubah-promo'); if(btnPromo) btnPromo.style.display = 'none';
-            }
+      <div id="view-report" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 shrink-0">
+            <div class="flex gap-2 bg-white p-1.5 rounded-xl shadow-inner border border-slate-200 overflow-x-auto w-full md:w-auto custom-scroll">
+                <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition">Histori Transaksi</button>
+                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Rekap Jualan</button>
+                <button onclick="superApp.toggleReportTab('kas')" id="tab-kas" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Kas Keluar</button>
+                <button onclick="superApp.toggleReportTab('selisih')" id="tab-selisih" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Audit Selisih</button>
+            </div>
+            <div class="flex gap-2 flex-wrap items-center w-full md:w-auto">
+                <input type="text" id="filter-search-trx" placeholder="Cari Resi..." class="flex-1 md:w-auto bg-white border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-sm text-slate-700 outline-none shadow-sm focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition" onkeyup="superApp.renderReport()">
+                <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-sm text-slate-700 outline-none shadow-sm" onchange="superApp.renderReport()">
+                <span class="text-slate-400 font-bold">-</span>
+                <input type="date" id="filter-end" class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-sm text-slate-700 outline-none shadow-sm" onchange="superApp.renderReport()">
+                <select id="report-outlet-filter" class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none shadow-sm hidden text-slate-800" onchange="superApp.renderReport()"></select>
+                <button onclick="superApp.exportPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition hover:-translate-y-1"><i class="fas fa-file-pdf text-red-400"></i></button>
+            </div>
+        </div>
+        <div id="pdf-export-area" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 lg:p-8 flex-1 flex flex-col min-h-0 relative">
+            <div class="text-center mb-8 border-b border-slate-100 pb-6 shrink-0"><h2 class="text-3xl font-black uppercase tracking-widest text-slate-800 mb-1">Laporan Operasional</h2><p class="text-slate-500 font-bold text-sm" id="report-title-label"></p><p class="text-[10px] font-bold text-slate-400 mt-1 uppercase" id="report-date-label"></p></div>
             
-            const ls = document.getElementById('login-screen'); if(ls) ls.classList.add('hidden');
-            const sbar = document.getElementById('sidebar'); if(sbar) sbar.classList.remove('hidden');
-            const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('hidden');
-            
-            superApp.updateNetworkUI(); superApp.syncOfflineQueue(); superApp.refreshData(); superApp.checkShiftStatus(); superApp.showToast(`Selamat datang, ${user.Username}!`);
-        } else { superApp.showToast('PIN Tidak Dikenali', 'error'); superApp.clearPin(); }
-        superApp.isProcessing = false;
-    },
+            <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 shrink-0">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Transaksi</p><h4 class="text-2xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
+                    <div class="bg-green-50 p-5 rounded-2xl border border-green-100"><p class="text-xs font-bold text-green-500 uppercase tracking-widest mb-1">Omset Tunai</p><h4 class="text-2xl font-black text-green-600" id="rep-total-tunai">Rp 0</h4></div>
+                    <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100"><p class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Omset QRIS</p><h4 class="text-2xl font-black text-blue-600" id="rep-total-qris">Rp 0</h4></div>
+                    <div class="bg-red-50 p-5 rounded-2xl border border-red-100"><p class="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Total Kas Keluar</p><h4 class="text-2xl font-black text-red-600" id="rep-total-kas">Rp 0</h4></div>
+                </div>
+                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-list text-brand-500"></i> Detail Histori Transaksi</h3>
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Resi & Waktu</th><th class="py-4 px-5">Kasir / Outlet</th><th class="py-4 px-5">Metode</th><th class="py-4 px-5">Status</th><th class="py-4 px-5 text-right">Total Bayar</th><th class="py-4 px-5 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                </div>
+            </div>
 
-    // ==========================================
-    // 5. SHIFT & KAS KELUAR
-    // ==========================================
-    checkShiftStatus: function() {
-        const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = superApp.outlet;
-        let openShift = (superApp.db.shifts || []).find(s => s.Outlet === superApp.outlet && s.Waktu_Tutup === '');
-        const posView = document.getElementById('view-pos'); 
+            <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
+                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekapitulasi Penjualan per Produk</h3>
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Nama Menu / Varian</th><th class="py-4 px-5 text-center">Total Terjual (Pcs)</th><th class="py-4 px-5 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                </div>
+                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-truck text-brand-500"></i> Log Mutasi & Transfer</h3>
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Tujuan</th><th class="py-4 px-5 text-right">Qty Kirim</th><th class="py-4 px-5 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                </div>
+            </div>
 
-        if(openShift) {
-            superApp.activeShiftId = openShift.ID_Shift;
-            try { superApp.activeStaffTeam = JSON.parse(openShift.Tim_Operasional); } catch(e){ superApp.activeStaffTeam = []; }
-            if(posView) posView.classList.remove('blur-lock');
-        } else {
-            superApp.activeShiftId = null; superApp.activeStaffTeam = [];
-            if(posView) posView.classList.add('blur-lock');
-            
-            const shiftUserName = document.getElementById('shift-user-name');
-            if(shiftUserName && superApp.currentUser) shiftUserName.innerText = superApp.currentUser.Username;
-            
-            let staffHtml = '';
-            (superApp.db.users || []).filter(u => u.Outlet === superApp.outlet || u.Outlet === 'Pusat').forEach(u => {
-                let badge = String(u.Role).toLowerCase().includes('senior') || String(u.Role).toLowerCase().includes('admin') ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-slate-100 text-slate-500';
-                staffHtml += `<label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100 transition"><input type="checkbox" value="${u.Username}" data-role="${u.Role}" class="shift-cb w-5 h-5 text-brand-500 rounded"><div class="flex-1 font-bold text-sm text-slate-800">${u.Username}</div><span class="px-2 py-0.5 border rounded text-[10px] font-black uppercase ${badge}"></span></label>`;
-            });
-            
-            const staffListEl = document.getElementById('shift-staff-list'); if(staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar di cabang ini.</p>';
-            
-            const mAwal = document.getElementById('shift-modal-awal'); 
-            if(mAwal) { mAwal.value = ''; }
+            <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0">
+                <h3 class="font-extrabold text-lg mb-3 text-red-500 flex items-center gap-2 shrink-0"><i class="fas fa-wallet"></i> Log Kas Keluar Laci</h3>
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5">Keterangan</th><th class="py-4 px-5 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                </div>
+            </div>
 
-            const modalShift = document.getElementById('modal-shift'); const modalShiftContent = document.getElementById('modal-shift-content');
-            if(modalShift && modalShiftContent) { modalShift.classList.remove('hidden'); setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); }
-        }
-    },
-    executeBukaShift: async function() {
-        if(superApp.isProcessing) return;
-        let cbs = document.querySelectorAll('.shift-cb:checked');
-        if(cbs.length === 0) return superApp.showToast("Pilih minimal 1 anggota tim!", "error");
-        let mAwalEl = document.getElementById('shift-modal-awal'); let m_awal = mAwalEl ? superApp.getNumericValue(mAwalEl.value) : 0;
-        if(m_awal === 0 && (!mAwalEl || mAwalEl.value === '')) return superApp.showToast("Uang Laci Awal wajib diisi!", "error");
-        
-        let tim = []; let hasSenior = false;
-        cbs.forEach(cb => {
-            tim.push({username: cb.value, role: cb.getAttribute('data-role')});
-            if(String(cb.getAttribute('data-role')).toLowerCase().includes('senior') || String(cb.getAttribute('data-role')).toLowerCase().includes('admin')) hasSenior = true;
-        });
-        if(!hasSenior) return superApp.showToast("Ditolak: Wajib 1 Senior dalam Shift!", "error");
+            <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0">
+                <h3 class="font-extrabold text-lg mb-3 text-purple-600 flex items-center gap-2 shrink-0"><i class="fas fa-clipboard-check"></i> Riwayat Audit Opname</h3>
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu Opname</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5 text-center">Sys vs Fisik</th><th class="py-4 px-5 text-right">Selisih</th><th class="py-4 px-5 text-center">Status Audit</th></tr></thead><tbody id="report-selisih-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                </div>
+            </div>
+        </div>
+      </div>
 
-        superApp.setLoading(true, "Membuka Laci Kasir...");
-        let shiftID = 'SHF' + new Date().getTime();
-        const payload = { action: 'buka_shift', outlet: superApp.outlet, tim: tim, modal_awal: m_awal, id_shift: shiftID };
-        let res = await superApp.apiPost(payload);
-        
-        if(res.status === 'sukses') {
-            superApp.activeShiftId = shiftID; superApp.activeStaffTeam = tim;
-            if(res.is_offline) {
-                let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
-                superApp.db.shifts.push({ID_Shift: shiftID, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Outlet: superApp.outlet, Waktu_Tutup: '', Tim_Operasional: JSON.stringify(tim), Modal_Awal: m_awal});
-            }
-            superApp.closeModal('modal-shift'); const posView = document.getElementById('view-pos'); if(posView) posView.classList.remove('blur-lock');
-            superApp.showToast(res.is_offline ? "Shift Dibuka (Mode Offline)" : "Shift Dibuka! Laci siap digunakan.");
-        }
-        superApp.setLoading(false);
-    },
-    openKasKeluar: function() {
-        const nom = document.getElementById('kas-out-nominal'); if(nom) nom.value = '';
-        const ket = document.getElementById('kas-out-ket'); if(ket) ket.value = '';
-        const mod = document.getElementById('modal-kas-keluar'); const modc = document.getElementById('modal-kas-keluar-content');
-        if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
-    },
-    executeKasKeluar: async function() {
-        if(superApp.isProcessing) return;
-        let nomEl = document.getElementById('kas-out-nominal'); let ketEl = document.getElementById('kas-out-ket');
+      <div id="view-ai" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-4 shrink-0">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg animate-pulse-slow"><i class="fas fa-robot"></i></div>
+                    <div><h3 class="font-extrabold text-2xl">Asisten AI Owner</h3><p class="text-sm font-medium text-slate-500">Analisa cerdas tren & prediksi stok.</p></div>
+                </div>
+                <div class="flex items-center gap-2 w-full md:w-auto mt-6 md:mt-0">
+                    <button onclick="superApp.generateAIReport()" class="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl text-sm font-bold hover:bg-indigo-100 transition shadow-sm"><i class="fas fa-sync-alt"></i></button>
+                    <select id="ai-filter-outlet" class="flex-1 md:flex-none border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm outline-none shadow-sm focus:border-brand-500 text-slate-800 transition" onchange="superApp.generateAIReport()"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 shrink-0" id="ai-insight-cards"></div>
+            <h3 class="font-extrabold text-lg mb-4 shrink-0 flex items-center gap-2 text-slate-700"><i class="fas fa-lightbulb text-yellow-500"></i> Rekomendasi Distribusi AI</h3>
+            <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-4 px-5">Cabang Target</th><th class="py-4 px-5">Item Kritis</th><th class="py-4 px-5 text-center">Avg. Terjual/Hari</th><th class="py-4 px-5 text-center">Prediksi Sisa Umur Stok</th><th class="py-4 px-5 text-center">Aksi (Cepat)</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+            </div>
+        </div>
+      </div>
+
+      <div id="view-gudang" class="app-view hidden flex-col lg:flex-row lg:min-h-[80vh] min-h-max gap-6">
+        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[50vh] lg:min-h-0">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 border-b border-slate-100 pb-4 gap-4 shrink-0">
+                <div><h3 class="font-extrabold text-xl">Gudang Pusat</h3><p class="text-sm font-medium text-slate-500">Master Data Stok Induk</p></div>
+                <div class="flex gap-2 w-full lg:w-auto">
+                    <button onclick="superApp.openCrudBahan()" class="flex-1 lg:flex-none bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md transition hover:-translate-y-1"><i class="fas fa-plus mr-1"></i>Bahan Baru</button>
+                    <button onclick="superApp.openRestokModal()" class="flex-1 lg:flex-none bg-brand-100 text-brand-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-200 shadow-md transition hover:-translate-y-1"><i class="fas fa-boxes-packing mr-1"></i>Restok</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative flex flex-col">
+                <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10 shadow-sm">A. Bahan Baku Utama</h4>
+                <table class="w-full text-left text-sm mb-6"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 whitespace-nowrap">Nama Bahan</th><th class="pb-3 px-4 text-right whitespace-nowrap">Sisa Pusat</th><th class="pb-3 px-4 text-center whitespace-nowrap">Aksi</th></tr></thead><tbody id="gudang-tbody-utama" class="divide-y divide-slate-50 font-bold"></tbody></table>
+                <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10 shadow-sm">B. Barang Pendukung</h4>
+                <table class="w-full text-left text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 whitespace-nowrap">Nama Barang</th><th class="pb-3 px-4 text-right whitespace-nowrap">Sisa Pusat</th><th class="pb-3 px-4 text-center whitespace-nowrap">Aksi</th></tr></thead><tbody id="gudang-tbody-pendukung" class="divide-y divide-slate-50 font-bold"></tbody></table>
+            </div>
+        </div>
+        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[50vh] lg:min-h-0">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-4 mb-4 gap-4 shrink-0">
+                <div><h3 class="font-extrabold text-xl">Master Produk (Menu Jual)</h3><p class="text-sm font-medium text-slate-500">Varian menu di kasir yang memotong BOM.</p></div>
+                <button onclick="superApp.openCrudMasterMenu('add')" class="w-full lg:w-auto bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition hover:-translate-y-1"><i class="fas fa-plus mr-1"></i>Menu Baru</button>
+            </div>
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative">
+                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white z-10 shadow-sm"><tr><th class="pb-3 px-4">Nama Menu (Foto Lokal)</th><th class="pb-3 px-4">Memotong Bahan</th><th class="pb-3 px-4 text-center">Aksi</th></tr></thead><tbody id="master-tbody" class="divide-y divide-slate-50 font-bold"></tbody></table>
+            </div>
+        </div>
+      </div>
+
+      <div id="view-outlet" class="app-view hidden flex-col lg:flex-row lg:min-h-[80vh] min-h-max gap-6">
+        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[40vh] lg:min-h-0">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-4 shrink-0"><h3 class="font-extrabold text-xl">Daftar Cabang</h3><button onclick="superApp.openCrudOutlet('add')" class="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md transition hover:-translate-y-1"><i class="fas fa-plus mr-1"></i>Outlet Baru</button></div>
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white z-10 shadow-sm"><tr><th class="pb-3 px-4">ID</th><th class="pb-3 px-4">Nama Outlet</th><th class="pb-3 px-4 text-center">Aksi</th></tr></thead><tbody id="crud-outlet-tbody" class="divide-y divide-slate-50 font-bold"></tbody></table></div>
+        </div>
+        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[50vh] lg:min-h-0">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-4 mb-4 shrink-0 gap-4">
+                <div><h3 class="font-extrabold text-xl">Distribusi & Harga</h3><p class="text-sm font-bold text-brand-500 mt-1"><i class="fas fa-location-dot"></i> Cabang Aktif: <span id="label-outlet-manage" class="text-slate-700"></span></p></div>
+                <div class="flex gap-2 w-full lg:w-auto">
+                    <button onclick="superApp.openAddOutletProduct()" class="flex-1 lg:flex-none bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md transition hover:-translate-y-1" title="Tambah Jualan"><i class="fas fa-plus mr-1"></i>Jual</button>
+                    <button onclick="superApp.openDistribusiModal()" class="flex-1 lg:flex-none bg-brand-100 text-brand-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-200 shadow-md transition hover:-translate-y-1" title="Kirim Stok Pusat"><i class="fas fa-truck-fast mr-1"></i>Pusat</button>
+                    <button onclick="superApp.openTransferModalOwner()" class="flex-1 lg:flex-none bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition hover:-translate-y-1" title="Transfer Antar Cabang"><i class="fas fa-exchange-alt mr-1"></i>Transfer</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative">
+                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white z-10 shadow-sm"><tr><th class="pb-3 px-4">Menu Jualan</th><th class="pb-3 px-4 text-right">Harga Cabang</th><th class="pb-3 px-4 text-right">Stok Fisik Toko</th><th class="pb-3 px-4 text-center">Aksi</th></tr></thead><tbody id="outlet-manage-tbody" class="divide-y divide-slate-50 font-bold"></tbody></table>
+            </div>
+        </div>
+      </div>
+
+      <div id="view-staf" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
+        <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-4 gap-4 shrink-0">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg"><i class="fas fa-trophy"></i></div>
+                    <div><h3 class="font-extrabold text-2xl text-slate-800">Kinerja & Leaderboard</h3><p class="text-sm font-medium text-slate-500 mt-1">Kompetisi performa outlet dan pencapaian staf.</p></div>
+                </div>
+                <select id="staf-filter-outlet" class="border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm outline-none shadow-sm focus:border-brand-500 text-slate-800 w-full md:w-auto transition" onchange="superApp.renderStaf()"></select>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 flex-1 overflow-y-auto min-h-0 custom-scroll relative content-start">
+                <div class="bg-slate-50 rounded-3xl p-6 border border-slate-100 shadow-inner">
+                    <h4 class="font-extrabold text-brand-600 mb-6 flex items-center gap-2 text-lg"><i class="fas fa-store"></i> Leaderboard Cabang</h4>
+                    <div id="staf-outlet-leaderboard" class="space-y-5"></div>
+                </div>
+                <div class="bg-slate-50 rounded-3xl p-6 border border-slate-100 shadow-inner">
+                    <h4 class="font-extrabold text-blue-600 mb-6 flex items-center gap-2 text-lg"><i class="fas fa-users"></i> Top Performa Karyawan</h4>
+                    <div id="staf-employee-list" class="space-y-4"></div>
+                </div>
+            </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none"></div>
+
+  <div id="modal-payment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
+      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
+      <div class="bg-brand-50 p-6 rounded-2xl mb-6 text-center border border-brand-100 shadow-inner"><h2 class="text-4xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
+      <div class="mb-5">
+          <label class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Metode Pembayaran</label>
+          <div class="grid grid-cols-2 gap-3">
+              <button onclick="superApp.setPaymentMethod('Tunai')" id="btn-pay-tunai" class="py-3.5 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition"><i class="fas fa-money-bill-wave mr-2"></i>TUNAI</button>
+              <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3.5 border-2 border-slate-200 bg-white text-slate-500 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50"><i class="fas fa-qrcode mr-2"></i>QRIS</button>
+          </div>
+      </div>
+      <div id="tunai-section">
+          <div class="grid grid-cols-4 gap-2 mb-4">
+              <button onclick="superApp.addPayNumpad(10000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
+              <button onclick="superApp.addPayNumpad(20000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
+              <button onclick="superApp.addPayNumpad(50000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
+              <button onclick="superApp.addPayNumpad(100000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
+              <button onclick="superApp.setCash('pas')" class="col-span-4 py-3 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition">UANG PAS</button>
+          </div>
+          <div class="flex items-center gap-2 mb-6 mt-4">
+            <input type="text" id="pay-cash-input" readonly onclick="superApp.openVirtualNumpad('pay-cash-input', 'Uang Diterima (Rp)', true)" class="flex-1 border-2 border-slate-200 bg-white rounded-xl px-5 py-4 font-black text-2xl text-slate-800 outline-none focus:border-brand-500 transition cursor-pointer text-right" placeholder="Rp 0">
+            <button onclick="superApp.setCash(0)" class="p-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-md whitespace-nowrap">Reset</button>
+          </div>
+          <div class="flex justify-between items-center bg-slate-50 p-5 rounded-2xl mb-6 border border-slate-100 text-slate-800 shadow-inner"><span class="font-bold text-slate-500">Kembalian:</span><span class="text-2xl font-black" id="pay-change">Rp 0</span></div>
+      </div>
+      <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition-all text-lg" id="btn-execute-pay">Selesaikan & Cetak</button>
+    </div>
+  </div>
+
+  <div id="modal-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl modal-enter text-slate-800" id="modal-detail-content">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-lg">Detail Struk</h3><button onclick="superApp.closeModal('modal-detail')" class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
+      <div id="detail-struk-body" class="bg-slate-50 p-5 rounded-xl text-sm font-mono text-slate-700 h-64 overflow-y-auto mb-5 border border-slate-200 custom-scroll shadow-inner"></div>
+      <div class="flex flex-col gap-2">
+        <button onclick="superApp.executeReprint()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-extrabold shadow-sm hover:bg-slate-800 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang</button>
+        <button onclick="superApp.promptVoidTrx()" id="btn-void-trx" class="w-full bg-white border-2 border-red-100 text-red-500 py-3.5 rounded-xl font-extrabold hover:bg-red-50 transition"><i class="fas fa-ban mr-2"></i>Batal (Admin PIN)</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-form" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800 custom-scroll" id="modal-form-content">
+      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
+      <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
+      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition hover:-translate-y-1">Simpan Perubahan</button>
+    </div>
+  </div>
+
+  <div id="virtual-numpad" class="fixed inset-x-0 bottom-0 z-[9999] bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex flex-col p-6 transform translate-y-full transition-transform duration-300 border-t border-slate-200">
+      <div class="flex justify-between items-center mb-6">
+          <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest" id="vnumpad-title">Input Nominal</p><h2 class="text-4xl font-black text-brand-600 truncate mt-1" id="vnumpad-display">0</h2></div>
+          <button onclick="superApp.closeVirtualNumpad()" class="w-12 h-12 bg-slate-100 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition font-bold text-xl shadow-inner"><i class="fas fa-chevron-down"></i></button>
+      </div>
+      <div class="grid grid-cols-4 gap-3 max-w-xl w-full mx-auto pb-4">
+          <div class="col-span-3 grid grid-cols-3 gap-3">
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('1')">1</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('2')">2</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('3')">3</button>
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('4')">4</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('5')">5</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('6')">6</button>
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('7')">7</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('8')">8</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('9')">9</button>
+            <button class="numpad-btn py-5 text-red-500 bg-red-50 border-red-100" onclick="superApp.vnumpadClear()"><i class="fas fa-trash-alt"></i></button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('0')">0</button><button class="numpad-btn py-5 font-black text-lg" onclick="superApp.vnumpadAdd('000')">000</button>
+          </div>
+          <div class="col-span-1 flex flex-col gap-3">
+              <button class="flex-1 bg-slate-100 text-slate-600 rounded-[1.2rem] font-bold text-2xl hover:bg-slate-200 transition shadow-sm border border-slate-200" onclick="superApp.vnumpadDel()"><i class="fas fa-backspace"></i></button>
+              <button class="flex-[2] bg-brand-500 text-white rounded-[1.2rem] font-black text-2xl shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition" onclick="superApp.vnumpadDone()">OK</button>
+          </div>
+      </div>
+  </div>
+
+</body>
+</html>
