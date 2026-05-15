@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
+const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- PASTIKAN GANTI DENGAN URL ANDA
 
 const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
@@ -7,105 +7,201 @@ const superApp = {
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
     retryCount: 0,
 
-    // --- 1. RUPIAH & TIME FORMATTER ---
+    // ==========================================
+    // 1. FORMATTER (RUPIAH & WAKTU REGEX)
+    // ==========================================
     formatRupiahInput: function(el) {
         let val = el.value.replace(/[^0-9]/g, '');
-        if(val !== '') el.value = parseInt(val, 10).toLocaleString('id-ID'); else el.value = '';
+        if(val !== '') el.value = parseInt(val, 10).toLocaleString('id-ID');
+        else el.value = '';
     },
-    getNumericValue: function(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; },
+    getNumericValue: function(val) {
+        return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
+    },
     cleanDateOnly: function(str) {
         if(!str) return ''; let s = String(str);
         let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; }
-        if (s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; } }
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; 
+        }
+        if (s.includes('T')) {
+            let d = new Date(s);
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; 
+            }
+        }
         return s.split(' ')[0];
     },
     cleanTimeOnly: function(str) {
         if(!str) return ''; let s = String(str);
         let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; }
-        if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
+        }
+        if(s.includes('T') && s.includes('Z')) {
+            let d = new Date(s);
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
+            }
+        } 
         let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
     },
     parseDateId: function(dateStr) {
         if(!dateStr) return new Date(0); let s = String(dateStr);
         let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let year = parseInt(match[3]); let day = p1, month = p2; if (p2 > 12) { month = p1; day = p2; } return new Date(year, month - 1, day, 0, 0, 0, 0); }
-        if(s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; } }
-        let firstPart = s.split(' ')[0]; let d2 = new Date(firstPart); if (!isNaN(d2.getTime())) { d2.setHours(0,0,0,0); return d2; }
+        if (match) {
+            let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let year = parseInt(match[3]);
+            let day = p1, month = p2; if (p2 > 12) { month = p1; day = p2; }
+            return new Date(year, month - 1, day, 0, 0, 0, 0);
+        }
+        if(s.includes('T')) { 
+            let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; } 
+        }
+        let firstPart = s.split(' ')[0]; let d2 = new Date(firstPart);
+        if (!isNaN(d2.getTime())) { d2.setHours(0,0,0,0); return d2; }
         return new Date(0);
     },
 
-    // --- 2. GLOBAL UTILS & DATA SYNC ---
+    // ==========================================
+    // 2. GLOBAL UTILS & DATA SYNC
+    // ==========================================
     pullFreshData: async function() {
-        if(this.isProcessing) return; this.setLoading(true, "Menarik Data Terbaru...");
+        if(this.isProcessing) return; 
+        this.setLoading(true, "Menarik Data Terbaru...");
         try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); const data = await res.json();
-            if(data && data.status === 'sukses') { this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); this.refreshData(); this.showToast("Data berhasil diperbarui dari Server!"); } 
-            else throw new Error("Gagal");
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+            const data = await res.json();
+            if(data && data.status === 'sukses') {
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                this.refreshData(); 
+                this.showToast("Data berhasil diperbarui dari Server!");
+            } else throw new Error("Gagal");
         } catch (e) { this.showToast("Gagal menarik data. Periksa internet Anda.", "error"); }
         this.setLoading(false);
     },
-    getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
+    getEmptyState: function(icon, title, desc) {
+        return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`;
+    },
     showToast: function(msg, type = 'success') {
         const container = document.getElementById('toast-container'); if(!container) return;
         const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' : (type === 'warning' ? '<i class="fas fa-cloud-arrow-up text-orange-500 text-xl"></i>' : '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>');
         const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-2xl shadow-slate-200 flex items-center gap-3 toast-animate z-[999] dark:bg-slate-800 dark:border-slate-700 pointer-events-auto`;
         t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
-        container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000); this.syncStorage();
+        container.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+        this.syncStorage();
     },
-    toggleSidebar: function() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('mobile-overlay'); if(sb && ov) { sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); } },
+    toggleSidebar: function() { 
+        const sb = document.getElementById('sidebar'); const ov = document.getElementById('mobile-overlay');
+        if(sb && ov) { sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); }
+    },
     setLoading: function(show, text="Memproses...") { 
-        const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text'); this.isProcessing = show;
-        if(loader && lText) { lText.innerText = text; if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } else { loader.classList.add('hidden'); loader.classList.remove('flex'); } }
+        const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text');
+        this.isProcessing = show;
+        if(loader && lText) { 
+            lText.innerText = text; 
+            if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } 
+            else { loader.classList.add('hidden'); loader.classList.remove('flex'); } 
+        }
     },
-    closeModal: function(id) { const content = document.getElementById(id+'-content'); const modal = document.getElementById(id); if(content && modal) { content.classList.remove('modal-enter-active'); setTimeout(() => modal.classList.add('hidden'), 300); } },
+    closeModal: function(id) { 
+        const content = document.getElementById(id+'-content'); const modal = document.getElementById(id);
+        if(content && modal) { content.classList.remove('modal-enter-active'); setTimeout(() => modal.classList.add('hidden'), 300); }
+    },
     toggleDarkMode: function() { 
-        document.documentElement.classList.toggle('dark'); let ic = document.getElementById('dark-icon'); 
-        if(ic) { if(document.documentElement.classList.contains('dark')) { ic.classList.replace('fa-moon', 'fa-sun'); ic.classList.replace('text-slate-600', 'text-yellow-400'); } else { ic.classList.replace('fa-sun', 'fa-moon'); ic.classList.replace('text-yellow-400', 'text-slate-600'); } }
+        document.documentElement.classList.toggle('dark'); 
+        let ic = document.getElementById('dark-icon'); 
+        if(ic) { 
+            if(document.documentElement.classList.contains('dark')) { ic.classList.replace('fa-moon', 'fa-sun'); ic.classList.replace('text-slate-600', 'text-yellow-400'); } 
+            else { ic.classList.replace('fa-sun', 'fa-moon'); ic.classList.replace('text-yellow-400', 'text-slate-600'); } 
+        }
     },
     apiPost: async function(payload) {
-        if(!this.isOnline) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
-        try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
-        catch(e) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
+        if(!this.isOnline) {
+            this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI();
+            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift };
+        }
+        try {
+            const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+            return await res.json();
+        } catch(e) {
+            this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI();
+            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift };
+        }
     },
     syncOfflineQueue: async function() {
         if(!this.isOnline || this.offlineQueue.length === 0) return;
-        this.showToast("Menyinkronkan data offline ke Server...", "warning"); let failedQueue = [];
-        for (let i = 0; i < this.offlineQueue.length; i++) { try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(this.offlineQueue[i]) }); } catch(e) { failedQueue.push(this.offlineQueue[i]); } }
+        this.showToast("Menyinkronkan data offline ke Server...", "warning");
+        let failedQueue = [];
+        for (let i = 0; i < this.offlineQueue.length; i++) {
+            try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(this.offlineQueue[i]) }); } 
+            catch(e) { failedQueue.push(this.offlineQueue[i]); }
+        }
         this.offlineQueue = failedQueue; localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
-        if(this.offlineQueue.length === 0) { this.showToast("Semua data tersinkronisasi!"); try { const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); } catch(e){} }
+        if(this.offlineQueue.length === 0) {
+            this.showToast("Semua data tersinkronisasi!");
+            try { const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); } catch(e){}
+        }
         this.updateNetworkUI();
     },
     updateNetworkUI: function() {
-        const ind = document.getElementById('network-indicator'); const dot = document.getElementById('net-dot'); const txt = document.getElementById('net-text'); if(!ind || !dot || !txt) return;
+        const ind = document.getElementById('network-indicator'); const dot = document.getElementById('net-dot'); const txt = document.getElementById('net-text');
+        if(!ind || !dot || !txt) return;
         if(this.isOnline) {
-            if(this.offlineQueue.length > 0) { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200 cursor-pointer transition'; dot.className = 'w-2 h-2 rounded-full bg-orange-500 animate-pulse'; txt.className = 'text-[10px] font-bold text-orange-600 hidden md:inline'; txt.innerText = `Menyinkron ${this.offlineQueue.length} data...`; } 
-            else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-green-500'; txt.className = 'text-[10px] font-bold text-green-600 hidden md:inline'; txt.innerText = 'Online & Sinkron'; }
-        } else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-red-500'; txt.className = 'text-[10px] font-bold text-red-600 hidden md:inline'; txt.innerText = `Offline (${this.offlineQueue.length} Pending)`; }
+            if(this.offlineQueue.length > 0) {
+                ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200 cursor-pointer transition'; dot.className = 'w-2 h-2 rounded-full bg-orange-500 animate-pulse'; txt.className = 'text-[10px] font-bold text-orange-600 hidden md:inline'; txt.innerText = `Menyinkron ${this.offlineQueue.length} data...`;
+            } else {
+                ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-green-500'; txt.className = 'text-[10px] font-bold text-green-600 hidden md:inline'; txt.innerText = 'Online & Sinkron';
+            }
+        } else {
+            ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-red-500'; txt.className = 'text-[10px] font-bold text-red-600 hidden md:inline'; txt.innerText = `Offline (${this.offlineQueue.length} Pending)`;
+        }
     },
 
-    // --- 3. DUAL MONITOR (CFD) ---
+    // ==========================================
+    // 3. DUAL MONITOR (CFD)
+    // ==========================================
     openCFD: async function() {
-        try { if ('getScreenDetails' in window) { const screens = await window.getScreenDetails(); const extScreen = screens.screens.find(s => s !== screens.currentScreen); if (extScreen) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; } } } catch(e) {}
+        try {
+            if ('getScreenDetails' in window) {
+                const screens = await window.getScreenDetails(); const extScreen = screens.screens.find(s => s !== screens.currentScreen);
+                if (extScreen) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; }
+            }
+        } catch(e) {}
         this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${window.screen.width},top=0,width=1024,height=768`);
     },
     changePromoImage: function() {
         let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
         fileInput.onchange = (event) => {
-            const file = event.target.files[0]; if(!file) return; if(this.isProcessing) return; this.setLoading(true, "Mengunggah Promo...");
+            const file = event.target.files[0]; if(!file) return;
+            if(this.isProcessing) return; this.setLoading(true, "Mengunggah Promo...");
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    const canvas = document.createElement('canvas'); let w = img.width; let h = img.height; const maxW = 1920; 
-                    if(w > maxW) { h = Math.round((h * maxW) / w); w = maxW; } canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h); const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                    const canvas = document.createElement('canvas');
+                    let w = img.width; let h = img.height; const maxW = 1920; 
+                    if(w > maxW) { h = Math.round((h * maxW) / w); w = maxW; }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+                    const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                    
                     const payload = { action: 'update_promo', url: base64 };
-                    this.apiPost(payload).then(res => { if(res.status === 'sukses') { localStorage.setItem('cfd_promo_url', base64); this.syncStorage(); this.setLoading(false); this.showToast("Banner Promo Diperbarui!"); } }).catch(() => this.setLoading(false));
-                }; img.src = e.target.result;
-            }; reader.readAsDataURL(file);
-        }; fileInput.click();
+                    this.apiPost(payload).then(res => {
+                        if(res.status === 'sukses') {
+                            localStorage.setItem('cfd_promo_url', base64); this.syncStorage(); this.setLoading(false); this.showToast("Banner Promo Diperbarui!");
+                        }
+                    }).catch(() => this.setLoading(false));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+        fileInput.click();
     },
     syncStorage: function(status = 'ordering') {
         if(new URLSearchParams(window.location.search).get('mode') === 'cfd') return; 
@@ -114,28 +210,43 @@ const superApp = {
     initCFD: function() {
         document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
         const cfdScreen = document.getElementById('cfd-screen'); if(cfdScreen) cfdScreen.classList.remove('hidden');
-        window.addEventListener('storage', (e) => { if(e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url') { let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if(data.outlet) this.renderCFD(data); } });
+        window.addEventListener('storage', (e) => { 
+            if(e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url') { 
+                let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); 
+                if(data.outlet) this.renderCFD(data); 
+            } 
+        });
         let initialData = localStorage.getItem('ai_snack_cfd'); if(initialData) this.renderCFD(JSON.parse(initialData));
         let savedBg = localStorage.getItem('cfd_promo_url'); if(savedBg) { const bg = document.getElementById('cfd-promo-bg'); if(bg) bg.style.backgroundImage = `url('${savedBg}')`; }
     },
     renderCFD: function(data) {
         const outNameEl = document.getElementById('cfd-outlet-name'); if(outNameEl) outNameEl.innerText = `Cabang ${data.outlet}`;
         if(data.promoUrl) { const bg = document.getElementById('cfd-promo-bg'); if(bg) bg.style.backgroundImage = `url('${data.promoUrl}')`; }
+        
         const cfdStandby = document.getElementById('cfd-standby'); const cfdSuccess = document.getElementById('cfd-success');
-        if(data.status === 'paid') { cfdSuccess.classList.remove('hidden'); document.getElementById('cfd-kembali').innerText = `Rp ${data.kembali.toLocaleString('id-ID')}`; setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 5000); } 
-        else { cfdSuccess.classList.add('hidden'); }
-        if(data.items.length === 0 && data.status !== 'paid') { cfdStandby.classList.remove('opacity-0', 'pointer-events-none'); } 
-        else {
-            cfdStandby.classList.add('opacity-0', 'pointer-events-none'); let html = '';
+        
+        if(data.status === 'paid') {
+            cfdSuccess.classList.remove('hidden'); document.getElementById('cfd-kembali').innerText = `Rp ${data.kembali.toLocaleString('id-ID')}`;
+            setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 5000);
+        } else { cfdSuccess.classList.add('hidden'); }
+
+        if(data.items.length === 0 && data.status !== 'paid') {
+            cfdStandby.classList.remove('opacity-0', 'pointer-events-none');
+        } else {
+            cfdStandby.classList.add('opacity-0', 'pointer-events-none');
+            let html = '';
             data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div>`; });
             const listEl = document.getElementById('cfd-cart-list'); if(listEl) listEl.innerHTML = html; 
             const totEl = document.getElementById('cfd-total'); if(totEl) totEl.innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
         }
     },
 
-    // --- 4. STARTUP & LOGIN ---
+    // ==========================================
+    // 4. STARTUP & LOGIN
+    // ==========================================
     init: async function() {
         if(new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
+
         window.addEventListener('beforeunload', () => { if(this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
         window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
         window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
@@ -143,21 +254,34 @@ const superApp = {
         
         try {
             let cacheDb = localStorage.getItem('aisnack_db_cache'); if(cacheDb) { this.db = JSON.parse(cacheDb); }
-            const logStat = document.getElementById('login-status'); if(logStat) { logStat.innerText = 'Menghubungkan ke Server...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center'; }
+
+            const logStat = document.getElementById('login-status');
+            if(logStat) { logStat.innerText = 'Menghubungkan ke Server...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center'; }
+
             let data = null;
             for (let i = 0; i < 3; i++) {
-                try { const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); data = await res.json(); if(data && data.status === 'sukses') break; } 
-                catch (e) { if(logStat) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; await new Promise(r => setTimeout(r, 2000)); }
+                try {
+                    const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                    data = await res.json();
+                    if(data && data.status === 'sukses') break;
+                } catch (e) {
+                    if(logStat) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`;
+                    await new Promise(r => setTimeout(r, 2000));
+                }
             }
+            
             if(!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
+            
             this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
             
             let promoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD');
             if(promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
 
             let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
-            let todayStr = `${yyyy}-${mm}-${dd}`; const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
+            let todayStr = `${yyyy}-${mm}-${dd}`;
+            const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
             if(fs && !fs.value) fs.value = todayStr; if(fe && !fe.value) fe.value = todayStr;
+
             if(logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
         } catch (err) { 
             const logStat = document.getElementById('login-status');
@@ -166,22 +290,37 @@ const superApp = {
         }
     },
     addPin: function(num) {
-        if(this.pinBuffer.length < 4) { this.pinBuffer += num; const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if(dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); } }
+        if(this.pinBuffer.length < 4) {
+            this.pinBuffer += num;
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
+            if(dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); }
+        }
         if(this.pinBuffer.length === 4) setTimeout(() => this.processLogin(), 200);
     },
     delPin: function() {
-        if(this.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } this.pinBuffer = this.pinBuffer.slice(0, -1); }
+        if(this.pinBuffer.length > 0) {
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
+            if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
+            this.pinBuffer = this.pinBuffer.slice(0, -1);
+        }
     },
     clearPin: function() { 
         this.pinBuffer = ''; 
-        for(let i=1; i<=4; i++) { const dot = document.getElementById(`dot-${i}`); if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } } 
+        for(let i=1; i<=4; i++) { 
+            const dot = document.getElementById(`dot-${i}`);
+            if(dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
+        } 
     },
     processLogin: function() {
-        if(this.isProcessing) return; this.isProcessing = true;
+        if(this.isProcessing) return;
+        this.isProcessing = true;
         if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); this.isProcessing = false; return; }
+        
         let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
         if(user) {
-            this.currentUser = user; this.outlet = user.Outlet === 'Pusat' ? ((this.db.outlets||[])[0]?.ID_Outlet || 'Penajam') : user.Outlet;
+            this.currentUser = user; 
+            this.outlet = user.Outlet === 'Pusat' ? ((this.db.outlets||[])[0]?.ID_Outlet || 'Penajam') : user.Outlet;
+            
             const sbRole = document.getElementById('sb-role'); if(sbRole) sbRole.innerText = user.Role; 
             const hInit = document.getElementById('header-initial'); if(hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
             
@@ -206,12 +345,15 @@ const superApp = {
             const sbar = document.getElementById('sidebar'); if(sbar) sbar.classList.remove('hidden');
             const mainApp = document.getElementById('main-app'); if(mainApp) mainApp.classList.remove('hidden');
             
-            this.updateNetworkUI(); this.syncOfflineQueue(); this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
+            this.updateNetworkUI(); this.syncOfflineQueue();
+            this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
         } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
         this.isProcessing = false;
     },
 
-    // --- 5. SHIFT & KAS KELUAR ---
+    // ==========================================
+    // 5. SHIFT & KAS KELUAR
+    // ==========================================
     checkShiftStatus: function() {
         const shiftOutName = document.getElementById('shift-outlet-name'); if(shiftOutName) shiftOutName.innerText = this.outlet;
         let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
@@ -235,7 +377,9 @@ const superApp = {
             });
             
             const staffListEl = document.getElementById('shift-staff-list'); if(staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar di cabang ini.</p>';
-            const mAwal = document.getElementById('shift-modal-awal'); if(mAwal) { mAwal.value = ''; mAwal.setAttribute('type', 'text'); mAwal.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
+            
+            const mAwal = document.getElementById('shift-modal-awal'); 
+            if(mAwal) { mAwal.value = ''; mAwal.setAttribute('type', 'text'); mAwal.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
 
             const modalShift = document.getElementById('modal-shift'); const modalShiftContent = document.getElementById('modal-shift-content');
             if(modalShift && modalShiftContent) { modalShift.classList.remove('hidden'); setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); }
@@ -272,7 +416,8 @@ const superApp = {
         this.setLoading(false);
     },
     openKasKeluar: function() {
-        const nom = document.getElementById('kas-out-nominal'); if(nom) { nom.value = ''; nom.setAttribute('type', 'text'); nom.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
+        const nom = document.getElementById('kas-out-nominal'); 
+        if(nom) { nom.value = ''; nom.setAttribute('type', 'text'); nom.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
         const ket = document.getElementById('kas-out-ket'); if(ket) ket.value = '';
         const mod = document.getElementById('modal-kas-keluar'); const modc = document.getElementById('modal-kas-keluar-content');
         if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
@@ -300,12 +445,16 @@ const superApp = {
         this.setLoading(false);
     },
     promptTutupShift: function() {
-        const setAkhir = document.getElementById('shift-setoran-akhir'); if(setAkhir) { setAkhir.value = ''; setAkhir.setAttribute('type', 'text'); setAkhir.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
+        const setAkhir = document.getElementById('shift-setoran-akhir'); 
+        if(setAkhir) { setAkhir.value = ''; setAkhir.setAttribute('type', 'text'); setAkhir.setAttribute('oninput', 'superApp.formatRupiahInput(this)'); }
         let shiftData = (this.db.shifts || []).find(s => s.ID_Shift === this.activeShiftId);
         let modal = shiftData ? Number(shiftData.Modal_Awal) : 0;
         let salesTunai = 0; let totalKasKeluar = 0;
         
-        (this.db.transactions || []).forEach(t => { let t_tunai = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); if(t.ID_Shift === this.activeShiftId && t.Status === 'Sukses' && String(t.Metode_Bayar||'').toUpperCase() === 'TUNAI') salesTunai += Number(t.Total_Bayar); });
+        (this.db.transactions || []).forEach(t => { 
+            let t_tunai = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); 
+            if(t.ID_Shift === this.activeShiftId && t.Status === 'Sukses' && String(t.Metode_Bayar||'').toUpperCase() === 'TUNAI') salesTunai += Number(t.Total_Bayar); 
+        });
         (this.db.kasKeluar || []).forEach(k => { if(k.ID_Shift === this.activeShiftId) totalKasKeluar += Number(k.Nominal); });
         
         let expected = modal + salesTunai - totalKasKeluar;
@@ -345,260 +494,9 @@ const superApp = {
         this.setLoading(false);
     },
 
-    // --- 6. OPNAME ---
-    renderOpname: function() {
-        const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
-        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
-
-        sortedMaster.forEach(m => {
-            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
-                let stokSistem = sData ? Number(sData.Stok_Toko) : 0;
-                
-                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${stokSistem}</td><td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
-                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${stokSistem}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
-
-                if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
-                else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
-            }
-        });
-        
-        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
-        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
-    },
-    calcOpname: function(sku) {
-        const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
-        let selEl = document.getElementById(`opn-selisih-${sku}`); if(!selEl) return;
-        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'py-3 px-4 text-right font-black text-slate-300'; return; }
-        let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
-        if(selisih < 0) selEl.className = 'py-3 px-4 text-right text-red-500 font-black'; else if(selisih > 0) selEl.className = 'py-3 px-4 text-right text-green-500 font-black'; else selEl.className = 'py-3 px-4 text-right text-slate-400 font-black';
-    },
-    calcOpnameMob: function(sku) {
-        const sysEl = document.getElementById(`opn-sys-mob-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
-        let selEl = document.getElementById(`opn-selisih-mob-${sku}`); if(!selEl) return;
-        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'font-black text-slate-300 text-lg'; return; }
-        let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
-        if(selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if(selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
-    },
-    submitOpname: async function() {
-        if(this.isProcessing) return;
-        if(!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
-        this.setLoading(true, "Menyimpan & Mengirim Audit...");
-        let items = [];
-        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
-        
-        (this.db.masterProduk || []).forEach(m => {
-            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
-                let fisikStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
-                if(fisikStr !== '') {
-                    let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
-                    let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
-                    let fisik = parseInt(fisikStr);
-                    let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
-                    let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
-                    items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                    let itemName = m.Nama_Produk || 'Unknown';
-                    waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
-                }
-            }
-        });
-        if(items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada stok yang dihitung!", "error"); }
-        
-        const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
-        let res = await this.apiPost(payload);
-        if(res.status === 'sukses') {
-            this.showToast("Opname terkirim untuk di Audit Owner!");
-            if(confirm("Apakah Anda ingin meneruskan laporan rincian ini via WhatsApp ke Owner sekarang?")) {
-                let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank');
-            }
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
-        }
-        this.setLoading(false);
-    },
-
-    // --- 7. AUDIT (OWNER) ---
-    toggleAuditTab: function(tab) {
-        const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
-        const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
-        const to = document.getElementById('tab-audit-opname'); if(to) to.className = 'px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent';
-        const tt = document.getElementById('tab-audit-terima'); if(tt) tt.className = 'px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent';
-        const vContent = document.getElementById(`audit-content-${tab}`); if(vContent) vContent.classList.remove('hidden'); 
-        const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
-    },
-    renderAudit: function() {
-        const tbodyOp = document.getElementById('audit-opname-tbody'); 
-        if(tbodyOp) {
-            let html = '';
-            (this.db.opname || []).forEach(op => {
-                if(op.Status_Approval === 'Pending') {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
-                    let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
-                    let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
-
-                    html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td><td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Disetujui', 'opname')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i> Setuju</button><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Ditolak', 'opname')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i> Tolak</button></td></tr>`;
-                }
-            });
-            tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
-        }
-        
-        const tbodyTr = document.getElementById('audit-terima-tbody');
-        if(tbodyTr) {
-            let html = '';
-            (this.db.mutasi || []).forEach(mt => {
-                if(mt.Status_Approval === 'Pending') {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
-                    let safeWaktu = String(mt.Waktu||''); let wStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
-
-                    html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Disetujui', 'terima')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i> Setuju</button><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Ditolak', 'terima')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i> Tolak</button></td></tr>`;
-                }
-            });
-            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
-        }
-    },
-    processApproval: async function(id1, sku, outlet, fisik, status, type) {
-        if(this.isProcessing) return;
-        if(!confirm(`Anda yakin ingin ${status} laporan ini?`)) return;
-        this.setLoading(true, "Memproses Audit...");
-        try {
-            if(type === 'opname') { await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'approve_opname', waktu: id1, sku: sku, outlet: outlet, fisik: fisik, status_app: status }) }); } 
-            else if (type === 'terima') { await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'approve_mutasi', id_mutasi: id1, status_app: status }) }); }
-            this.showToast(`Laporan ${status}!`);
-            const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
-        } catch(e) { this.showToast("Gagal memproses", "error"); }
-        this.setLoading(false);
-    },
-
-    // --- 8. TRANSFER OWNER ---
-    openTransferModalOwner: function() {
-        let outletOpts = ''; (this.db.outlets || []).forEach(o => { outletOpts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`; });
-        let opt = ''; 
-        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
-        sortedMaster.forEach(m => { if(String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung') { opt += `<option value="${m.SKU}">${m.Nama_Produk}</option>`; } });
-
-        let inputs = `
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Asal (Sumber)</label><select id="frm-trf-out-asal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${outletOpts}</select></div>
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
-            <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl text-sm font-bold mb-2 hidden shadow-inner border border-blue-100 flex items-center justify-between" id="trf-stok-info-box"><span><i class="fas fa-box-open mr-2"></i> Stok Tersedia</span> <span id="trf-stok-info" class="text-xl font-black">0</span></div>
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
-            ${this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number')}
-        `;
-        this.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransferOwner()");
-        setTimeout(() => this.updateTransferStokInfo(), 100);
-    },
-    updateTransferStokInfo: function() {
-        const asal = document.getElementById('frm-trf-out-asal'); const sku = document.getElementById('frm-trf-sku');
-        const info = document.getElementById('trf-stok-info'); const box = document.getElementById('trf-stok-info-box');
-        if(asal && sku && info && box) {
-            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku.value && x.ID_Outlet === asal.value);
-            let sisa = sData ? Number(sData.Stok_Toko) : 0;
-            info.innerText = sisa; box.classList.remove('hidden');
-        }
-    },
-    executeTransferOwner: async function() {
-        if(this.isProcessing) return;
-        const elAsal = document.getElementById('frm-trf-out-asal'); const elSku = document.getElementById('frm-trf-sku'); 
-        const elQty = document.getElementById('frm-trf-qty'); const elTujuan = document.getElementById('frm-trf-out-tujuan');
-
-        if(!elSku || !elQty || !elTujuan) return;
-        let sku = elSku.value; let qty = elQty.value; let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : this.outlet; 
-        
-        if(asalOutlet === targetOutlet) return this.showToast("Toko asal dan tujuan tidak boleh sama", "error");
-        if(!qty || parseInt(qty) <= 0) return this.showToast("Qty tidak valid", "error"); 
-        
-        let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku && x.ID_Outlet === asalOutlet);
-        let sisa = sData ? Number(sData.Stok_Toko) : 0;
-        if(parseInt(qty) > sisa) return this.showToast(`Qty melebihi sisa fisik di ${asalOutlet}!`, "error");
-
-        if(!confirm(`Kirim barang ini dari ${asalOutlet} ke ${targetOutlet}? Stok ${asalOutlet} akan langsung terpotong.`)) return;
-
-        this.setLoading(true, "Memproses Transfer...");
-        const payload = { action: 'transfer_stok', sku: sku, outlet_asal: asalOutlet, outlet_tujuan: targetOutlet, qty: parseInt(qty), kasir: this.currentUser.Username };
-        let res = await this.apiPost(payload);
-        
-        if(res.status === 'sukses') {
-            this.closeModal('modal-form'); this.showToast("Transfer dikirim! Menunggu Penerimaan di toko tujuan.");
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
-            this.refreshData(); 
-        } else { this.setLoading(false); }
-    },
-
-    // --- 9. TERIMA BARANG (KASIR) ---
-    renderTerimaBarang: function() {
-        const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
-        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
-
-        sortedMaster.forEach(m => {
-            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
-                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
-
-                if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; } else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
-            }
-        });
-        const tU = document.getElementById('terima-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-        const tP = document.getElementById('terima-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
-        const tMob = document.getElementById('terima-mobile-cards'); if(tMob) tMob.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
-    },
-    submitTerimaBarang: async function() {
-        if(this.isProcessing) return;
-        if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
-        this.setLoading(true, "Menyimpan...");
-        let items = []; let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
-        
-        (this.db.masterProduk || []).forEach(m => {
-            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
-                let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
-                
-                if(qtyStr !== '' && parseInt(qtyStr) > 0) {
-                    let noteDesk = document.getElementById(`trm-note-${m.SKU}`); let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
-                    let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
-                    items.push({ sku: m.SKU, qty: parseInt(qtyStr), catatan: note });
-                    waText += `📦 *${m.Nama_Produk}*\nQty Diterima: *${qtyStr} Pcs*\nCatatan: ${note || '-'}\n\n`;
-                }
-            }
-        });
-        if(items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada barang masuk yang diinput!", "error"); }
-        
-        const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
-        let res = await this.apiPost(payload);
-        if(res.status === 'sukses') {
-            this.showToast("Berhasil dilaporkan ke Owner!");
-            if(confirm("Apakah Anda ingin meneruskan notifikasi ini via WhatsApp ke Owner sekarang?")) { let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank'); }
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
-        }
-        this.setLoading(false);
-    },
-
-    // --- 10. REFRESH DATA & POS ENGINE ---
-    refreshData: function() {
-        const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${this.outlet}`;
-        const lOutManage = document.getElementById('label-outlet-manage'); if(lOutManage) lOutManage.innerText = this.outlet;
-        
-        this.filteredProducts = [];
-        if(this.db && this.db.masterProduk) {
-            this.db.masterProduk.forEach(master => {
-                if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') { 
-                    let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
-                    let stokReference = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
-                    let stokBahan = (this.db.hargaStokOutlet || []).find(x => x.SKU === stokReference && x.ID_Outlet === this.outlet);
-                    if(hargaOutlet && hargaOutlet.Harga_Jual > 0) {
-                        let qtySisa = stokBahan ? stokBahan.Stok_Toko : 0;
-                        this.filteredProducts.push({ sku: master.SKU, nama: master.Nama_Produk, img: master.Gambar_URL, harga: hargaOutlet.Harga_Jual, maxStok: qtySisa, sku_bahan: master.SKU_Bahan });
-                    }
-                }
-            });
-        }
-        this.filteredProducts.sort((a,b) => String(a.nama||'').localeCompare(String(b.nama||'')));
-        
-        this.renderProducts(); this.renderReport(); this.renderGudang(); this.renderStaf(); this.renderOpname(); this.renderAudit(); this.renderTerimaBarang(); this.generateAIReport();
-    },
+    // ==========================================
+    // 6. POS & CHART LOGIC
+    // ==========================================
     changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
     switchMenu: function(menu) {
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
@@ -670,8 +568,6 @@ const superApp = {
         const badge = document.getElementById('cart-badge'); if(badge) badge.innerText = `${items} Item`; 
         this.payTotal = total; this.syncStorage(); 
     },
-
-    // --- 11. PAYMENT & CHECKOUT ---
     openPaymentModal: function() {
         if (this.cart.length === 0) return this.showToast("Pilih produk dahulu!", "error");
         const pt = document.getElementById('pay-total'); if(pt) pt.innerText = `Rp ${this.payTotal.toLocaleString('id-ID')}`;
@@ -693,7 +589,10 @@ const superApp = {
             this.setCash('pas'); 
         }
     },
-    addPayNumpad: function(val) { let input = document.getElementById('pay-cash-input'); if(input) { let current = this.getNumericValue(input.value); this.setCash(current + val); } },
+    addPayNumpad: function(val) { 
+        let input = document.getElementById('pay-cash-input');
+        if(input) { let current = this.getNumericValue(input.value); this.setCash(current + val); }
+    },
     setCash: function(val) {
         let input = document.getElementById('pay-cash-input');
         if(input) {
@@ -704,7 +603,8 @@ const superApp = {
         this.calcChange();
     },
     calcChange: function() {
-        let input = document.getElementById('pay-cash-input'); if(input) this.payCash = this.getNumericValue(input.value); 
+        let input = document.getElementById('pay-cash-input');
+        if(input) this.payCash = this.getNumericValue(input.value); 
         this.payChange = this.payCash - this.payTotal;
         let btn = document.getElementById('btn-execute-pay'), changeEl = document.getElementById('pay-change');
         if(changeEl && btn) {
@@ -713,7 +613,8 @@ const superApp = {
         }
     },
     executeCheckout: async function() {
-        if(this.isProcessing) return; this.setLoading(true, "Memproses Transaksi...");
+        if(this.isProcessing) return;
+        this.setLoading(true, "Memproses Transaksi...");
         let trxID = 'TRX' + new Date().getTime();
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam };
         
@@ -729,10 +630,254 @@ const superApp = {
             } else { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json(); }
             this.refreshData();
         }
-        this.cart = []; this.renderCart(); this.closeModal('modal-payment'); this.setLoading(false);
+        this.cart = []; this.renderCart(); 
+        this.closeModal('modal-payment');
+        this.setLoading(false);
     },
 
-    // --- 12. REPORT & ANALYTICS ---
+    // ==========================================
+    // 7. TERIMA BARANG (KASIR)
+    // ==========================================
+    renderTerimaBarang: function() {
+        const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
+        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+
+        sortedMaster.forEach(m => {
+            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
+
+                if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; } else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
+            }
+        });
+        const tU = document.getElementById('terima-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('terima-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        const tMob = document.getElementById('terima-mobile-cards'); if(tMob) tMob.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
+    },
+    submitTerimaBarang: async function() {
+        if(this.isProcessing) return;
+        if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
+        this.setLoading(true, "Menyimpan...");
+        let items = [];
+        let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+        
+        (this.db.masterProduk || []).forEach(m => {
+            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
+                let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
+                
+                if(qtyStr !== '' && parseInt(qtyStr) > 0) {
+                    let noteDesk = document.getElementById(`trm-note-${m.SKU}`); let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
+                    let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
+                    items.push({ sku: m.SKU, qty: parseInt(qtyStr), catatan: note });
+                    waText += `📦 *${m.Nama_Produk}*\nQty Diterima: *${qtyStr} Pcs*\nCatatan: ${note || '-'}\n\n`;
+                }
+            }
+        });
+        if(items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada barang masuk yang diinput!", "error"); }
+        
+        const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+        let res = await this.apiPost(payload);
+        if(res.status === 'sukses') {
+            this.showToast("Berhasil dilaporkan ke Owner!");
+            if(confirm("Apakah Anda ingin meneruskan notifikasi ini via WhatsApp ke Owner sekarang?")) { let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank'); }
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
+        }
+        this.setLoading(false);
+    },
+
+    // ==========================================
+    // 8. TRANSFER OWNER
+    // ==========================================
+    openTransferModalOwner: function() {
+        let outletOpts = ''; (this.db.outlets || []).forEach(o => { outletOpts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`; });
+        let opt = ''; 
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+        sortedMaster.forEach(m => { if(String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung') { opt += `<option value="${m.SKU}">${m.Nama_Produk}</option>`; } });
+
+        let inputs = `
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Asal (Sumber)</label><select id="frm-trf-out-asal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${outletOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
+            <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl text-sm font-bold mb-2 hidden shadow-inner border border-blue-100 flex items-center justify-between" id="trf-stok-info-box"><span><i class="fas fa-box-open mr-2"></i> Stok Tersedia</span> <span id="trf-stok-info" class="text-xl font-black">0</span></div>
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
+            ${this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number')}
+        `;
+        this.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransferOwner()");
+        setTimeout(() => this.updateTransferStokInfo(), 100);
+    },
+    updateTransferStokInfo: function() {
+        const asal = document.getElementById('frm-trf-out-asal'); const sku = document.getElementById('frm-trf-sku');
+        const info = document.getElementById('trf-stok-info'); const box = document.getElementById('trf-stok-info-box');
+        if(asal && sku && info && box) {
+            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku.value && x.ID_Outlet === asal.value);
+            let sisa = sData ? Number(sData.Stok_Toko) : 0;
+            info.innerText = sisa; box.classList.remove('hidden');
+        }
+    },
+    executeTransferOwner: async function() {
+        if(this.isProcessing) return;
+        const elAsal = document.getElementById('frm-trf-out-asal'); const elSku = document.getElementById('frm-trf-sku'); 
+        const elQty = document.getElementById('frm-trf-qty'); const elTujuan = document.getElementById('frm-trf-out-tujuan');
+
+        if(!elSku || !elQty || !elTujuan) return;
+        let sku = elSku.value; let qty = elQty.value; let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : this.outlet; 
+        
+        if(asalOutlet === targetOutlet) return this.showToast("Toko asal dan tujuan tidak boleh sama", "error");
+        if(!qty || parseInt(qty) <= 0) return this.showToast("Qty tidak valid", "error"); 
+        
+        let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku && x.ID_Outlet === asalOutlet);
+        let sisa = sData ? Number(sData.Stok_Toko) : 0;
+        if(parseInt(qty) > sisa) return this.showToast(`Qty melebihi sisa fisik di ${asalOutlet}!`, "error");
+
+        if(!confirm(`Kirim barang ini dari ${asalOutlet} ke ${targetOutlet}? Stok ${asalOutlet} akan langsung terpotong.`)) return;
+
+        this.setLoading(true, "Memproses Transfer...");
+        const payload = { action: 'transfer_stok', sku: sku, outlet_asal: asalOutlet, outlet_tujuan: targetOutlet, qty: parseInt(qty), kasir: this.currentUser.Username };
+        let res = await this.apiPost(payload);
+        
+        if(res.status === 'sukses') {
+            this.closeModal('modal-form'); this.showToast("Transfer dikirim! Menunggu Penerimaan di toko tujuan.");
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            this.refreshData(); 
+        } else { this.setLoading(false); }
+    },
+
+    // ==========================================
+    // 9. OPNAME STOK
+    // ==========================================
+    renderOpname: function() {
+        const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
+        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+
+        sortedMaster.forEach(m => {
+            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+                let stokSistem = sData ? Number(sData.Stok_Toko) : 0;
+                
+                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${stokSistem}</td><td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${stokSistem}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
+
+                if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; } else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
+            }
+        });
+        
+        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
+    },
+    calcOpname: function(sku) {
+        const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
+        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
+        let selEl = document.getElementById(`opn-selisih-${sku}`); if(!selEl) return;
+        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'py-3 px-4 text-right font-black text-slate-300'; return; }
+        let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
+        if(selisih < 0) selEl.className = 'py-3 px-4 text-right text-red-500 font-black'; else if(selisih > 0) selEl.className = 'py-3 px-4 text-right text-green-500 font-black'; else selEl.className = 'py-3 px-4 text-right text-slate-400 font-black';
+    },
+    calcOpnameMob: function(sku) {
+        const sysEl = document.getElementById(`opn-sys-mob-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
+        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = parseInt(fisikEl?fisikEl.value:0);
+        let selEl = document.getElementById(`opn-selisih-mob-${sku}`); if(!selEl) return;
+        if(isNaN(fisik)) { selEl.innerText = '-'; selEl.className = 'font-black text-slate-300 text-lg'; return; }
+        let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
+        if(selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if(selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
+    },
+    submitOpname: async function() {
+        if(this.isProcessing) return;
+        if(!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
+        this.setLoading(true, "Menyimpan & Mengirim Audit...");
+        let items = [];
+        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+        
+        (this.db.masterProduk || []).forEach(m => {
+            if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
+                let fisikStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
+                
+                if(fisikStr !== '') {
+                    let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
+                    let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
+                    let fisik = parseInt(fisikStr);
+                    let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
+                    let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
+                    
+                    items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
+                    let itemName = m.Nama_Produk || 'Unknown';
+                    waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
+                }
+            }
+        });
+        if(items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada stok yang dihitung!", "error"); }
+        
+        const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+        let res = await this.apiPost(payload);
+        if(res.status === 'sukses') {
+            this.showToast("Opname terkirim untuk di Audit Owner!");
+            if(confirm("Apakah Anda ingin meneruskan laporan rincian ini via WhatsApp ke Owner sekarang?")) { let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank'); }
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
+        }
+        this.setLoading(false);
+    },
+
+    // ==========================================
+    // 10. AUDIT (OWNER)
+    // ==========================================
+    toggleAuditTab: function(tab) {
+        const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
+        const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
+        const to = document.getElementById('tab-audit-opname'); if(to) to.className = 'px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent';
+        const tt = document.getElementById('tab-audit-terima'); if(tt) tt.className = 'px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent';
+        
+        const vContent = document.getElementById(`audit-content-${tab}`); if(vContent) vContent.classList.remove('hidden'); 
+        const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
+    },
+    renderAudit: function() {
+        const tbodyOp = document.getElementById('audit-opname-tbody'); 
+        if(tbodyOp) {
+            let html = '';
+            (this.db.opname || []).forEach(op => {
+                if(op.Status_Approval === 'Pending') {
+                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
+                    let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
+                    let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
+
+                    html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td><td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Disetujui', 'opname')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i> Setuju</button><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Ditolak', 'opname')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i> Tolak</button></td></tr>`;
+                }
+            });
+            tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
+        }
+        
+        const tbodyTr = document.getElementById('audit-terima-tbody');
+        if(tbodyTr) {
+            let html = '';
+            (this.db.mutasi || []).forEach(mt => {
+                if(mt.Status_Approval === 'Pending') {
+                    let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
+                    let safeWaktu = String(mt.Waktu||''); let wStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
+
+                    html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Disetujui', 'terima')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i> Setuju</button><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Ditolak', 'terima')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i> Tolak</button></td></tr>`;
+                }
+            });
+            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
+        }
+    },
+    processApproval: async function(id1, sku, outlet, fisik, status, type) {
+        if(this.isProcessing) return;
+        if(!confirm(`Anda yakin ingin ${status} laporan ini?`)) return;
+        this.setLoading(true, "Memproses Audit...");
+        try {
+            if(type === 'opname') { await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'approve_opname', waktu: id1, sku: sku, outlet: outlet, fisik: fisik, status_app: status }) }); } 
+            else if (type === 'terima') { await fetch(API_URL, { method: 'POST', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({ action: 'approve_mutasi', id_mutasi: id1, status_app: status }) }); }
+            this.showToast(`Laporan ${status}!`);
+            const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
+        } catch(e) { this.showToast("Gagal memproses", "error"); }
+        this.setLoading(false);
+    },
+
+    // ==========================================
+    // 11. REPORT & ANALYTICS
+    // ==========================================
     toggleReportTab: function(tab) {
         const rt = document.getElementById('report-content-trx'); if(rt) rt.classList.add('hidden'); 
         const rr = document.getElementById('report-content-rekap'); if(rr) rr.classList.add('hidden');
@@ -808,7 +953,8 @@ const superApp = {
         
         let mutasiHtml = '';
         [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
-            let safeWaktu = String(m.Waktu || ''); let mDate = this.parseDateId(safeWaktu.split(' ')[0]);
+            let safeWaktu = String(m.Waktu || '');
+            let mDate = this.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
                 let mWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
                 if(i < 100) mutasiHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-500">${mWaktuStr}</td><td class="py-4 px-5 whitespace-nowrap text-slate-700 font-bold">${m.SKU || '-'}</td><td class="py-4 px-5 whitespace-nowrap font-bold text-brand-600"><i class="fas fa-location-dot mr-1"></i>${m.Outlet_Tujuan || '-'}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black bg-blue-50/30 text-blue-700">${m.Qty || 0} Pcs</td><td class="py-4 px-5 whitespace-normal min-w-[150px] text-xs italic text-slate-500">${m.Keterangan || '-'}</td></tr>`;
@@ -849,19 +995,25 @@ const superApp = {
         const rsTbody = document.getElementById('report-selisih-tbody'); if(rsTbody) rsTbody.innerHTML = selisihHtml || `<tr><td colspan="6" class="text-center py-12 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Selisih Kosong', 'Tidak ada histori opname disini')}</td></tr>`;
     },
     exportPDF: function() {
-        this.showToast("Mempersiapkan PDF Laporan..."); const element = document.getElementById('pdf-export-area'); if(!element) return;
+        this.showToast("Mempersiapkan PDF Laporan...");
+        const element = document.getElementById('pdf-export-area'); if(!element) return;
         element.classList.add('pdf-container'); 
+        
         const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
         const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
         const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
         const rcs = document.getElementById('report-content-selisih'); if(rcs) rcs.classList.remove('hidden');
+        
         const opt = { margin: 0.3, filename: `Laporan_ERP_${new Date().getTime()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save().then(()=> { element.classList.remove('pdf-container'); this.toggleReportTab('trx'); this.showToast("PDF Diunduh!"); });
+        html2pdf().set(opt).from(element).save().then(()=> { 
+            element.classList.remove('pdf-container'); this.toggleReportTab('trx'); this.showToast("PDF Diunduh!"); 
+        });
     },
     openDetailTrx: function(trxId) {
         let trx = (this.db.transactions || []).find(x => x.ID_TRX === trxId); if(!trx) return;
         this.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
         let statText = trx.Status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
+        
         let cleanDate = this.cleanDateOnly(trx.Tanggal); let cleanTime = this.cleanTimeOnly(trx.Waktu);
 
         let strukHtml = `<div class="text-center font-bold mb-4 text-slate-800 border-b-2 border-slate-800 pb-2">=== Ai-Snack ===\nCabang: ${trx.Outlet}\nNo. Resi: ${trx.ID_TRX}\n${cleanDate} ${cleanTime}${statText}</div>`;
@@ -904,7 +1056,9 @@ const superApp = {
         this.setLoading(false);
     },
 
-    // --- 13. AI ASSISTANT ---
+    // ==========================================
+    // 12. AI ASSISTANT
+    // ==========================================
     generateAIReport: function() {
         const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
         if(!aiCards || !aiRekBody || !this.db) return;
@@ -919,7 +1073,8 @@ const superApp = {
 
         let oldestDate = new Date();
         (this.db.transactions || []).forEach(t => { let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
-        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)); if(daysActive < 1) daysActive = 1;
+        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
+        if(daysActive < 1) daysActive = 1;
 
         let warnings = [];
         (this.db.masterProduk || []).forEach(mp => {
@@ -966,7 +1121,317 @@ const superApp = {
         } else { aiRekBody.innerHTML = `<tr><td colspan="5" class="text-center py-12 h-32">${this.getEmptyState('fa-shield-halved', 'Stok Aman', 'Semua stok terpantau aman (Tidak ada prediksi krisis).')}</td></tr>`; }
     },
 
-    // --- 14. PRINTER & BLUETOOTH ---
+    // ==========================================
+    // 13. GUDANG & MASTER DATA
+    // ==========================================
+    handleImageUpload: function(event, inputId, maxWidth = 150) {
+        const file = event.target.files[0]; if (!file) return;
+        superApp.showToast("Memproses Gambar...", "warning");
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width; let height = img.height;
+                if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                const base64 = canvas.toDataURL('image/jpeg', 0.5); 
+                if(base64.length > 45000) { superApp.showToast("Ukuran foto terlalu besar. Silakan crop atau gunakan foto lain.", "error"); return; }
+                document.getElementById(inputId).value = base64;
+                const preview = document.getElementById(inputId + '-preview');
+                if (preview) { preview.src = base64; preview.classList.remove('hidden'); }
+                superApp.showToast("Gambar Siap Disimpan!");
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+    renderGudang: function() {
+        const gBodyUtama = document.getElementById('gudang-tbody-utama');
+        const gBodyPendukung = document.getElementById('gudang-tbody-pendukung');
+        let htmlUtama = ''; let htmlPendukung = '';
+
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+        
+        sortedMaster.forEach(g => {
+            if(String(g.Kategori||'').toLowerCase() === 'bahan' || String(g.Kategori||'').toLowerCase() === 'pendukung') {
+                let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
+                let row = `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-5 whitespace-normal min-w-[150px] font-bold text-slate-700">${g.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-medium">SKU: ${g.SKU}</span></td><td class="py-3 px-5 whitespace-nowrap text-right font-black text-brand-500 bg-brand-50/30 text-lg">${stok}</td><td class="py-3 px-5 whitespace-nowrap text-center"><button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold ml-1 hover:bg-red-100 transition"><i class="fas fa-trash"></i></button></td></tr>`;
+                if(String(g.Kategori||'').toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
+            }
+        });
+        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku')}</td></tr>`;
+        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-box', 'Barang Kosong', 'Belum ada barang pendukung')}</td></tr>`;
+        
+        const masterBody = document.getElementById('master-tbody');
+        if(masterBody) {
+            let html = '';
+            sortedMaster.forEach(m => {
+                if(String(m.Kategori||'').toLowerCase() !== 'bahan' && String(m.Kategori||'').toLowerCase() !== 'pendukung') {
+                    let bahanName = '-';
+                    if(m.SKU_Bahan) { let b = (this.db.masterProduk || []).find(x=>x.SKU===m.SKU_Bahan); if(b) bahanName = b.Nama_Produk; }
+                    let imgT = m.Gambar_URL ? `<img src="${m.Gambar_URL}" class="w-10 h-10 rounded-xl object-cover inline-block mr-3 shadow-sm" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';">` : `<div class="w-10 h-10 rounded-xl bg-slate-100 inline-flex items-center justify-center mr-3 text-slate-300 shadow-inner"><i class="fas fa-image"></i></div>`;
+                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-5 whitespace-normal min-w-[150px] font-bold text-sm flex items-center text-slate-700">${imgT} ${m.Nama_Produk}</td><td class="py-3 px-5 whitespace-normal min-w-[120px] text-xs font-bold text-orange-600 bg-orange-50/30">${bahanName}</td><td class="py-3 px-5 whitespace-nowrap text-center"><button onclick="superApp.openCrudMasterMenu('edit', '${m.SKU}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${m.SKU}')" class="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold ml-1 hover:bg-red-100 transition"><i class="fas fa-trash"></i></button></td></tr>`;
+                }
+            });
+            masterBody.innerHTML = html || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-utensils', 'Belum Ada Master', 'Tambahkan menu jualan di sini')}</td></tr>`;
+        }
+        
+        const outBody = document.getElementById('crud-outlet-tbody');
+        if(outBody) {
+            outBody.innerHTML = (this.db.outlets || []).map(o => `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 font-bold text-sm text-slate-700">${o.ID_Outlet}</td><td class="py-4 px-5 font-medium text-slate-600">${o.Nama_Outlet}</td><td class="py-4 px-5 text-center"><button onclick="superApp.openCrudOutlet('edit', '${o.ID_Outlet}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button></td></tr>`).join('');
+        }
+
+        const mOutBody = document.getElementById('outlet-manage-tbody');
+        if(mOutBody) {
+            let html = '';
+            sortedMaster.forEach(master => {
+                if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') {
+                    let oData = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
+                    if(oData) {
+                        let hrg = oData.Harga_Jual; 
+                        let refBahan = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
+                        let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
+                        let stk = sData ? sData.Stok_Toko : 0;
+                        html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-normal min-w-[150px] font-bold text-sm text-slate-700">${master.Nama_Produk}</td><td class="py-4 px-5 whitespace-nowrap text-right text-brand-600 font-bold bg-brand-50/30 text-lg">Rp ${Number(hrg).toLocaleString('id-ID')}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black text-slate-700 text-lg">${stk}</td><td class="py-4 px-5 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-100 transition shadow-sm"><i class="fas fa-tag mr-1"></i> Set Harga</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-3 py-2 rounded-xl text-xs font-bold ml-1 hover:bg-red-100 transition shadow-sm"><i class="fas fa-trash"></i></button></td></tr>`;
+                    }
+                }
+            });
+            mOutBody.innerHTML = html || `<tr><td colspan="4" class="text-center py-10 h-32">${this.getEmptyState('fa-store-slash', 'Cabang Kosong', 'Belum ada menu yang dikirim/dijual di cabang ini')}</td></tr>`;
+        }
+    },
+    openCrudBahan: function(action = 'add', sku = '') {
+        let m = action === 'edit' ? (this.db.masterProduk || []).find(x => x.SKU === sku) : {};
+        let nextId = action === 'edit' ? sku : 'SUP-' + Math.floor(Math.random()*9000+1000);
+        let isBahanSel = String(m.Kategori||'').toLowerCase() === 'bahan' ? 'selected' : '';
+        let isPendukungSel = String(m.Kategori||'').toLowerCase() === 'pendukung' ? 'selected' : '';
+
+        let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
+                     this.makeInput('Nama Bahan / Barang Pendukung', 'mst-nama', m.Nama_Produk||'') + 
+                     `<div><label class="text-xs font-bold text-slate-500 block mb-1">Kategori</label><select id="frm-mst-kat" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition"><option value="Bahan" ${isBahanSel}>Bahan Baku Utama (BOM POS)</option><option value="Pendukung" ${isPendukungSel}>Barang Pendukung (Saus, dll)</option></select></div>` +
+                     `<input type="hidden" id="frm-mst-bahan" value=""><input type="hidden" id="frm-mst-img" value="">`;
+        this.buildForm(action==='edit'?"Edit Bahan/Barang":"Tambah Bahan/Barang", inputs, `superApp.executeCrud('Master_Produk', '${action==='edit'?sku:''}')`);
+    },
+    openCrudMasterMenu: function(action = 'add', sku = '') {
+        let m = action === 'edit' ? (this.db.masterProduk || []).find(x => x.SKU === sku) : {};
+        let nextId = action === 'edit' ? sku : 'MNU-' + Math.floor(Math.random()*9000+1000);
+        let opt = '<option value="">-- Menu Mandiri (Tidak potong stok bahan) --</option>'; 
+        
+        let sortedBahan = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+        sortedBahan.forEach(p => { 
+            if(String(p.Kategori||'').toLowerCase()==='bahan') {
+                let sel = (m.SKU_Bahan === p.SKU) ? 'selected' : '';
+                opt += `<option value="${p.SKU}" ${sel}>${p.Nama_Produk}</option>`; 
+            }
+        });
+        
+        let imgInput = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Foto Menu (Opsional)</label><input type="file" accept="image/*" onchange="superApp.handleImageUpload(event, 'frm-mst-img', 150)" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm outline-none bg-white text-slate-500 focus:border-brand-500 transition"><input type="hidden" id="frm-mst-img" value="${m.Gambar_URL||''}"><img id="frm-mst-img-preview" src="${m.Gambar_URL||''}" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="mt-3 w-24 h-24 object-cover rounded-2xl shadow-md border border-slate-100 ${m.Gambar_URL?'':'hidden'}"></div>`;
+
+        let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
+                     this.makeInput('Nama Menu Kasir', 'mst-nama', m.Nama_Produk||'') + 
+                     `<input type="hidden" id="frm-mst-kat" value="${m.Kategori||'AISNACK'}">` +
+                     `<div><label class="text-xs font-bold text-slate-500 block mb-1">Bahan yang Terpotong (BOM)</label><select id="frm-mst-bahan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm bg-white outline-none text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + imgInput;
+        this.buildForm(action==='edit'?"Edit Menu Kasir":"Tambah Menu Kasir", inputs, `superApp.executeCrud('Master_Produk', '${action==='edit'?sku:''}')`);
+    },
+    openAddOutletProduct: function() {
+        let opt = '';
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+        
+        sortedMaster.forEach(p => { 
+            if(String(p.Kategori||'').toLowerCase() !== 'bahan' && String(p.Kategori||'').toLowerCase() !== 'pendukung') {
+                let isExist = (this.db.hargaStokOutlet || []).find(x => x.SKU === p.SKU && x.ID_Outlet === this.outlet);
+                if(!isExist) opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; 
+            }
+        });
+        if(opt === '') return this.showToast("Semua produk master sudah ada di cabang ini!", "warning");
+        let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Master Produk</label><select id="frm-add-out-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm bg-white outline-none text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', '', 'text', '', false, 'superApp.formatRupiahInput(this)');
+        this.buildForm("Tambah Menu ke Cabang", inputs, `superApp.executeEditHarga(document.getElementById('frm-add-out-sku').value)`);
+    },
+    openEditHargaOutlet: function(sku, nama, currHarga) {
+        let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Produk</label><input type="text" disabled value="${nama}" class="w-full border-2 border-slate-200 bg-slate-100 rounded-xl px-4 py-3 font-bold text-sm outline-none text-slate-600"></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', Number(currHarga).toLocaleString('id-ID'), 'text', '', false, 'superApp.formatRupiahInput(this)');
+        this.buildForm("Pengaturan Harga Cabang", inputs, `superApp.executeEditHarga('${sku}')`);
+    },
+    executeEditHarga: async function(sku) {
+        if(this.isProcessing) return;
+        let editHrg = document.getElementById('frm-edit-hrg'); if(!editHrg) return;
+        let hrg = this.getNumericValue(editHrg.value); this.setLoading(true, "Update Harga...");
+        const payload = { action: 'edit_harga_outlet', sku: sku, outlet: this.outlet, harga: hrg };
+        let res = await this.apiPost(payload);
+        if(res.status === 'sukses') {
+            this.closeModal('modal-form'); 
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            this.refreshData(); 
+        }
+        this.setLoading(false);
+    },
+    deleteOutletProduct: async function(sku) {
+        if(this.isProcessing) return;
+        if(!confirm(`Yakin hapus produk ini dari menu POS cabang ${this.outlet}?`)) return;
+        this.setLoading(true, "Menghapus dari Cabang...");
+        const payload = { action: 'delete_outlet_product', sku: sku, outlet: this.outlet };
+        let res = await this.apiPost(payload);
+        if(res.status === 'sukses') { this.showToast("Dihapus dari cabang."); if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); } }
+        this.setLoading(false);
+    },
+    openRestokModal: function() {
+        let opt = ''; 
+        let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+        sortedMaster.forEach(p => { if(String(p.Kategori||'').toLowerCase()==='bahan' || String(p.Kategori||'').toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
+        let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Induk</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number');
+        this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
+    },
+    executeRestok: async function() {
+        if(this.isProcessing) return;
+        const elSku = document.getElementById('frm-rstk-sku'); const elQty = document.getElementById('frm-rstk-qty');
+        if(!elSku || !elQty) return; let sku = elSku.value; let qty = elQty.value; let n = elSku.options[elSku.selectedIndex].text;
+        if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Menyimpan Restok...");
+        const payload = { action: 'restok_gudang', sku: sku, nama: n, qty: qty };
+        let res = await this.apiPost(payload);
+        
+        if(res.status === 'sukses') {
+            this.closeModal('modal-form'); 
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            this.refreshData(); 
+        }
+        this.setLoading(false);
+    },
+    openDistribusiModal: function(prefillSku = '', prefillOutlet = '') {
+        let opt = ''; 
+        let sortedMaster = [...(this.db.stokGudang || [])].sort((a,b) => {
+            let nameA = this.db.masterProduk.find(x => x.SKU === a.SKU)?.Nama_Produk || a.SKU;
+            let nameB = this.db.masterProduk.find(x => x.SKU === b.SKU)?.Nama_Produk || b.SKU;
+            return String(nameA||'').localeCompare(String(nameB||''));
+        });
+        
+        sortedMaster.forEach(g => {
+            let m = (this.db.masterProduk || []).find(x => x.SKU === g.SKU);
+            if(m && (String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung')) {
+                let sel = (prefillSku === g.SKU) ? 'selected' : '';
+                opt += `<option value="${g.SKU}" ${sel}>${m.Nama_Produk} (Sisa Pusat: ${g.Stok_Pusat})</option>`; 
+            }
+        });
+        
+        let outletOpts = '';
+        (this.db.outlets || []).forEach(o => {
+            let selOut = (prefillOutlet === o.ID_Outlet || this.outlet === o.ID_Outlet) ? 'selected' : '';
+            outletOpts += `<option value="${o.ID_Outlet}" ${selOut}>${o.Nama_Outlet}</option>`;
+        });
+
+        let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Kirim Barang / Bahan Baku</label><select id="frm-dist-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + 
+                     `<div><label class="text-xs font-bold text-slate-500 block mb-1">Tujuan Cabang</label><select id="frm-dist-out" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition">${outletOpts}</select></div>` +
+                     this.makeInput('Jumlah Kirim (Pcs)', 'dist-qty', '', 'number');
+        this.buildForm("Kirim Stok Gudang -> Cabang", inputs, "superApp.executeDistribusi()");
+    },
+    executeDistribusi: async function() {
+        if(this.isProcessing) return;
+        const elSku = document.getElementById('frm-dist-sku'); const elQty = document.getElementById('frm-dist-qty'); const elOut = document.getElementById('frm-dist-out');
+        if(!elSku || !elQty || !elOut) return;
+        let sku = elSku.value; let qty = elQty.value; let targetOutlet = elOut.value;
+        if(!qty) return this.showToast("Qty wajib diisi", "error"); this.setLoading(true, "Distribusi Stok...");
+        const payload = { action: 'distribusi', sku: sku, outlet: targetOutlet, qty: qty };
+        let res = await this.apiPost(payload);
+        
+        if(res.status === 'sukses') {
+            this.closeModal('modal-form'); 
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            this.refreshData(); 
+        }
+        this.setLoading(false);
+    },
+
+    openCrudOutlet: function(action, id='') {
+        let o = action==='edit' ? (this.db.outlets || []).find(x=>x.ID_Outlet===id) : {};
+        let inputs = this.makeInput('ID Outlet Unik', 'out-id', o.ID_Outlet||'', 'text', '', action==='edit') + this.makeInput('Nama Outlet', 'out-nama', o.Nama_Outlet||'') + this.makeInput('Alamat / Detail', 'out-alamat', o.Alamat||'');
+        this.buildForm(action==='edit'?"Edit Outlet":"Tambah Outlet Baru", inputs, `superApp.executeCrud('Daftar_Outlet', '${action==='edit'?o.ID_Outlet:''}')`);
+    },
+    executeCrud: async function(sheet, oldId) {
+        if(this.isProcessing) return;
+        let row = [], idVal = '';
+        if(sheet === 'Master_Produk') { 
+            const fSku = document.getElementById('frm-mst-sku'); const fNama = document.getElementById('frm-mst-nama'); const fKat = document.getElementById('frm-mst-kat'); const fBahan = document.getElementById('frm-mst-bahan'); const fImg = document.getElementById('frm-mst-img');
+            if(!fSku || !fNama) return; idVal = fSku.value; row = [idVal, fNama.value, fKat.value, fBahan.value, fImg.value]; 
+        } else if(sheet === 'Daftar_Outlet') { 
+            const fId = document.getElementById('frm-out-id'); const fNama = document.getElementById('frm-out-nama'); const fAlamat = document.getElementById('frm-out-alamat');
+            if(!fId || !fNama) return; idVal = fId.value; row = [idVal, fNama.value, fAlamat.value, 'Aktif']; 
+        }
+        if(!idVal) return this.showToast("Gagal menyimpan form", "error"); this.setLoading(true, "Menyimpan...");
+        const payload = { action: 'save', sheetName: sheet, id: oldId || idVal, rowData: row };
+        let res = await this.apiPost(payload);
+        if(res.status === 'sukses') {
+            this.closeModal('modal-form'); 
+            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            this.refreshData(); 
+        }
+        this.setLoading(false);
+    },
+    deleteCrud: async function(sheet, id) {
+        if(this.isProcessing) return;
+        if(!confirm(`Yakin hapus data ini?`)) return; this.setLoading(true, "Menghapus...");
+        const payload = { action: 'delete', sheetName: sheet, id: id };
+        let res = await this.apiPost(payload);
+        if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+        this.setLoading(false);
+    },
+
+    // ==========================================
+    // 14. STAF (INTERACTIVE LEADERBOARD)
+    // ==========================================
+    renderStaf: function() {
+        const filterEl = document.getElementById('staf-filter-outlet');
+        if(filterEl && filterEl.options.length <= 1) {
+            let opts = '<option value="Semua">Semua Cabang</option>';
+            (this.db.outlets || []).forEach(o => opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`);
+            filterEl.innerHTML = opts;
+        }
+        let selOut = filterEl ? filterEl.value : 'Semua';
+
+        let outletSales = {}; let staffSales = {}; let maxOutletSales = 0; let maxStaffSales = 0;
+
+        (this.db.transactions || []).forEach(t => {
+            if (t.Status === 'Sukses') {
+                let out = t.Outlet; let kasir = t.Kasir; let bayar = Number(t.Total_Bayar) || 0;
+                if(!outletSales[out]) outletSales[out] = 0; outletSales[out] += bayar;
+                if(!staffSales[kasir]) staffSales[kasir] = { outlet: out, sales: 0 }; staffSales[kasir].sales += bayar;
+            }
+        });
+
+        Object.values(outletSales).forEach(v => { if(v > maxOutletSales) maxOutletSales = v; });
+        Object.values(staffSales).forEach(v => { if(v.sales > maxStaffSales) maxStaffSales = v.sales; });
+
+        let outHtml = '';
+        let outArr = Object.keys(outletSales).map(k => ({name: k, sales: outletSales[k]})).sort((a,b) => b.sales - a.sales);
+        outArr.forEach((o, i) => {
+            let pct = maxOutletSales > 0 ? (o.sales / maxOutletSales) * 100 : 0;
+            let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-700');
+            outHtml += `<div class="flex flex-col gap-1.5 mb-5"><div class="flex justify-between text-sm font-bold text-slate-700"><span><i class="fas fa-medal ${medal} mr-2 text-lg"></i> ${o.name}</span><span>Rp ${o.sales.toLocaleString('id-ID')}</span></div><div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-gradient-to-r from-brand-500 to-orange-400 h-3 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
+        });
+        const outListEl = document.getElementById('staf-outlet-leaderboard');
+        if(outListEl) outListEl.innerHTML = outHtml || this.getEmptyState('fa-store', 'Belum Ada Data', 'Belum ada transaksi terekam.');
+
+        let stafHtml = '';
+        let stafArr = Object.keys(staffSales).map(k => ({name: k, ...staffSales[k]})).filter(s => selOut === 'Semua' || s.outlet === selOut).sort((a,b) => b.sales - a.sales);
+        stafArr.forEach((s, i) => {
+            let pct = maxStaffSales > 0 ? (s.sales / maxStaffSales) * 100 : 0;
+            stafHtml += `<div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:-translate-y-1 transition duration-300"><div class="flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-100">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5"><i class="fas fa-location-dot text-brand-500 mr-1"></i>${s.outlet}</p></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-lg">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner"><div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
+        });
+        const stafListEl = document.getElementById('staf-employee-list');
+        if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
+    },
+
+    // ==========================================
+    // 15. SYSTEM UTILS (PRINTER & UI)
+    // ==========================================
+    makeInput: function(label, id, val='', type='text', hint='', dis=false, customEvent='') { 
+        return `<div><label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} ${customEvent?'oninput="'+customEvent+'"':''} class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 transition ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; 
+    },
+    buildForm: function(title, inputsHtml, actionFunctionStr) {
+        const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
+        const bodyEl = document.getElementById('modal-form-body'); if(bodyEl) bodyEl.innerHTML = inputsHtml;
+        const btnEl = document.getElementById('modal-form-btn'); if(btnEl) btnEl.setAttribute('onclick', actionFunctionStr);
+        const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
+        if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
+    },
     connectBluetooth: async function() {
         const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
         try {
@@ -985,12 +1450,14 @@ const superApp = {
             
             let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
             str += `Cabang: ${outlet}\nNo. Resi: ${id}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
-            items.forEach(i => { str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`; });
+            items.forEach(i => {
+                str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
+            });
             str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
             const data = new TextEncoder().encode(str);
             for (let i = 0; i < data.length; i += 100) await this.printerChar.writeValue(data.slice(i, i + 100));
         } catch(e) { throw e; }
     }
-};
+}; // END OF SUPERAPP OBJECT
 
 window.onload = () => superApp.init();
