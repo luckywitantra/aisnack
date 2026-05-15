@@ -5,59 +5,86 @@ const superApp = {
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
+    retryCount: 0,
 
     // =========================================================================
-    // HELPER: RUPIAH & WAKTU
+    // PEMBERSIH ZONA WAKTU (ULTIMATE REGEX FORMATTER)
     // =========================================================================
-    formatRupiahInput: function(el) {
-        let val = el.value.replace(/[^0-9]/g, '');
-        if(val !== '') el.value = parseInt(val, 10).toLocaleString('id-ID');
-        else el.value = '';
-    },
-    getNumericValue: function(val) {
-        return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
-    },
     cleanDateOnly: function(str) {
-        if(!str) return ''; let s = String(str);
+        if(!str) return '';
+        let s = String(str);
         let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let pad = n => n.length < 2 ? '0' + n : n; return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; }
+        if (match) {
+            let pad = n => String(n).length < 2 ? '0' + n : n;
+            return `${pad(match[1])}/${pad(match[2])}/${match[3]}`;
+        }
         if (s.includes('T')) {
             let d = new Date(s);
-            if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; }
+            if (!isNaN(d.getTime())) {
+                let pad = n => n < 10 ? '0' + n : n;
+                return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+            }
         }
         return s.split(' ')[0];
     },
     cleanTimeOnly: function(str) {
-        if(!str) return ''; let s = String(str);
+        if(!str) return '';
+        let s = String(str);
         let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { let pad = n => n.length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; }
-        if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
-        let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
+        if (match) {
+            let pad = n => String(n).length < 2 ? '0' + n : n;
+            // FIX: Penambahan kurung tutup ")" pada pad(match[3]) yang sebelumnya hilang
+            return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`;
+        }
+        if(s.includes('T') && s.includes('Z')) {
+            let d = new Date(s);
+            if (!isNaN(d.getTime())) {
+                let pad = n => n < 10 ? '0' + n : n;
+                return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`;
+            }
+        } 
+        let parts = s.split(' '); 
+        return parts.length > 1 ? parts[1] : s;
     },
     parseDateId: function(dateStr) {
-        if(!dateStr) return new Date(0); let s = String(dateStr);
+        if(!dateStr) return new Date(0);
+        let s = String(dateStr);
         let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
         if (match) {
-            let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let year = parseInt(match[3]);
-            let day = p1, month = p2; if (p2 > 12) { month = p1; day = p2; }
+            let p1 = parseInt(match[1]);
+            let p2 = parseInt(match[2]);
+            let year = parseInt(match[3]);
+            let day = p1, month = p2;
+            if (p2 > 12) { month = p1; day = p2; }
             return new Date(year, month - 1, day, 0, 0, 0, 0);
         }
-        if(s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; } }
-        let firstPart = s.split(' ')[0]; let d2 = new Date(firstPart);
+        if(s.includes('T')) {
+            let d = new Date(s);
+            if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; }
+        }
+        let firstPart = s.split(' ')[0];
+        let d2 = new Date(firstPart);
         if (!isNaN(d2.getTime())) { d2.setHours(0,0,0,0); return d2; }
         return new Date(0);
     },
 
     pullFreshData: async function() {
-        if(this.isProcessing) return; this.setLoading(true, "Menarik Data Terbaru...");
+        if(this.isProcessing) return;
+        this.setLoading(true, "Menarik Data Terbaru...");
         try {
             const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
             const data = await res.json();
             if(data && data.status === 'sukses') {
-                this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                this.refreshData(); this.showToast("Data berhasil diperbarui dari Server!");
-            } else throw new Error("Gagal");
-        } catch (e) { this.showToast("Gagal menarik data. Periksa internet Anda.", "error"); }
+                this.db = data;
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                this.refreshData();
+                this.showToast("Data berhasil diperbarui dari Server!");
+            } else {
+                throw new Error("Gagal");
+            }
+        } catch (e) {
+            this.showToast("Gagal menarik data. Periksa internet Anda.", "error");
+        }
         this.setLoading(false);
     },
 
@@ -65,7 +92,8 @@ const superApp = {
         return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`;
     },
     showToast: function(msg, type = 'success') {
-        const container = document.getElementById('toast-container'); if(!container) return;
+        const container = document.getElementById('toast-container');
+        if(!container) return;
         const icon = type === 'success' ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' : (type === 'warning' ? '<i class="fas fa-cloud-arrow-up text-orange-500 text-xl"></i>' : '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>');
         const t = document.createElement('div'); t.className = `bg-white p-4 rounded-2xl shadow-2xl shadow-slate-200 flex items-center gap-3 toast-animate z-[999] dark:bg-slate-800 dark:border-slate-700 pointer-events-auto`;
         t.innerHTML = `${icon}<p class="font-bold text-sm text-slate-800">${msg}</p>`;
@@ -78,7 +106,7 @@ const superApp = {
     },
     setLoading: function(show, text="Memproses...") { 
         const loader = document.getElementById('app-loader'); const lText = document.getElementById('loader-text');
-        this.isProcessing = show;
+        if(show) this.isProcessing = true; else this.isProcessing = false;
         if(loader && lText) { lText.innerText = text; if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } else { loader.classList.add('hidden'); loader.classList.remove('flex'); } }
     },
     closeModal: function(id) { 
@@ -280,7 +308,8 @@ const superApp = {
         } 
     },
     processLogin: function() {
-        if(this.isProcessing) return; this.isProcessing = true;
+        if(this.isProcessing) return;
+        this.isProcessing = true;
         if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); this.isProcessing = false; return; }
         let user = this.db.users.find(u => u.PIN == this.pinBuffer);
         if(user) {
@@ -469,8 +498,24 @@ const superApp = {
                 let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                 let stokSistem = sData ? Number(sData.Stok_Toko) : 0;
                 
-                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${stokSistem}</td><td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
-                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${stokSistem}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
+                let strHtml = `<tr class="border-b border-slate-50">
+                    <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
+                    <td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${stokSistem}</td>
+                    <td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td>
+                    <td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td>
+                    <td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td>
+                </tr>`;
+                
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                        <div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${stokSistem}</span></p></div>
+                        <span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')">
+                        <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi...">
+                    </div>
+                </div>`;
 
                 if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
                 else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
@@ -639,10 +684,10 @@ const superApp = {
         });
 
         let inputs = `
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Asal (Sumber)</label><select id="frm-trf-out-asal" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${outletOpts}</select></div>
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
-            <div class="bg-blue-50 text-blue-600 p-3 rounded-xl text-xs font-bold mb-2 hidden shadow-inner" id="trf-stok-info-box">Stok Tersedia: <span id="trf-stok-info" class="text-lg ml-1">0</span></div>
-            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Asal (Sumber)</label><select id="frm-trf-out-asal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${outletOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
+            <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl text-sm font-bold mb-2 hidden shadow-inner border border-blue-100 flex items-center justify-between" id="trf-stok-info-box"><span><i class="fas fa-box-open mr-2"></i> Stok Tersedia</span> <span id="trf-stok-info" class="text-xl font-black">0</span></div>
+            <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
             ${this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number')}
         `;
         this.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransferOwner()");
@@ -709,7 +754,7 @@ const superApp = {
         if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
         this.setLoading(true, "Menyimpan...");
         let items = [];
-        let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
         
         (this.db.masterProduk || []).forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
@@ -978,7 +1023,7 @@ const superApp = {
                     totalRev += Number(t.Total_Bayar) || 0; countTrx++;
                     if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += Number(t.Total_Bayar) || 0; else totalTunai += Number(t.Total_Bayar) || 0;
                 }
-                let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px]">Batal</span>`;
+                let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-bold">Batal</span>`;
                 let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
                 let rowBg = t.Status === 'Sukses' ? 'border-b border-slate-50 hover:bg-slate-50' : 'row-void';
                 
@@ -1071,13 +1116,13 @@ const superApp = {
     openDetailTrx: function(trxId) {
         let trx = (this.db.transactions || []).find(x => x.ID_TRX === trxId); if(!trx) return;
         this.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
-        let statText = trx.Status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
+        let statText = trx.Status === 'Sukses' ? '' : '<br><span style="color:red; font-size:16px;">*** DIBATALKAN ***</span>';
         
         let cleanDate = this.cleanDateOnly(trx.Tanggal);
         let cleanTime = this.cleanTimeOnly(trx.Waktu);
 
-        let strukHtml = `<div class="text-center font-bold mb-4 text-slate-800 border-b-2 border-slate-800 pb-2">=== Ai-Snack ===\nCabang: ${trx.Outlet}\nNo. Resi: ${trx.ID_TRX}\n${cleanDate} ${cleanTime}${statText}</div>`;
-        items.forEach(i => { strukHtml += `<div class="mb-2 text-slate-800 font-bold">${i.nama}\n<div class="flex justify-between font-normal text-slate-600"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span class="font-bold text-slate-800">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
+        let strukHtml = `<div class="text-center font-bold mb-4 text-slate-800 border-b-2 border-slate-800 pb-2">=== Ai-Snack ===<br>Cabang: ${trx.Outlet}<br>No. Resi: ${trx.ID_TRX}<br>${cleanDate} ${cleanTime}${statText}</div>`;
+        items.forEach(i => { strukHtml += `<div class="mb-2 text-slate-800 font-bold">${i.nama}<br><div class="flex justify-between font-normal text-slate-600"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span class="font-bold text-slate-800">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
         strukHtml += `<div class="border-t-2 border-slate-800 mt-4 pt-2 flex justify-between font-black text-slate-800 text-lg"><span>TOTAL</span><span>Rp ${Number(trx.Total_Bayar).toLocaleString('id-ID')}</span></div>`;
         let tunaiVal = trx.Tunai !== undefined ? trx.Tunai : (trx.Dibayar || 0);
         strukHtml += `<div class="flex justify-between text-slate-600 font-bold mt-2"><span>${trx.Metode_Bayar||'TUNAI'}</span><span>Rp ${Number(tunaiVal).toLocaleString('id-ID')}</span></div><div class="flex justify-between text-slate-600 font-bold"><span>KEMBALI</span><span>Rp ${Number(trx.Kembalian).toLocaleString('id-ID')}</span></div>`;
@@ -1184,7 +1229,6 @@ const superApp = {
 
         let lblCabang = aiOutlet === 'Semua' ? 'Keseluruhan Cabang' : `Cabang ${aiOutlet}`;
 
-        // Trend Visualizer
         let trendHtml = top1.vel > 5 ? `<span class="text-green-300 text-sm ml-2 bg-green-900/30 px-2 py-1 rounded-lg"><i class="fas fa-arrow-trend-up"></i> Naik</span>` : `<span class="text-orange-200 text-sm ml-2 bg-orange-900/30 px-2 py-1 rounded-lg"><i class="fas fa-minus"></i> Stabil</span>`;
 
         aiCards.innerHTML = `
@@ -1320,11 +1364,7 @@ const superApp = {
             }
         });
         
-        let imgInput = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Foto Menu (Opsional)</label>
-                        <input type="file" accept="image/*" onchange="superApp.handleImageUpload(event, 'frm-mst-img', 150)" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm outline-none bg-white text-slate-500 focus:border-brand-500 transition">
-                        <input type="hidden" id="frm-mst-img" value="${m.Gambar_URL||''}">
-                        <img id="frm-mst-img-preview" src="${m.Gambar_URL||''}" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="mt-3 w-24 h-24 object-cover rounded-2xl shadow-md border border-slate-100 ${m.Gambar_URL?'':'hidden'}">
-                        </div>`;
+        let imgInput = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Foto Menu (Opsional)</label><input type="file" accept="image/*" onchange="superApp.handleImageUpload(event, 'frm-mst-img', 150)" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm outline-none bg-white text-slate-500 focus:border-brand-500 transition"><input type="hidden" id="frm-mst-img" value="${m.Gambar_URL||''}"><img id="frm-mst-img-preview" src="${m.Gambar_URL||''}" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="mt-3 w-24 h-24 object-cover rounded-2xl shadow-md border border-slate-100 ${m.Gambar_URL?'':'hidden'}"></div>`;
 
         let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
                      this.makeInput('Nama Menu Kasir', 'mst-nama', m.Nama_Produk||'') + 
@@ -1579,3 +1619,5 @@ const superApp = {
         return `<div><label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} ${customEvent?'oninput="'+customEvent+'"':''} class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 transition ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; 
     }
 };
+
+window.onload = () => superApp.init();
