@@ -52,23 +52,45 @@
       <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-[1.5rem] flex items-center justify-center shadow-lg mb-4 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
       <h2 class="text-xl lg:text-2xl font-black text-slate-800 mb-1">Masuk Sistem</h2>
       <p class="text-xs lg:text-sm font-bold text-slate-400 mb-6">Masukkan PIN Otorisasi</p>
-      
-      <div id="pin-numpad-container" class="w-full transition-all duration-300">
-          <div class="flex gap-4 mb-6 justify-center">
-            <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-1"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-2"></div>
-            <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-3"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-4"></div>
+      <div class="flex gap-4 mb-6">
+        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-1"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-2"></div>
+        <div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-3"></div><div class="w-4 h-4 rounded-full border-2 border-slate-300 pin-dot" id="dot-4"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 lg:gap-3 w-full mb-4">
+        <button class="numpad-btn" onclick="superApp.addPin('1')">1</button>
+        <button class="numpad-btn" onclick="superApp.addPin('2')">2</button>
+        <button class="numpad-btn" onclick="superApp.addPin('3')">3</button>
+        <button class="numpad-btn" onclick="superApp.addPin('4')">4</button>
+        <button class="numpad-btn" onclick="superApp.addPin('5')">5</button>
+        <button class="numpad-btn" onclick="superApp.addPin('6')">6</button>
+        <button class="numpad-btn" onclick="superApp.addPin('7')">7</button>
+        <button class="numpad-btn" onclick="superApp.addPin('8')">8</button>
+        <button class="numpad-btn" onclick="superApp.addPin('9')">9</button>
+        <button class="numpad-btn text-slate-400 text-lg border-transparent shadow-none hover:bg-slate-100" onclick="superApp.clearPin()"><i class="fas fa-times"></i></button>
+        <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
+        <button class="numpad-btn text-red-500 text-lg border-transparent shadow-none hover:bg-red-50" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
+      </div>
+      <p class="text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse" id="login-status">Memuat Database Server...</p>
+    </div>
+  </div>
+
+  <div id="virtual-numpad" class="fixed inset-x-0 bottom-0 z-[9999] bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex flex-col p-6 transform translate-y-full transition-transform duration-300 border-t border-slate-200">
+      <div class="flex justify-between items-center mb-6">
+          <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest" id="vnumpad-title">Input Nominal</p><h2 class="text-4xl font-black text-brand-600 truncate mt-1" id="vnumpad-display">0</h2></div>
+          <button onclick="superApp.closeVirtualNumpad()" class="w-12 h-12 bg-slate-100 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition font-bold text-xl shadow-inner"><i class="fas fa-chevron-down"></i></button>
+      </div>
+      <div class="grid grid-cols-4 gap-3 max-w-xl w-full mx-auto pb-4">
+          <div class="col-span-3 grid grid-cols-3 gap-3">
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('1')">1</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('2')">2</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('3')">3</button>
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('4')">4</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('5')">5</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('6')">6</button>
+            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('7')">7</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('8')">8</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('9')">9</button>
+            <button class="numpad-btn py-5 text-red-500 bg-red-50 border-red-100" onclick="superApp.vnumpadClear()"><i class="fas fa-trash-alt"></i></button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('0')">0</button><button class="numpad-btn py-5 font-black text-lg" onclick="superApp.vnumpadAdd('000')">000</button>
           </div>
-          <div class="grid grid-cols-3 gap-2 lg:gap-3 w-full mb-4">
-            <button class="numpad-btn" onclick="superApp.addPin('1')">1</button><button class="numpad-btn" onclick="superApp.addPin('2')">2</button><button class="numpad-btn" onclick="superApp.addPin('3')">3</button>
-            <button class="numpad-btn" onclick="superApp.addPin('4')">4</button><button class="numpad-btn" onclick="superApp.addPin('5')">5</button><button class="numpad-btn" onclick="superApp.addPin('6')">6</button>
-            <button class="numpad-btn" onclick="superApp.addPin('7')">7</button><button class="numpad-btn" onclick="superApp.addPin('8')">8</button><button class="numpad-btn" onclick="superApp.addPin('9')">9</button>
-            <button class="numpad-btn text-slate-400 text-lg border-transparent shadow-none hover:bg-slate-100" onclick="superApp.clearPin()"><i class="fas fa-times"></i></button>
-            <button class="numpad-btn" onclick="superApp.addPin('0')">0</button>
-            <button class="numpad-btn text-red-500 text-lg border-transparent shadow-none hover:bg-red-50" onclick="superApp.delPin()"><i class="fas fa-backspace"></i></button>
+          <div class="col-span-1 flex flex-col gap-3">
+              <button class="flex-1 bg-slate-100 text-slate-600 rounded-[1.2rem] font-bold text-2xl hover:bg-slate-200 transition shadow-sm border border-slate-200" onclick="superApp.vnumpadDel()"><i class="fas fa-backspace"></i></button>
+              <button class="flex-[2] bg-brand-500 text-white rounded-[1.2rem] font-black text-2xl shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition" onclick="superApp.vnumpadDone()">OK</button>
           </div>
       </div>
-      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center mt-2" id="login-status">Mempersiapkan Sistem...</p>
-    </div>
   </div>
 
   <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity" onclick="superApp.toggleSidebar()"></div>
@@ -81,6 +103,7 @@
         </div>
         <button class="lg:hidden text-slate-400 text-2xl" onclick="superApp.toggleSidebar()"><i class="fas fa-times"></i></button>
     </div>
+    
     <nav class="space-y-1 px-4 overflow-y-auto flex-1 custom-scroll flex flex-col gap-1" id="sidebar-nav">
         <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 mb-2 shrink-0">Aplikasi Kasir</p>
         <button onclick="superApp.switchMenu('pos')" id="nav-pos" class="nav-btn nav-active w-full flex items-center p-3 rounded-2xl transition group shrink-0"><i class="fas fa-cash-register w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Point of Sale</span></button>
@@ -115,9 +138,7 @@
       </div>
       <div class="flex items-center gap-2 lg:gap-3 overflow-x-auto no-scrollbar">
         <button onclick="superApp.pullFreshData()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 cursor-pointer hover:bg-blue-100 transition text-[10px] font-bold text-blue-600 shrink-0"><i class="fas fa-cloud-download-alt"></i><span class="hidden md:inline">Tarik Data</span></button>
-        <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 shrink-0 cursor-pointer" onclick="superApp.syncOfflineQueue()">
-            <span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span><span id="net-text" class="text-[10px] font-bold text-green-600 hidden md:inline">Online</span>
-        </div>
+        <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 shrink-0 cursor-pointer" onclick="superApp.syncOfflineQueue()"><span id="net-dot" class="w-2 h-2 rounded-full bg-green-500"></span><span id="net-text" class="text-[10px] font-bold text-green-600 hidden md:inline">Online</span></div>
         <button id="btn-ubah-promo" onclick="superApp.changePromoImage()" class="hidden lg:flex bg-slate-100 text-slate-600 border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-slate-200 transition shrink-0"><i class="fas fa-image"></i> Ubah Promo</button>
         <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition shrink-0"><i class="fas fa-desktop"></i> Layar</button>
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition shrink-0"><i class="fas fa-moon" id="dark-icon"></i></button>
@@ -137,7 +158,6 @@
           </div>
           <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pb-6 content-start flex-1 min-h-0 custom-scroll" id="product-list"></div>
         </div>
-        
         <aside class="w-full md:w-[320px] lg:w-[380px] bg-white border border-slate-200 rounded-[2rem] flex flex-col shadow-lg h-[50dvh] md:h-full shrink-0">
           <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-[2rem] shrink-0">
             <h2 class="font-extrabold text-lg text-slate-800">Keranjang</h2><span class="bg-brand-100 text-brand-600 px-3 py-1 rounded-full text-xs font-black shadow-sm" id="cart-badge">0 Item</span>
@@ -188,11 +208,11 @@
         <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex items-center gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
                 <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-3xl shadow-inner"><i class="fas fa-user-check"></i></div>
-                <div class="flex-1"><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-medium text-slate-500">Otorisasi massal laporan kasir.</p></div>
+                <div class="flex-1"><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-medium text-slate-500">Persetujuan penyesuaian stok cabang dari laporan kasir.</p></div>
                 
-                <div id="bulk-action-bar" class="hidden flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                    <button onclick="superApp.processBulkApproval('Disetujui')" class="flex-1 bg-green-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-green-600 transition"><i class="fas fa-check-double mr-1"></i> Setuju Terpilih</button>
-                    <button onclick="superApp.processBulkApproval('Ditolak')" class="flex-1 bg-red-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-red-600 transition"><i class="fas fa-ban mr-1"></i> Tolak Terpilih</button>
+                <div id="bulk-action-bar" class="hidden flex gap-2">
+                    <button onclick="superApp.processBulkApproval('Disetujui')" class="bg-green-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-green-600 transition"><i class="fas fa-check-double mr-2"></i>Setujui Pilihan</button>
+                    <button onclick="superApp.processBulkApproval('Ditolak')" class="bg-red-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-red-600 transition"><i class="fas fa-ban mr-2"></i>Tolak Pilihan</button>
                 </div>
             </div>
 
@@ -202,10 +222,10 @@
             </div>
             
             <div id="audit-content-opname" class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-3 px-4 text-center"><input type="checkbox" class="w-5 h-5 rounded cursor-pointer accent-brand-500" onchange="superApp.toggleAllAuditCb('opname', this.checked)"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item</th><th class="py-3 px-4 text-center">Sys vs Fisik</th><th class="py-3 px-4 text-right">Selisih</th><th class="py-3 px-4">Alasan Kasir</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-3 px-4 w-10"><input type="checkbox" id="cb-all-opname" onchange="superApp.toggleAllAuditCb('opname', this.checked)" class="w-5 h-5 rounded cursor-pointer accent-brand-500"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item</th><th class="py-3 px-4 text-center">Sys vs Fisik</th><th class="py-3 px-4 text-right">Selisih</th><th class="py-3 px-4">Alasan Kasir</th><th class="py-3 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
             <div id="audit-content-terima" class="hidden flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-3 px-4 text-center"><input type="checkbox" class="w-5 h-5 rounded cursor-pointer accent-brand-500" onchange="superApp.toggleAllAuditCb('terima', this.checked)"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item Masuk</th><th class="py-3 px-4 text-center">Qty Diterima</th><th class="py-3 px-4">Catatan Kasir</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-3 px-4 w-10"><input type="checkbox" id="cb-all-terima" onchange="superApp.toggleAllAuditCb('terima', this.checked)" class="w-5 h-5 rounded cursor-pointer accent-brand-500"></th><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Outlet & Kasir</th><th class="py-3 px-4">Item Masuk</th><th class="py-3 px-4 text-center">Qty Diterima</th><th class="py-3 px-4">Catatan Kasir</th><th class="py-3 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
@@ -229,44 +249,10 @@
         </div>
         <div id="pdf-export-area" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 lg:p-8 flex-1 flex flex-col min-h-0 relative">
             <div class="text-center mb-8 border-b border-slate-100 pb-6 shrink-0"><h2 class="text-3xl font-black uppercase tracking-widest text-slate-800 mb-1">Laporan Operasional</h2><p class="text-slate-500 font-bold text-sm" id="report-title-label"></p><p class="text-[10px] font-bold text-slate-400 mt-1 uppercase" id="report-date-label"></p></div>
-            
-            <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 shrink-0">
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Transaksi</p><h4 class="text-2xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
-                    <div class="bg-green-50 p-5 rounded-2xl border border-green-100"><p class="text-xs font-bold text-green-500 uppercase tracking-widest mb-1">Omset Tunai</p><h4 class="text-2xl font-black text-green-600" id="rep-total-tunai">Rp 0</h4></div>
-                    <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100"><p class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Omset QRIS</p><h4 class="text-2xl font-black text-blue-600" id="rep-total-qris">Rp 0</h4></div>
-                    <div class="bg-red-50 p-5 rounded-2xl border border-red-100"><p class="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Total Kas Keluar</p><h4 class="text-2xl font-black text-red-600" id="rep-total-kas">Rp 0</h4></div>
-                </div>
-                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-list text-brand-500"></i> Detail Histori Transaksi</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Resi & Waktu</th><th class="py-4 px-5">Kasir / Outlet</th><th class="py-4 px-5">Metode</th><th class="py-4 px-5">Status</th><th class="py-4 px-5 text-right">Total Bayar</th><th class="py-4 px-5 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
-                </div>
-            </div>
-
-            <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
-                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekapitulasi Penjualan per Produk</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Nama Menu / Varian</th><th class="py-4 px-5 text-center">Total Terjual (Pcs)</th><th class="py-4 px-5 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
-                </div>
-                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-truck text-brand-500"></i> Log Mutasi & Transfer</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Tujuan</th><th class="py-4 px-5 text-right">Qty Kirim</th><th class="py-4 px-5 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
-                </div>
-            </div>
-
-            <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0">
-                <h3 class="font-extrabold text-lg mb-3 text-red-500 flex items-center gap-2 shrink-0"><i class="fas fa-wallet"></i> Log Kas Keluar Laci</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5">Keterangan</th><th class="py-4 px-5 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
-                </div>
-            </div>
-
-            <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0">
-                <h3 class="font-extrabold text-lg mb-3 text-purple-600 flex items-center gap-2 shrink-0"><i class="fas fa-clipboard-check"></i> Riwayat Audit Opname</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu Opname</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5 text-center">Sys vs Fisik</th><th class="py-4 px-5 text-right">Selisih</th><th class="py-4 px-5 text-center">Status Audit</th></tr></thead><tbody id="report-selisih-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
-                </div>
-            </div>
+            <div id="report-content-trx" class="flex-1 flex flex-col min-h-0"><div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 shrink-0"><div class="bg-slate-50 p-5 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Transaksi</p><h4 class="text-2xl font-black text-slate-800" id="rep-total-trx">0</h4></div><div class="bg-green-50 p-5 rounded-2xl border border-green-100"><p class="text-xs font-bold text-green-500 uppercase tracking-widest mb-1">Omset Tunai</p><h4 class="text-2xl font-black text-green-600" id="rep-total-tunai">Rp 0</h4></div><div class="bg-blue-50 p-5 rounded-2xl border border-blue-100"><p class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Omset QRIS</p><h4 class="text-2xl font-black text-blue-600" id="rep-total-qris">Rp 0</h4></div><div class="bg-red-50 p-5 rounded-2xl border border-red-100"><p class="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Total Kas Keluar</p><h4 class="text-2xl font-black text-red-600" id="rep-total-kas">Rp 0</h4></div></div><h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-list text-brand-500"></i> Detail Histori Transaksi</h3><div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner"><table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Resi & Waktu</th><th class="py-4 px-5">Kasir / Outlet</th><th class="py-4 px-5">Metode</th><th class="py-4 px-5">Status</th><th class="py-4 px-5 text-right">Total Bayar</th><th class="py-4 px-5 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-100"></tbody></table></div></div>
+            <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0"><h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekapitulasi Penjualan per Produk</h3><div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner"><table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Nama Menu / Varian</th><th class="py-4 px-5 text-center">Total Terjual (Pcs)</th><th class="py-4 px-5 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-100"></tbody></table></div><h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-truck text-brand-500"></i> Log Mutasi & Transfer</h3><div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner"><table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Tujuan</th><th class="py-4 px-5 text-right">Qty Kirim</th><th class="py-4 px-5 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table></div></div>
+            <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0"><h3 class="font-extrabold text-lg mb-3 text-red-500 flex items-center gap-2 shrink-0"><i class="fas fa-wallet"></i> Log Kas Keluar Laci</h3><div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner"><table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5">Keterangan</th><th class="py-4 px-5 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-100"></tbody></table></div></div>
+            <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0"><h3 class="font-extrabold text-lg mb-3 text-purple-600 flex items-center gap-2 shrink-0"><i class="fas fa-clipboard-check"></i> Riwayat Audit Opname</h3><div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner"><table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Waktu Opname</th><th class="py-4 px-5">Barang</th><th class="py-4 px-5">Cabang & Kasir</th><th class="py-4 px-5 text-center">Sys vs Fisik</th><th class="py-4 px-5 text-right">Selisih</th><th class="py-4 px-5 text-center">Status Audit</th></tr></thead><tbody id="report-selisih-tbody" class="font-bold divide-y divide-slate-100"></tbody></table></div></div>
         </div>
       </div>
 
@@ -361,75 +347,3 @@
 
     </div>
   </main>
-
-  <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none"></div>
-
-  <div id="modal-payment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2.5rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
-      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
-      <div class="bg-brand-50 p-6 rounded-2xl mb-6 text-center border border-brand-100 shadow-inner"><h2 class="text-4xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
-      <div class="mb-5">
-          <label class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Metode Pembayaran</label>
-          <div class="grid grid-cols-2 gap-3">
-              <button onclick="superApp.setPaymentMethod('Tunai')" id="btn-pay-tunai" class="py-3.5 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition"><i class="fas fa-money-bill-wave mr-2"></i>TUNAI</button>
-              <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3.5 border-2 border-slate-200 bg-white text-slate-500 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50"><i class="fas fa-qrcode mr-2"></i>QRIS</button>
-          </div>
-      </div>
-      <div id="tunai-section">
-          <div class="grid grid-cols-4 gap-2 mb-4">
-              <button onclick="superApp.addPayNumpad(10000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
-              <button onclick="superApp.addPayNumpad(20000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">20k</button>
-              <button onclick="superApp.addPayNumpad(50000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">50k</button>
-              <button onclick="superApp.addPayNumpad(100000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-700 shadow-sm hover:border-brand-500 transition text-sm">100k</button>
-              <button onclick="superApp.setCash('pas')" class="col-span-4 py-3 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition">UANG PAS</button>
-          </div>
-          <div class="flex items-center gap-2 mb-6 mt-4">
-            <input type="text" id="pay-cash-input" readonly onclick="superApp.openVirtualNumpad('pay-cash-input', 'Uang Diterima (Rp)', true)" class="flex-1 border-2 border-slate-200 bg-white rounded-xl px-5 py-4 font-black text-2xl text-slate-800 outline-none focus:border-brand-500 transition cursor-pointer text-right" placeholder="Rp 0">
-            <button onclick="superApp.setCash(0)" class="p-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-md whitespace-nowrap">Reset</button>
-          </div>
-          <div class="flex justify-between items-center bg-slate-50 p-5 rounded-2xl mb-6 border border-slate-100 text-slate-800 shadow-inner"><span class="font-bold text-slate-500">Kembalian:</span><span class="text-2xl font-black" id="pay-change">Rp 0</span></div>
-      </div>
-      <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition-all text-lg" id="btn-execute-pay">Selesaikan & Cetak</button>
-    </div>
-  </div>
-
-  <div id="modal-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl modal-enter text-slate-800" id="modal-detail-content">
-      <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-lg">Detail Struk</h3><button onclick="superApp.closeModal('modal-detail')" class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
-      <div id="detail-struk-body" class="bg-slate-50 p-5 rounded-xl text-sm font-mono text-slate-700 h-64 overflow-y-auto mb-5 border border-slate-200 custom-scroll shadow-inner"></div>
-      <div class="flex flex-col gap-2">
-        <button onclick="superApp.executeReprint()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-extrabold shadow-sm hover:bg-slate-800 transition"><i class="fas fa-print mr-2"></i>Cetak Ulang</button>
-        <button onclick="superApp.promptVoidTrx()" id="btn-void-trx" class="w-full bg-white border-2 border-red-100 text-red-500 py-3.5 rounded-xl font-extrabold hover:bg-red-50 transition"><i class="fas fa-ban mr-2"></i>Batal (Admin PIN)</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-form" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2.5rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter overflow-y-auto max-h-[90vh] text-slate-800 custom-scroll" id="modal-form-content">
-      <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl" id="modal-form-title">Form</h3><button onclick="superApp.closeModal('modal-form')" class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button></div>
-      <div id="modal-form-body" class="space-y-4 text-slate-800"></div>
-      <button id="modal-form-btn" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold mt-6 shadow-lg hover:bg-brand-600 transition hover:-translate-y-1">Simpan Perubahan</button>
-    </div>
-  </div>
-
-  <div id="virtual-numpad" class="fixed inset-x-0 bottom-0 z-[9999] bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex flex-col p-6 transform translate-y-full transition-transform duration-300 border-t border-slate-200">
-      <div class="flex justify-between items-center mb-6">
-          <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest" id="vnumpad-title">Input Nominal</p><h2 class="text-4xl font-black text-brand-600 truncate mt-1" id="vnumpad-display">0</h2></div>
-          <button onclick="superApp.closeVirtualNumpad()" class="w-12 h-12 bg-slate-100 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition font-bold text-xl shadow-inner"><i class="fas fa-chevron-down"></i></button>
-      </div>
-      <div class="grid grid-cols-4 gap-3 max-w-xl w-full mx-auto pb-4">
-          <div class="col-span-3 grid grid-cols-3 gap-3">
-            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('1')">1</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('2')">2</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('3')">3</button>
-            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('4')">4</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('5')">5</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('6')">6</button>
-            <button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('7')">7</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('8')">8</button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('9')">9</button>
-            <button class="numpad-btn py-5 text-red-500 bg-red-50 border-red-100" onclick="superApp.vnumpadClear()"><i class="fas fa-trash-alt"></i></button><button class="numpad-btn py-5 text-xl" onclick="superApp.vnumpadAdd('0')">0</button><button class="numpad-btn py-5 font-black text-lg" onclick="superApp.vnumpadAdd('000')">000</button>
-          </div>
-          <div class="col-span-1 flex flex-col gap-3">
-              <button class="flex-1 bg-slate-100 text-slate-600 rounded-[1.2rem] font-bold text-2xl hover:bg-slate-200 transition shadow-sm border border-slate-200" onclick="superApp.vnumpadDel()"><i class="fas fa-backspace"></i></button>
-              <button class="flex-[2] bg-brand-500 text-white rounded-[1.2rem] font-black text-2xl shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:bg-brand-600 hover:-translate-y-1 active:scale-95 transition" onclick="superApp.vnumpadDone()">OK</button>
-          </div>
-      </div>
-  </div>
-
-</body>
-</html>
