@@ -13,37 +13,34 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .nav-active { background-color: #f97316; color: white; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); }
-    .nav-active i { color: white !important; }
-    .modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .modal-enter-active { opacity: 1; transform: scale(1); }
-    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .toast-animate { animation: slideInRight 0.3s ease-out forwards; }
-    .blur-lock { filter: blur(8px); pointer-events: none; user-select: none; }
-    .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
-    
-    .dark body { background-color: #0f172a; color: #f8fafc; }
-    .dark .bg-white { background-color: #1e293b; border-color: #334155; }
-    .dark .bg-slate-50 { background-color: #0f172a; }
-    .dark .text-slate-800 { color: #f8fafc; }
-    .dark .text-slate-500 { color: #94a3b8; }
-    .dark .border-slate-100,.dark .border-slate-200 { border-color: #334155; }
-    .numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
-    .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
-    .numpad-btn:active { transform: scale(0.95); }
-    .item-empty { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
-    
-    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
-    .animate-pulse-slow { animation: pulse-slow 3s infinite; }
-    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .slide-up { animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    
-    .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
-    .dark .skeleton { background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%); background-size: 200% 100%; }
-    @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; }
+    body{font-family:'Plus Jakarta Sans',sans-serif;-webkit-tap-highlight-color:transparent}
+    .no-scrollbar::-webkit-scrollbar{display:none}
+    .nav-active{background-color:#f97316;color:white;box-shadow:0 4px 15px rgba(249,115,22,0.3)}
+    .nav-active i{color:white !important}
+    .modal-enter{opacity:0;transform:scale(0.95);transition:all 0.3s cubic-bezier(0.4,0,0.2,1)}
+    .modal-enter-active{opacity:1;transform:scale(1)}
+    @keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+    .toast-animate{animation:slideInRight 0.3s ease-out forwards}
+    .blur-lock{filter:blur(8px);pointer-events:none;user-select:none}
+    .pdf-container{background:white !important;color:black !important;padding:20px !important}
+    .dark body{background-color:#0f172a;color:#f8fafc}
+    .dark .bg-white{background-color:#1e293b;border-color:#334155}
+    .dark .bg-slate-50{background-color:#0f172a}
+    .dark .text-slate-800{color:#f8fafc}
+    .dark .text-slate-500{color:#94a3b8}
+    .dark .border-slate-100,.dark .border-slate-200{border-color:#334155}
+    .numpad-btn{background:var(--tw-bg-opacity,#f8fafc);border-radius:1rem;font-size:1.5rem;font-weight:800;padding:1rem;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;transition:all 0.1s;cursor:pointer}
+    .dark .numpad-btn{background:#334155;border-color:#475569;color:white}
+    .numpad-btn:active{transform:scale(0.95)}
+    .item-empty{opacity:0.4;filter:grayscale(1);pointer-events:none}
+    @keyframes pulse-slow{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+    .animate-pulse-slow{animation:pulse-slow 3s infinite}
+    @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    .slide-up{animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) forwards}
+    .skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#cbd5e1 50%,#e2e8f0 75%);background-size:200% 100%;animation:skeletonLoading 1.5s infinite}
+    .dark .skeleton{background:linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%);background-size:200% 100%}
+    @keyframes skeletonLoading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .fly-dot{position:fixed;width:20px;height:20px;background-color:#f97316;border-radius:50%;z-index:9999;pointer-events:none;transition:transform 0.5s cubic-bezier(0.2,1,0.3,1),opacity 0.5s ease-in}
   </style>
   <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{500:'#f97316',600:'#ea580c'}}}}}</script>
 </head>
@@ -81,7 +78,7 @@
 
   <div id="login-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 lg:p-8 shadow-2xl flex flex-col items-center border border-slate-800">
-      <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-3xl flex items-center justify-center shadow-lg mb-4 lg:mb-6 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
+      <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-orange-400 rounded-3xl flex items-center justify-center shadow-lg mb-4 p-3"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-full h-full object-contain filter drop-shadow-md"></div>
       <h2 class="text-xl lg:text-2xl font-black text-slate-800 mb-1">Masuk Sistem</h2>
       <p class="text-xs lg:text-sm font-bold text-slate-400 mb-6">Masukkan PIN Otorisasi</p>
       <div class="flex gap-4 mb-6">
@@ -168,7 +165,7 @@
         <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Riwayat & Rekap</span></button>
         
         <div id="admin-menus" class="hidden flex-col gap-1 shrink-0">
-            <p class="px-4 text-xs font-bold text-slate-400 uppercase mt-6 mb-2">Akses Admin (Owner)</p>
+            <p class="px-4 text-xs font-bold text-slate-400 uppercase mt-6 mb-2">Akses Admin</p>
             <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-user-check w-8 text-blue-500 group-hover:text-blue-600"></i><span class="font-bold text-sm text-blue-600">Audit & Approval</span></button>
             <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Asisten AI Owner</span></button>
             <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-warehouse w-8 text-slate-400 group-hover:text-brand-500"></i><span class="font-bold text-sm">Gudang & Master</span></button>
@@ -265,17 +262,17 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex items-center gap-4 mb-6 border-b border-slate-200 pb-4 shrink-0">
                 <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 text-2xl shadow-sm"><i class="fas fa-user-check"></i></div>
-                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan penyesuaian stok cabang dari laporan kasir.</p></div>
+                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan penyesuaian stok cabang.</p></div>
             </div>
-            <div class="flex gap-2 bg-slate-50 p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4 w-full md:w-auto">
+            <div class="flex gap-2 bg-slate-50 p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4 shrink-0">
                 <button onclick="superApp.toggleAuditTab('opname')" id="tab-audit-opname" class="px-4 py-2 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-slate-200">Audit Opname Fisik</button>
-                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk & Transfer</button>
+                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk</button>
             </div>
             <div id="audit-content-opname" class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Alasan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
             <div id="audit-content-terima" class="hidden flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
@@ -439,6 +436,7 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
+      
       <div class="mb-4">
           <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Metode Pembayaran</label>
           <div class="grid grid-cols-2 gap-2">
@@ -446,6 +444,7 @@
               <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS/TRANSFER</button>
           </div>
       </div>
+      
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
               <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
@@ -460,6 +459,7 @@
           </div>
           <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 text-slate-800"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       </div>
+
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan & Cetak</button>
     </div>
   </div>
@@ -691,7 +691,6 @@
                 const logStat = document.getElementById('login-status');
                 if(logStat) { logStat.innerText = 'Menghubungkan ke Server...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center'; }
 
-                // SMART RETRY LOGIC JIKA GOOGLE SHEET NGELAG
                 let data = null;
                 for (let i = 0; i < 3; i++) {
                     try {
@@ -925,10 +924,10 @@
             const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
             
             let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
-                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
                     let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                     let stokSistem = sData ? Number(sData.Stok_Toko) : 0;
                     
@@ -951,7 +950,7 @@
                         </div>
                     </div>`;
 
-                    if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
                     else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
@@ -994,7 +993,7 @@
             let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
             
             (this.db.masterProduk || []).forEach(m => {
-                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
                     let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
                     let fisikStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
                     
@@ -1007,7 +1006,7 @@
                         let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                         
                         items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                        let itemName = m.Nama_Produk || 'Unknown';
+                        let itemName = m.Nama_Produk;
                         waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
                     }
                 }
@@ -1042,7 +1041,7 @@
                 let html = '';
                 (this.db.opname || []).forEach(op => {
                     if(op.Status_Approval === 'Pending') {
-                        let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
+                        let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
                         let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
                         let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
@@ -1068,8 +1067,8 @@
                 let html = '';
                 (this.db.mutasi || []).forEach(mt => {
                     if(mt.Status_Approval === 'Pending') {
-                        let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
-                        let wStr = String(mt.Waktu||'').includes('T') ? this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu) : (mt.Waktu||'');
+                        let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU;
+                        let wStr = String(mt.Waktu).includes('T') ? this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu) : mt.Waktu;
 
                         html += `<tr class="border-b border-slate-50">
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
@@ -1106,10 +1105,10 @@
         // TRANSFER & TERIMA BARANG (KASIR)
         openTransferModal: function() {
             let opt = ''; 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
             
             sortedMaster.forEach(m => {
-                if(String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung') {
+                if(m.Kategori.toLowerCase()==='bahan' || m.Kategori.toLowerCase()==='pendukung') {
                     let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                     let sisa = sData ? Number(sData.Stok_Toko) : 0;
                     if(sisa > 0) { opt += `<option value="${m.SKU}">${m.Nama_Produk} (Sisa: ${sisa})</option>`; }
@@ -1159,10 +1158,10 @@
             const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
             
             let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
 
             sortedMaster.forEach(m => {
-                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
                     let strHtml = `<tr class="border-b border-slate-50">
                         <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
                         <td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td>
@@ -1176,7 +1175,7 @@
                         </div>
                     </div>`;
 
-                    if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    if(m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
                     else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
@@ -1194,7 +1193,7 @@
             let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
             
             (this.db.masterProduk || []).forEach(m => {
-                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
+                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
                     let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
                     let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
                     
@@ -1229,7 +1228,7 @@
             this.filteredProducts = [];
             if(this.db && this.db.masterProduk) {
                 this.db.masterProduk.forEach(master => {
-                    if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') { 
+                    if(master.Kategori.toLowerCase() !== 'bahan' && master.Kategori.toLowerCase() !== 'pendukung') { 
                         let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
                         let stokReference = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                         let stokBahan = (this.db.hargaStokOutlet || []).find(x => x.SKU === stokReference && x.ID_Outlet === this.outlet);
@@ -1240,7 +1239,7 @@
                     }
                 });
             }
-            this.filteredProducts.sort((a,b) => String(a.nama||'').localeCompare(String(b.nama||'')));
+            this.filteredProducts.sort((a,b) => a.nama.localeCompare(b.nama));
             
             this.renderProducts(); 
             this.renderReport(); 
@@ -1279,7 +1278,7 @@
             let pList = document.getElementById('product-list');
             if(pList) {
                 if(this.isLoadingData) return; 
-                pList.innerHTML = this.filteredProducts.filter(p => String(p.nama||'').toLowerCase().includes(key.toLowerCase())).map(p => this.createProductCard(p)).join('');
+                pList.innerHTML = this.filteredProducts.filter(p => p.nama.toLowerCase().includes(key.toLowerCase())).map(p => this.createProductCard(p)).join('');
             }
         },
         renderProducts: function() {
@@ -1429,23 +1428,21 @@
             dateStart.setHours(0,0,0,0); dateEnd.setHours(23,59,59,999);
             
             let searchTrxEl = document.getElementById('filter-search-trx');
-            let searchTrx = searchTrxEl ? String(searchTrxEl.value||'').toLowerCase() : '';
+            let searchTrx = searchTrxEl ? searchTrxEl.value.toLowerCase() : '';
 
             const rdl = document.getElementById('report-date-label'); if(rdl) rdl.innerText = new Date().toLocaleString('id-ID');
             const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal} ${dStart ? `| Tgl: ${dStart} s/d ${dEnd}` : ''}`;
 
             let totalRev = 0, totalTunai = 0, totalQris = 0, countTrx = 0, totalKas = 0, trxHtml = ''; let productSales = {};
-            
             [...(this.db.transactions || [])].reverse().forEach((t, i) => {
                 let trxDate = this.parseDateId(t.Tanggal);
                 if((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
                     
-                    let safeID = String(t.ID_TRX || '');
-                    if(searchTrx && !safeID.toLowerCase().includes(searchTrx)) return;
+                    if(searchTrx && !t.ID_TRX.toLowerCase().includes(searchTrx)) return;
 
                     if (t.Status === 'Sukses') { 
-                        totalRev += Number(t.Total_Bayar) || 0; countTrx++;
-                        if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += Number(t.Total_Bayar) || 0; else totalTunai += Number(t.Total_Bayar) || 0;
+                        totalRev += t.Total_Bayar || 0; countTrx++;
+                        if(t.Metode_Bayar === 'QRIS') totalQris += t.Total_Bayar || 0; else totalTunai += t.Total_Bayar || 0;
                     }
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
                     let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
@@ -1454,15 +1451,13 @@
                     let cleanTime = this.cleanTimeOnly(t.Waktu);
 
                     if(i < 500) {
-                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${safeID || 'N/A'}</div><div class="text-[10px] text-slate-400">${cleanDate} ${cleanTime}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${safeID}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
+                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${t.ID_TRX}</div><div class="text-[10px] text-slate-400">${cleanDate} ${cleanTime}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
                     }
                     if (t.Status === 'Sukses') {
                         let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                         items.forEach(item => {
-                            let safeNama = item.nama || 'Unknown';
-                            if(!productSales[safeNama]) productSales[safeNama] = { qty: 0, rev: 0 };
-                            productSales[safeNama].qty += Number(item.qty) || 0;
-                            productSales[safeNama].rev += (Number(item.price)||0) * (Number(item.qty)||0);
+                            if(!productSales[item.nama]) productSales[item.nama] = { qty: 0, rev: 0 };
+                            productSales[item.nama].qty += item.qty; productSales[item.nama].rev += (item.price * item.qty);
                         });
                     }
                 }
@@ -1478,11 +1473,10 @@
             
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
-                let safeWaktu = String(m.Waktu || '');
-                let mDate = this.parseDateId(safeWaktu.split(' ')[0]);
+                let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    let mWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
-                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU || '-'}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan || '-'}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty || 0} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan || '-'}</td></tr>`;
+                    let mWaktuStr = String(m.Waktu).includes('T') ? this.cleanDateOnly(m.Waktu) + ' ' + this.cleanTimeOnly(m.Waktu) : m.Waktu;
+                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan}</td></tr>`;
                 }
             });
             const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || `<tr><td colspan="5" class="text-center py-10 h-32">${this.getEmptyState('fa-truck', 'Belum Ada Mutasi', 'Tidak ada data distribusi di rentang ini')}</td></tr>`;
@@ -1491,10 +1485,10 @@
             [...(this.db.kasKeluar || [])].reverse().forEach((k, i) => {
                 let kDate = this.parseDateId(k.Tanggal);
                 if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
-                    totalKas += Number(k.Nominal) || 0;
+                    totalKas += Number(k.Nominal);
                     let kDateStr = this.cleanDateOnly(k.Tanggal);
                     let kTimeStr = this.cleanTimeOnly(k.Waktu);
-                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${kTimeStr}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td></tr>`;
+                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${kTimeStr}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
                 }
             });
             const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
@@ -1502,17 +1496,16 @@
             
             let selisihHtml = '';
             [...(this.db.opname || [])].reverse().forEach((op, i) => {
-                let safeWaktu = String(op.Waktu || '');
-                let opDate = this.parseDateId(safeWaktu.split(' ')[0]);
+                let opDate = this.parseDateId(op.Waktu.split(' ')[0]);
                 if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
+                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
                     let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
                     let badge = '';
                     if(op.Status_Approval === 'Pending') badge = '<span class="bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded text-[10px]">Pending</span>';
                     else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Disetujui</span>';
                     else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Ditolak</span>';
                     
-                    let opWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
+                    let opWaktuStr = String(op.Waktu).includes('T') ? this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu) : op.Waktu;
 
                     if(i < 500) {
                         selisihHtml += `<tr class="border-b border-slate-50">
@@ -1594,7 +1587,7 @@
             this.setLoading(false);
         },
 
-        // AI ASSISTANT
+        // 6. AI ASSISTANT (FIXED NaN BUG)
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1615,7 +1608,7 @@
 
             let warnings = [];
             (this.db.masterProduk || []).forEach(mp => {
-                if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
+                if(mp.Kategori.toLowerCase() === 'pendukung' || mp.Kategori.toLowerCase() === 'bahan') {
                     let totalMasuk = 0;
                     (this.db.mutasi || []).forEach(m => { 
                         if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; 
@@ -1642,11 +1635,7 @@
             (this.db.transactions || []).forEach(t => {
                 if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                    items.forEach(item => { 
-                        let safeNama = item.nama || 'Unknown';
-                        if(!productSales[safeNama]) productSales[safeNama] = 0; 
-                        productSales[safeNama] += Number(item.qty)||0; 
-                    });
+                    items.forEach(item => { if(!productSales[item.nama]) productSales[item.nama] = 0; productSales[item.nama] += Number(item.qty)||0; });
                 }
             });
             let topSellers = []; 
@@ -1715,13 +1704,13 @@
             const gBodyPendukung = document.getElementById('gudang-tbody-pendukung');
             let htmlUtama = ''; let htmlPendukung = '';
 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
             
             sortedMaster.forEach(g => {
-                if(String(g.Kategori||'').toLowerCase() === 'bahan' || String(g.Kategori||'').toLowerCase() === 'pendukung') {
+                if(g.Kategori.toLowerCase() === 'bahan' || g.Kategori.toLowerCase() === 'pendukung') {
                     let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
                     let row = `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-normal min-w-[150px] font-bold">${g.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">SKU: ${g.SKU}</span></td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-brand-500">${stok}</td><td class="py-2 px-4 whitespace-nowrap text-center"><button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
-                    if(String(g.Kategori||'').toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
+                    if(g.Kategori.toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
                 }
             });
             if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku')}</td></tr>`;
@@ -1731,7 +1720,7 @@
             if(masterBody) {
                 let html = '';
                 sortedMaster.forEach(m => {
-                    if(String(m.Kategori||'').toLowerCase() !== 'bahan' && String(m.Kategori||'').toLowerCase() !== 'pendukung') {
+                    if(m.Kategori.toLowerCase() !== 'bahan' && m.Kategori.toLowerCase() !== 'pendukung') {
                         let bahanName = '-';
                         if(m.SKU_Bahan) { let b = (this.db.masterProduk || []).find(x=>x.SKU===m.SKU_Bahan); if(b) bahanName = b.Nama_Produk; }
                         let imgT = m.Gambar_URL ? `<img src="${m.Gambar_URL}" class="w-8 h-8 rounded object-cover inline-block mr-2" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';">` : '';
@@ -1750,14 +1739,14 @@
             if(mOutBody) {
                 let html = '';
                 sortedMaster.forEach(master => {
-                    if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') {
+                    if(master.Kategori.toLowerCase() !== 'bahan' && master.Kategori.toLowerCase() !== 'pendukung') {
                         let oData = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
                         if(oData) {
                             let hrg = oData.Harga_Jual; 
                             let refBahan = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                             let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
                             let stk = sData ? sData.Stok_Toko : 0;
-                            html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 whitespace-normal min-w-[150px] font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 px-4 whitespace-nowrap text-right text-brand-500 font-bold">Rp ${Number(hrg).toLocaleString('id-ID')}</td><td class="py-3 px-4 whitespace-nowrap text-right font-black">${stk}</td><td class="py-3 px-4 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Set</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
+                            html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 whitespace-normal min-w-[150px] font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 px-4 whitespace-nowrap text-right text-brand-500 font-bold">Rp ${hrg.toLocaleString('id-ID')}</td><td class="py-3 px-4 whitespace-nowrap text-right font-black">${stk}</td><td class="py-3 px-4 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Set</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
                         }
                     }
                 });
@@ -1781,9 +1770,9 @@
             let nextId = action === 'edit' ? sku : 'MNU-' + Math.floor(Math.random()*9000+1000);
             let opt = '<option value="">-- Menu Mandiri (Tidak potong stok bahan) --</option>'; 
             
-            let sortedBahan = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedBahan = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
             sortedBahan.forEach(p => { 
-                if(String(p.Kategori||'').toLowerCase()==='bahan') {
+                if(p.Kategori.toLowerCase()==='bahan') {
                     let sel = (m.SKU_Bahan === p.SKU) ? 'selected' : '';
                     opt += `<option value="${p.SKU}" ${sel}>${p.Nama_Produk}</option>`; 
                 }
@@ -1803,10 +1792,10 @@
         },
         openAddOutletProduct: function() {
             let opt = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
             
             sortedMaster.forEach(p => { 
-                if(String(p.Kategori||'').toLowerCase() !== 'bahan' && String(p.Kategori||'').toLowerCase() !== 'pendukung') {
+                if(p.Kategori.toLowerCase() !== 'bahan' && p.Kategori.toLowerCase() !== 'pendukung') {
                     let isExist = (this.db.hargaStokOutlet || []).find(x => x.SKU === p.SKU && x.ID_Outlet === this.outlet);
                     if(!isExist) opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; 
                 }
@@ -1843,8 +1832,8 @@
         },
         openRestokModal: function() {
             let opt = ''; 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
-            sortedMaster.forEach(p => { if(String(p.Kategori||'').toLowerCase()==='bahan' || String(p.Kategori||'').toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            sortedMaster.forEach(p => { if(p.Kategori.toLowerCase()==='bahan' || p.Kategori.toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
             let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Induk</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number');
             this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
         },
@@ -1868,12 +1857,12 @@
             let sortedMaster = [...(this.db.stokGudang || [])].sort((a,b) => {
                 let nameA = this.db.masterProduk.find(x => x.SKU === a.SKU)?.Nama_Produk || a.SKU;
                 let nameB = this.db.masterProduk.find(x => x.SKU === b.SKU)?.Nama_Produk || b.SKU;
-                return String(nameA||'').localeCompare(String(nameB||''));
+                return nameA.localeCompare(nameB);
             });
             
             sortedMaster.forEach(g => {
                 let m = (this.db.masterProduk || []).find(x => x.SKU === g.SKU);
-                if(m && (String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung')) {
+                if(m && (m.Kategori.toLowerCase()==='bahan' || m.Kategori.toLowerCase()==='pendukung')) {
                     let sel = (prefillSku === g.SKU) ? 'selected' : '';
                     opt += `<option value="${g.SKU}" ${sel}>${m.Nama_Produk} (Sisa Pusat: ${g.Stok_Pusat})</option>`; 
                 }
@@ -1941,7 +1930,7 @@
             this.setLoading(false);
         },
 
-        // STAF
+        // STAF (INTERACTIVE LEADERBOARD)
         renderStaf: function() {
             const filterEl = document.getElementById('staf-filter-outlet');
             if(filterEl && filterEl.options.length <= 1) {
