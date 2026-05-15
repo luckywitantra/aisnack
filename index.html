@@ -29,7 +29,7 @@
     .dark .bg-slate-50 { background-color: #0f172a; }
     .dark .text-slate-800 { color: #f8fafc; }
     .dark .text-slate-500 { color: #94a3b8; }
-    .dark .border-slate-100, .dark .border-slate-200 { border-color: #334155; }
+    .dark .border-slate-100,.dark .border-slate-200 { border-color: #334155; }
     .numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
     .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
     .numpad-btn:active { transform: scale(0.95); }
@@ -301,6 +301,7 @@
                 <span class="text-slate-400 font-bold">-</span>
                 <input type="date" id="filter-end" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
                 <select id="report-outlet-filter" class="bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm outline-none shadow-sm hidden text-slate-800" onchange="superApp.renderReport()"></select>
+                <button onclick="superApp.pullFreshData()" class="bg-blue-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:bg-blue-600 transition"><i class="fas fa-cloud-download-alt mr-2"></i>Tarik Data</button>
                 <button onclick="superApp.exportPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800"><i class="fas fa-file-pdf mr-2 text-red-400"></i></button>
             </div>
         </div>
@@ -451,6 +452,7 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
+      
       <div class="mb-4">
           <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Metode Pembayaran</label>
           <div class="grid grid-cols-2 gap-2">
@@ -458,6 +460,7 @@
               <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS/TRANSFER</button>
           </div>
       </div>
+      
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
               <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
@@ -472,6 +475,7 @@
           </div>
           <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 text-slate-800"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       </div>
+
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan & Cetak</button>
     </div>
   </div>
@@ -503,7 +507,6 @@
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
         offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
-        retryCount: 0,
 
         // =========================================================================
         // PEMBERSIH ZONA WAKTU (ULTIMATE REGEX FORMATTER)
@@ -511,11 +514,9 @@
         cleanDateOnly: function(str) {
             if(!str) return '';
             let s = String(str);
-            // 1. Jika teks punya format DD/MM/YYYY yang sah, langsung potong dan ambil!
             let match = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
             if (match) return match[0];
             
-            // 2. Jika lolos dan ternyata format satelit Google (ISO T/Z)
             if (s.includes('T')) {
                 let d = new Date(s);
                 if (!isNaN(d.getTime())) {
@@ -528,27 +529,53 @@
         cleanTimeOnly: function(str) {
             if(!str) return '';
             let s = String(str);
-            // 1. Cari format jam yang sah (HH.MM.SS atau HH:MM:SS)
             let match = s.match(/(\d{2})[.:](\d{2})[.:](\d{2})/);
             if (match) return `${match[1]}.${match[2]}.${match[3]}`;
             
-            // 2. Jika gagal, ambil kasar dari format Google
-            if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
+            if(s.includes('T') && s.includes('Z')) {
+                let d = new Date(s);
+                if (!isNaN(d.getTime())) {
+                    let pad = n => n < 10 ? '0' + n : n;
+                    return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`;
+                }
+            } 
             let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
         },
         parseDateId: function(dateStr) {
             if(!dateStr) return new Date(0);
             let s = String(dateStr);
-            // Scan cari DD/MM/YYYY
             let match = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
             if (match) {
-                // Di JavaScript, Bulan dimulai dari index 0 (0 = Jan, 11 = Des)
-                return new Date(match[3], match[2] - 1, match[1]); 
+                return new Date(match[3], match[2] - 1, match[1], 0, 0, 0, 0); 
+            }
+            if(s.includes('T')) {
+                let d = new Date(s);
+                if (!isNaN(d.getTime())) { d.setHours(0,0,0,0); return d; }
             }
             let firstPart = s.split(' ')[0];
-            if (firstPart.includes('T')) firstPart = firstPart.split('T')[0];
-            let d = new Date(firstPart);
-            return isNaN(d.getTime()) ? new Date(0) : d;
+            let d2 = new Date(firstPart);
+            if (!isNaN(d2.getTime())) { d2.setHours(0,0,0,0); return d2; }
+            return new Date(0);
+        },
+
+        pullFreshData: async function() {
+            if(this.isProcessing) return;
+            this.setLoading(true, "Menarik Data Terbaru...");
+            try {
+                const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                const data = await res.json();
+                if(data && data.status === 'sukses') {
+                    this.db = data;
+                    localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                    this.refreshData();
+                    this.showToast("Data berhasil diperbarui dari Server!");
+                } else {
+                    throw new Error("Gagal");
+                }
+            } catch (e) {
+                this.showToast("Gagal menarik data. Periksa internet Anda.", "error");
+            }
+            this.setLoading(false);
         },
 
         getEmptyState: function(icon, title, desc) {
@@ -1103,8 +1130,7 @@
                 (this.db.mutasi || []).forEach(mt => {
                     if(mt.Status_Approval === 'Pending') {
                         let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
-                        let safeWaktu = String(mt.Waktu||'');
-                        let wStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
+                        let wStr = String(mt.Waktu||'').includes('T') ? this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu) : (mt.Waktu||'');
 
                         html += `<tr class="border-b border-slate-50">
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
@@ -1512,9 +1538,10 @@
             
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
-                let mDate = this.parseDateId(m.Waktu);
+                let safeWaktu = String(m.Waktu || '');
+                let mDate = this.parseDateId(safeWaktu.split(' ')[0]);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    let mWaktuStr = this.cleanDateOnly(m.Waktu) + ' ' + this.cleanTimeOnly(m.Waktu);
+                    let mWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
                     if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU || '-'}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan || '-'}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty || 0} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan || '-'}</td></tr>`;
                 }
             });
@@ -1535,7 +1562,8 @@
             
             let selisihHtml = '';
             [...(this.db.opname || [])].reverse().forEach((op, i) => {
-                let opDate = this.parseDateId(op.Waktu);
+                let safeWaktu = String(op.Waktu || '');
+                let opDate = this.parseDateId(safeWaktu.split(' ')[0]);
                 if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
                     let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
                     let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
@@ -1544,7 +1572,7 @@
                     else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Disetujui</span>';
                     else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Ditolak</span>';
                     
-                    let opWaktuStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
+                    let opWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
 
                     if(i < 500) {
                         selisihHtml += `<tr class="border-b border-slate-50">
@@ -1626,7 +1654,7 @@
             this.setLoading(false);
         },
 
-        // 6. AI ASSISTANT
+        // 6. AI ASSISTANT (FIXED NaN BUG)
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
