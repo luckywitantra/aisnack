@@ -7,7 +7,7 @@ const superApp = {
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
 
     // ==========================================
-    // 1. HELPER: FORMATTER & PARSER
+    // 1. FORMATTER & PARSER
     // ==========================================
     formatRupiahInput: function(el) {
         let val = el.value.replace(/[^0-9]/g, '');
@@ -44,9 +44,9 @@ const superApp = {
         if(superApp.isProcessing) return; superApp.setLoading(true, "Menarik Data Terbaru...");
         try {
             const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); const data = await res.json();
-            if(data && data.status === 'sukses') { superApp.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); superApp.refreshData(); superApp.showToast("Data berhasil diperbarui dari Server!"); } 
+            if(data && data.status === 'sukses') { superApp.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); superApp.refreshData(); superApp.showToast("Data berhasil diperbarui!"); } 
             else throw new Error("Gagal");
-        } catch (e) { superApp.showToast("Gagal menarik data. Periksa internet Anda.", "error"); }
+        } catch (e) { superApp.showToast("Gagal menarik data. Periksa internet.", "error"); }
         superApp.setLoading(false);
     },
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
@@ -74,7 +74,7 @@ const superApp = {
     },
     syncOfflineQueue: async function() {
         if(!superApp.isOnline || superApp.offlineQueue.length === 0) return;
-        superApp.showToast("Menyinkronkan data offline ke Server...", "warning"); let failedQueue = [];
+        superApp.showToast("Menyinkronkan data offline...", "warning"); let failedQueue = [];
         for (let i = 0; i < superApp.offlineQueue.length; i++) { try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(superApp.offlineQueue[i]) }); } catch(e) { failedQueue.push(superApp.offlineQueue[i]); } }
         superApp.offlineQueue = failedQueue; localStorage.setItem('aisnack_offline_queue', JSON.stringify(superApp.offlineQueue));
         if(superApp.offlineQueue.length === 0) { superApp.showToast("Semua data tersinkronisasi!"); try { const res = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await res.json(); superApp.refreshData(); } catch(e){} }
@@ -358,7 +358,7 @@ const superApp = {
     },
 
     // ==========================================
-    // 6. POS & MAIN NAVIGATION
+    // 6. POS CORE (REFRESH, RENDER & CART)
     // ==========================================
     refreshData: function() {
         const hSub = document.getElementById('header-subtitle'); if(hSub) hSub.innerText = `${superApp.outlet}`;
@@ -380,14 +380,15 @@ const superApp = {
         }
         superApp.filteredProducts.sort((a,b) => String(a.nama||'').localeCompare(String(b.nama||'')));
         
-        superApp.renderProducts(); 
-        if (typeof superApp.renderReport === 'function') superApp.renderReport(); 
-        if (typeof superApp.renderGudang === 'function') superApp.renderGudang(); 
-        if (typeof superApp.renderStaf === 'function') superApp.renderStaf(); 
-        if (typeof superApp.renderOpname === 'function') superApp.renderOpname(); 
-        if (typeof superApp.renderAudit === 'function') superApp.renderAudit(); 
-        if (typeof superApp.renderTerimaBarang === 'function') superApp.renderTerimaBarang(); 
-        if (typeof superApp.generateAIReport === 'function') superApp.generateAIReport();
+        // Render semua view yang mungkin butuh update
+        if(document.getElementById('product-list')) superApp.renderProducts(); 
+        if(document.getElementById('report-trx-tbody')) superApp.renderReport(); 
+        if(document.getElementById('gudang-tbody-utama')) superApp.renderGudang(); 
+        if(document.getElementById('staf-outlet-leaderboard')) superApp.renderStaf(); 
+        if(document.getElementById('opname-tbody-utama')) superApp.renderOpname(); 
+        if(document.getElementById('audit-opname-tbody')) superApp.renderAudit(); 
+        if(document.getElementById('terima-tbody-utama')) superApp.renderTerimaBarang(); 
+        if(document.getElementById('ai-insight-cards')) superApp.generateAIReport();
     },
     changeOutlet: function(val) { superApp.outlet = val; superApp.cart = []; superApp.renderCart(); superApp.checkShiftStatus(); superApp.refreshData(); },
     switchMenu: function(menu) {
@@ -402,13 +403,13 @@ const superApp = {
         
         if(window.innerWidth < 1024) superApp.toggleSidebar();
         
-        // Execute respective renders if available
-        if(menu === 'report' && typeof superApp.renderReport === 'function') superApp.renderReport();
-        if(menu === 'opname' && typeof superApp.renderOpname === 'function') superApp.renderOpname();
-        if(menu === 'audit' && typeof superApp.renderAudit === 'function') superApp.renderAudit();
-        if(menu === 'terima' && typeof superApp.renderTerimaBarang === 'function') superApp.renderTerimaBarang();
-        if(menu === 'ai' && typeof superApp.generateAIReport === 'function') superApp.generateAIReport();
-        if(menu === 'staf' && typeof superApp.renderStaf === 'function') superApp.renderStaf(); 
+        // Panggil render manual saat menu diklik (keamanan ekstra)
+        if(menu === 'report') superApp.renderReport(); 
+        if(menu === 'opname') superApp.renderOpname(); 
+        if(menu === 'audit') superApp.renderAudit();
+        if(menu === 'terima') superApp.renderTerimaBarang(); 
+        if(menu === 'ai') superApp.generateAIReport(); 
+        if(menu === 'staf') superApp.renderStaf(); 
     },
     filterProducts: function(key) {
         let pList = document.getElementById('product-list');
@@ -537,30 +538,33 @@ const superApp = {
     // ==========================================
     renderTerimaBarang: function() {
         const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = superApp.outlet;
-        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
-        
-        [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||''))).forEach(m => {
+        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+        let sortedMaster = [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+
+        sortedMaster.forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
-                let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
-                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
-                if(String(m.Kategori||'').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
+                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
+
+                if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; } else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
             }
         });
-        const tU = document.getElementById('terima-tbody-utama'); if(tU) tU.innerHTML = hu || superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
-        const tP = document.getElementById('terima-tbody-pendukung'); if(tP) tP.innerHTML = hp || superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
-        const tMob = document.getElementById('terima-mobile-cards'); if(tMob) tMob.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
+        const tU = document.getElementById('terima-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('terima-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="3" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        const tMob = document.getElementById('terima-mobile-cards'); if(tMob) tMob.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
     },
     submitTerimaBarang: async function() {
         if(superApp.isProcessing) return;
         if(!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
         superApp.setLoading(true, "Menyimpan...");
         let items = [];
-        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${superApp.outlet}\n👤 Kasir: ${superApp.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+        let waText = `*LAPORAN BARANG DATANG*\n📍 Cabang: ${superApp.outlet}\n👤 Kasir: ${superApp.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
         
         (superApp.db.masterProduk || []).forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                 let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
                 let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
+                
                 if(qtyStr !== '' && parseInt(qtyStr) > 0) {
                     let noteDesk = document.getElementById(`trm-note-${m.SKU}`); let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
@@ -643,9 +647,10 @@ const superApp = {
     // ==========================================
     renderOpname: function() {
         const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = superApp.outlet;
-        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
-        
-        [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||''))).forEach(m => {
+        let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
+        let sortedMaster = [...(superApp.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+
+        sortedMaster.forEach(m => {
             if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                 let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === superApp.outlet);
                 let sys = sData ? Number(sData.Stok_Toko) : 0;
@@ -653,13 +658,13 @@ const superApp = {
                 let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td><td class="py-3 px-4 text-center"><input type="number" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" placeholder="0" oninput="superApp.calcOpname('${m.SKU}')"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
                 let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Fisik" oninput="superApp.calcOpnameMob('${m.SKU}')"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
 
-                if (String(m.Kategori||'').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
+                if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += desk; htmlUtamaMobile += mob; } else { htmlPdkDesk += desk; htmlPdkMobile += mob; }
             }
         });
         
-        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = hu || superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
-        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = hp || superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
-        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
+        const tU = document.getElementById('opname-tbody-utama'); if(tU) tU.innerHTML = htmlUtamaDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('opname-tbody-pendukung'); if(tP) tP.innerHTML = htmlPdkDesk || `<tr><td colspan="5" class="text-center py-6 h-32">${superApp.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        const mobCards = document.getElementById('opname-mobile-cards'); if(mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (htmlUtamaMobile || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (htmlPdkMobile || '<p class="text-xs text-center">Kosong</p>');
     },
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl?sysEl.innerText:0) || 0;
@@ -693,7 +698,6 @@ const superApp = {
                     let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
                     let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
                     let fisik = parseInt(fisikStr);
-                    
                     let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                     
@@ -709,9 +713,7 @@ const superApp = {
         let res = await superApp.apiPost(payload);
         if(res.status === 'sukses') {
             superApp.showToast("Opname terkirim untuk di Audit Owner!");
-            if(confirm("Apakah Anda ingin meneruskan laporan rincian ini via WhatsApp ke Owner sekarang?")) {
-                let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank');
-            }
+            if(confirm("Apakah Anda ingin meneruskan laporan rincian ini via WhatsApp ke Owner sekarang?")) { let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; window.open(waUrl, '_blank'); }
             if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await r.json(); superApp.refreshData(); superApp.switchMenu('pos'); }
         }
         superApp.setLoading(false);
@@ -809,6 +811,7 @@ const superApp = {
         [...(superApp.db.transactions || [])].reverse().forEach((t, i) => {
             let trxDate = superApp.parseDateId(t.Tanggal);
             if((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
+                
                 let safeID = String(t.ID_TRX || '');
                 if(searchTrx && !safeID.toLowerCase().includes(searchTrx)) return;
 
@@ -819,12 +822,21 @@ const superApp = {
                 let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-bold">Batal</span>`;
                 let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
                 let rowBg = t.Status === 'Sukses' ? 'border-b border-slate-50 hover:bg-slate-50' : 'row-void';
-                let cleanDate = superApp.cleanDateOnly(t.Tanggal); let cleanTime = superApp.cleanTimeOnly(t.Waktu);
+                
+                let cleanDate = superApp.cleanDateOnly(t.Tanggal);
+                let cleanTime = superApp.cleanTimeOnly(t.Waktu);
 
-                if(i < 500) { trxHtml += `<tr class="${rowBg} transition"><td class="py-4 px-5 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${safeID || 'N/A'}</div><div class="text-[10px] text-slate-400 mt-0.5">${cleanDate} ${cleanTime}</div></td><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-700 font-bold">${t.Kasir || t.Outlet}</td><td class="py-4 px-5 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-4 px-5 whitespace-nowrap">${statBadge}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td><td class="py-4 px-5 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-[10px] font-bold px-4 py-2 rounded-lg shadow-sm transition"><i class="fas fa-eye mr-1"></i> Detail</button></td></tr>`; }
+                if(i < 500) {
+                    trxHtml += `<tr class="${rowBg} transition"><td class="py-4 px-5 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${safeID || 'N/A'}</div><div class="text-[10px] text-slate-400 mt-0.5">${cleanDate} ${cleanTime}</div></td><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-700 font-bold">${t.Kasir || t.Outlet}</td><td class="py-4 px-5 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-4 px-5 whitespace-nowrap">${statBadge}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td><td class="py-4 px-5 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-[10px] font-bold px-4 py-2 rounded-lg shadow-sm transition"><i class="fas fa-eye mr-1"></i> Detail</button></td></tr>`;
+                }
                 if (t.Status === 'Sukses') {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                    items.forEach(item => { let safeNama = item.nama || 'Unknown'; if(!productSales[safeNama]) productSales[safeNama] = { qty: 0, rev: 0 }; productSales[safeNama].qty += Number(item.qty) || 0; productSales[safeNama].rev += (Number(item.price)||0) * (Number(item.qty)||0); });
+                    items.forEach(item => {
+                        let safeNama = item.nama || 'Unknown';
+                        if(!productSales[safeNama]) productSales[safeNama] = { qty: 0, rev: 0 };
+                        productSales[safeNama].qty += Number(item.qty) || 0;
+                        productSales[safeNama].rev += (Number(item.price)||0) * (Number(item.qty)||0);
+                    });
                 }
             }
         });
@@ -839,7 +851,8 @@ const superApp = {
         
         let mutasiHtml = '';
         [...(superApp.db.mutasi || [])].reverse().forEach((m, i) => {
-            let safeWaktu = String(m.Waktu || ''); let mDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
+            let safeWaktu = String(m.Waktu || '');
+            let mDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
                 let mWaktuStr = safeWaktu.includes('T') ? superApp.cleanDateOnly(safeWaktu) + ' ' + superApp.cleanTimeOnly(safeWaktu) : safeWaktu;
                 if(i < 100) mutasiHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-500">${mWaktuStr}</td><td class="py-4 px-5 whitespace-nowrap text-slate-700 font-bold">${m.SKU || '-'}</td><td class="py-4 px-5 whitespace-nowrap font-bold text-brand-600"><i class="fas fa-location-dot mr-1"></i>${m.Outlet_Tujuan || '-'}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black bg-blue-50/30 text-blue-700">${m.Qty || 0} Pcs</td><td class="py-4 px-5 whitespace-normal min-w-[150px] text-xs italic text-slate-500">${m.Keterangan || '-'}</td></tr>`;
@@ -852,7 +865,8 @@ const superApp = {
             let kDate = superApp.parseDateId(k.Tanggal);
             if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
                 totalKas += Number(k.Nominal) || 0;
-                let kDateStr = superApp.cleanDateOnly(k.Tanggal); let kTimeStr = superApp.cleanTimeOnly(k.Waktu);
+                let kDateStr = superApp.cleanDateOnly(k.Tanggal);
+                let kTimeStr = superApp.cleanTimeOnly(k.Waktu);
                 if(i < 100) kasHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-500">${kDateStr} ${kTimeStr}</td><td class="py-4 px-5 whitespace-nowrap font-bold text-slate-700">${k.Outlet} <span class="text-xs text-slate-400">(${k.Kasir})</span></td><td class="py-4 px-5 whitespace-normal min-w-[150px] font-medium text-slate-600">${k.Keterangan}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black text-red-500 bg-red-50/30">- Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td></tr>`;
             }
         });
@@ -861,7 +875,8 @@ const superApp = {
         
         let selisihHtml = '';
         [...(superApp.db.opname || [])].reverse().forEach((op, i) => {
-            let safeWaktu = String(op.Waktu || ''); let opDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
+            let safeWaktu = String(op.Waktu || '');
+            let opDate = superApp.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
                 let itemName = superApp.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
                 let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
@@ -883,19 +898,24 @@ const superApp = {
         superApp.showToast("Mempersiapkan PDF Laporan...");
         const element = document.getElementById('pdf-export-area'); if(!element) return;
         element.classList.add('pdf-container'); 
+        
         const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
         const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
         const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
         const rcs = document.getElementById('report-content-selisih'); if(rcs) rcs.classList.remove('hidden');
         
         const opt = { margin: 0.3, filename: `Laporan_ERP_${new Date().getTime()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save().then(()=> { element.classList.remove('pdf-container'); superApp.toggleReportTab('trx'); superApp.showToast("PDF Diunduh!"); });
+        html2pdf().set(opt).from(element).save().then(()=> { 
+            element.classList.remove('pdf-container'); superApp.toggleReportTab('trx'); superApp.showToast("PDF Diunduh!"); 
+        });
     },
     openDetailTrx: function(trxId) {
         let trx = (superApp.db.transactions || []).find(x => x.ID_TRX === trxId); if(!trx) return;
         superApp.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
         let statText = trx.Status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
-        let cleanDate = superApp.cleanDateOnly(trx.Tanggal); let cleanTime = superApp.cleanTimeOnly(trx.Waktu);
+        
+        let cleanDate = superApp.cleanDateOnly(trx.Tanggal);
+        let cleanTime = superApp.cleanTimeOnly(trx.Waktu);
 
         let strukHtml = `<div class="text-center font-bold mb-4 text-slate-800 border-b-2 border-slate-800 pb-2">=== Ai-Snack ===\nCabang: ${trx.Outlet}\nNo. Resi: ${trx.ID_TRX}\n${cleanDate} ${cleanTime}${statText}</div>`;
         items.forEach(i => { strukHtml += `<div class="mb-2 text-slate-800 font-bold">${i.nama}\n<div class="flex justify-between font-normal text-slate-600"><span>${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')}</span><span class="font-bold text-slate-800">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div></div>`; });
@@ -911,7 +931,9 @@ const superApp = {
     },
     executeReprint: async function() {
         if(!superApp.activeReprintTrx) return; let t = superApp.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); let cleanDate = superApp.cleanDateOnly(t.Tanggal); let cleanTime = superApp.cleanTimeOnly(t.Waktu);
+        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
+        let cleanDate = superApp.cleanDateOnly(t.Tanggal);
+        let cleanTime = superApp.cleanTimeOnly(t.Waktu);
         try { await superApp.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + cleanTime); } catch(e) {}
     },
     promptVoidTrx: function() {
@@ -920,14 +942,18 @@ const superApp = {
         if(adminUser) { superApp.executeVoidTrx(superApp.activeReprintTrx.ID_TRX); } else { superApp.showToast("PIN Salah atau Anda bukan Admin! Batal ditolak.", "error"); }
     },
     executeVoidTrx: async function(trxId) {
-        if(superApp.isProcessing) return; superApp.setLoading(true, "Membatalkan Transaksi...");
+        if(superApp.isProcessing) return;
+        superApp.setLoading(true, "Membatalkan Transaksi...");
         const payload = { action: 'batal_trx', trx_id: trxId, tim_operasional: superApp.activeStaffTeam };
         let res = await superApp.apiPost(payload);
         if(res.status === 'sukses') {
             superApp.showToast("Transaksi Dibatalkan!"); 
             let t = superApp.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-            let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0); let cleanDate = superApp.cleanDateOnly(t.Tanggal); let cleanTime = superApp.cleanTimeOnly(t.Waktu);
+            let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
+            let cleanDate = superApp.cleanDateOnly(t.Tanggal);
+            let cleanTime = superApp.cleanTimeOnly(t.Waktu);
             try { await superApp.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + cleanTime); } catch(e){}
+
             if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); superApp.db = await refreshRes.json(); }
             superApp.refreshData(); superApp.closeModal('modal-detail');
         }
@@ -945,23 +971,31 @@ const superApp = {
         if(filterEl && filterEl.options.length <= 1) {
             let opts = '<option value="Semua">Semua Cabang Terpantau</option>';
             (superApp.db.outlets || []).forEach(o => opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`);
-            filterEl.innerHTML = opts; filterEl.value = superApp.outlet;
+            filterEl.innerHTML = opts;
+            filterEl.value = superApp.outlet;
         }
         let aiOutlet = filterEl ? filterEl.value : superApp.outlet;
 
         let oldestDate = new Date();
         (superApp.db.transactions || []).forEach(t => { let d = superApp.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
-        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)); if(daysActive < 1) daysActive = 1;
+        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
+        if(daysActive < 1) daysActive = 1;
 
         let warnings = [];
         (superApp.db.masterProduk || []).forEach(mp => {
             if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
                 let totalMasuk = 0;
-                (superApp.db.mutasi || []).forEach(m => { if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; });
+                (superApp.db.mutasi || []).forEach(m => { 
+                    if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; 
+                });
                 
                 let sisa = 0;
-                if(aiOutlet === 'Semua') { (superApp.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; }); } 
-                else { let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet); sisa = sData ? Number(sData.Stok_Toko)||0 : 0; }
+                if(aiOutlet === 'Semua') {
+                    (superApp.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; });
+                } else {
+                    let sData = (superApp.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet);
+                    sisa = sData ? Number(sData.Stok_Toko)||0 : 0;
+                }
 
                 let pemakaian = totalMasuk - sisa; if(pemakaian < 0) pemakaian = 0; 
                 let velocity = pemakaian / daysActive; velocity = Number(velocity) || 0; 
@@ -976,20 +1010,48 @@ const superApp = {
         (superApp.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                items.forEach(item => { let safeNama = item.nama || 'Unknown'; if(!productSales[safeNama]) productSales[safeNama] = 0; productSales[safeNama] += Number(item.qty)||0; });
+                items.forEach(item => { 
+                    let safeNama = item.nama || 'Unknown';
+                    if(!productSales[safeNama]) productSales[safeNama] = 0; 
+                    productSales[safeNama] += Number(item.qty)||0; 
+                });
             }
         });
         let topSellers = []; 
-        for (const [nama, qty] of Object.entries(productSales)) { let v = Number(qty)/daysActive; topSellers.push({ name: nama, vel: Number(v)||0 }); }
-        topSellers.sort((a,b) => b.vel - a.vel); let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
+        for (const [nama, qty] of Object.entries(productSales)) { 
+            let v = Number(qty)/daysActive;
+            topSellers.push({ name: nama, vel: Number(v)||0 }); 
+        }
+        topSellers.sort((a,b) => b.vel - a.vel); 
+        let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
 
         let lblCabang = aiOutlet === 'Semua' ? 'Keseluruhan Cabang' : `Cabang ${aiOutlet}`;
+
+        // Trend Visualizer
         let trendHtml = top1.vel > 5 ? `<span class="text-green-300 text-sm ml-2 bg-green-900/30 px-2 py-1 rounded-lg"><i class="fas fa-arrow-trend-up"></i> Naik</span>` : `<span class="text-orange-200 text-sm ml-2 bg-orange-900/30 px-2 py-1 rounded-lg"><i class="fas fa-minus"></i> Stabil</span>`;
 
         aiCards.innerHTML = `
-            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div><p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p><h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4><p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p></div>
-            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div><p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p><h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4><p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p></div>
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div><p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p><h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4><p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p></div>
+            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div>
+                <p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p>
+                <h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4>
+                <p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p>
+            </div>
+            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div>
+                <p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p>
+                <h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4>
+                <p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div>
+                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div>
+                <p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p>
+                <h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4>
+                <p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p>
+            </div>
         `;
 
         if(warnings.length > 0) {
