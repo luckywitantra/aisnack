@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ai-Snack ERP & POS Ultimate</title>
+  
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#f97316">
   
@@ -14,7 +15,7 @@
   <link rel="stylesheet" href="style.css">
   <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{500:'#f97316',600:'#ea580c'}}}}}</script>
 </head>
-<body class="text-slate-800 h-[100dvh] flex overflow-hidden relative transition-colors duration-300">
+<body class="text-slate-800 h-[100dvh] flex overflow-hidden relative transition-colors duration-300 bg-slate-50">
 
   <div id="app-loader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[99999] hidden flex-col items-center justify-center transition-all duration-300">
     <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_rgba(249,115,22,0.5)]"></div>
@@ -67,6 +68,65 @@
     </div>
   </div>
 
+  <div id="modal-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-shift-content">
+      <div class="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-clock"></i></div>
+      <h3 class="font-extrabold text-xl mb-2 text-slate-800">Mulai Shift Baru</h3>
+      <p class="text-slate-500 font-medium text-sm mb-2">User: <span id="shift-user-name" class="font-bold text-brand-500"></span></p>
+      <p class="text-slate-500 font-medium text-sm mb-6">Cabang: <span id="shift-outlet-name" class="font-bold text-brand-500"></span></p>
+      <div class="text-left mb-6">
+        <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Tim Bantuan (Opsional)</label>
+        <div id="shift-staff-list" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar border-y border-slate-100 py-2 mb-4"></div>
+        <label class="text-xs font-bold text-slate-500 block mb-2">Uang Modal Awal Laci (Rp)</label>
+        <input type="text" inputmode="numeric" id="shift-modal-awal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white transition" oninput="superApp.formatRupiahInput(this)" placeholder="0">
+      </div>
+      <button onclick="superApp.executeBukaShift()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition mb-3">Buka Kasir Sekarang</button>
+      <button onclick="superApp.closeModal('modal-shift')" class="w-full bg-slate-100 text-slate-500 py-3 rounded-xl font-bold hover:bg-slate-200 transition text-sm">Lewati / Cek Menu Lain</button>
+    </div>
+  </div>
+
+  <div id="modal-kas-keluar" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-slate-800" id="modal-kas-keluar-content">
+      <h3 class="font-extrabold text-xl mb-2 border-b pb-3">Input Kas Keluar</h3>
+      <p class="text-slate-500 text-sm mb-4">Catat pengeluaran darurat dari uang laci.</p>
+      <div class="space-y-4 mb-6">
+        <div>
+            <label class="text-xs font-bold text-slate-500 block mb-1">Nominal (Rp)</label>
+            <input type="text" inputmode="numeric" id="kas-out-nominal" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white transition" oninput="superApp.formatRupiahInput(this)" placeholder="0">
+        </div>
+        <div>
+            <label class="text-xs font-bold text-slate-500 block mb-1">Keterangan / Keperluan</label>
+            <input type="text" id="kas-out-ket" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-red-500 bg-white transition" placeholder="Cth: Beli Es Batu">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="superApp.closeModal('modal-kas-keluar')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Batal</button>
+        <button onclick="superApp.executeKasKeluar()" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-red-600 transition">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-tutup-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] hidden flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center text-slate-800" id="modal-tutup-shift-content">
+      <h3 class="font-extrabold text-xl mb-2">Tutup Laci & Rekap Shift</h3>
+      <p class="text-slate-500 text-sm mb-6">Hitung uang fisik di laci kasir sekarang.</p>
+      <div class="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200 shadow-inner">
+          <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Modal Awal</span><span class="text-xs font-black" id="ts-modal">Rp 0</span></div>
+          <div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-500">Sales Tunai</span><span class="text-xs font-black text-green-600" id="ts-sales">Rp 0</span></div>
+          <div class="flex justify-between mb-3"><span class="text-xs font-bold text-slate-500">Kas Keluar</span><span class="text-xs font-black text-red-500" id="ts-kasout">Rp 0</span></div>
+          <div class="flex justify-between border-t border-slate-200 pt-2"><span class="text-sm font-bold text-slate-800">Uang Laci (Sistem)</span><span class="text-sm font-black text-brand-600" id="ts-expected">Rp 0</span></div>
+      </div>
+      <div class="text-left mb-6">
+        <label class="text-xs font-bold text-slate-500 block mb-2">Setoran Fisik Laci (Uang Riil)</label>
+        <input type="text" inputmode="numeric" id="shift-setoran-akhir" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-brand-500 bg-white transition" oninput="superApp.formatRupiahInput(this)" placeholder="0">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="superApp.closeModal('modal-tutup-shift')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition">Batal</button>
+        <button onclick="superApp.executeTutupShift()" class="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition">Akhiri Shift</button>
+      </div>
+    </div>
+  </div>
+
   <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden backdrop-blur-sm" onclick="superApp.toggleSidebar()"></div>
 
   <aside id="sidebar" class="fixed lg:static top-0 left-0 h-[100dvh] w-72 bg-white border-r border-slate-100 flex flex-col pt-6 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl lg:shadow-none shrink-0">
@@ -80,28 +140,28 @@
     
     <nav class="space-y-1 px-4 overflow-y-auto flex-1 custom-scroll flex flex-col gap-1" id="sidebar-nav">
         <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2 mb-2 shrink-0">Aplikasi Kasir</p>
-        <button onclick="superApp.switchMenu('pos')" id="nav-pos" class="nav-btn nav-active w-full flex items-center p-3 rounded-2xl transition group shrink-0"><i class="fas fa-cash-register w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Point of Sale</span></button>
-        <button onclick="superApp.openKasKeluar()" class="w-full flex items-center p-3 rounded-2xl text-red-500 hover:bg-red-50 transition group shrink-0"><i class="fas fa-money-bill-transfer w-8 group-hover:text-red-600 transition"></i><span class="font-bold text-sm">Input Kas Keluar</span></button>
-        <button onclick="superApp.switchMenu('terima')" id="nav-terima" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-boxes-packing w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Penerimaan Barang</span></button>
-        <button onclick="superApp.switchMenu('opname')" id="nav-opname" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-clipboard-check w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Opname Fisik Stok</span></button>
-        <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Riwayat & Rekap</span></button>
+        <button onclick="superApp.switchMenu('pos')" id="nav-pos" class="nav-btn nav-active w-full flex items-center p-3 rounded-2xl transition group shrink-0"><i class="fas fa-cash-register w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Point of Sale</span></button>
+        <button onclick="superApp.openKasKeluar()" class="w-full flex items-center p-3 rounded-2xl text-red-500 hover:bg-red-50 transition group shrink-0"><i class="fas fa-money-bill-transfer w-8 group-hover:text-red-600 transition"></i><span class="font-bold text-sm ml-3">Input Kas Keluar</span></button>
+        <button onclick="superApp.switchMenu('terima')" id="nav-terima" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-boxes-packing w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Penerimaan Barang</span></button>
+        <button onclick="superApp.switchMenu('opname')" id="nav-opname" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-clipboard-check w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Opname Fisik Stok</span></button>
+        <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group shrink-0"><i class="fas fa-file-invoice w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Riwayat & Rekap</span></button>
         
         <div id="admin-menus" class="hidden flex-col gap-1 shrink-0">
-            <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-6 mb-2">Akses Admin</p>
-            <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-user-check w-8 text-blue-500 group-hover:text-blue-600 transition"></i><span class="font-bold text-sm text-blue-600">Audit & Approval</span></button>
-            <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Asisten AI Owner</span></button>
-            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-warehouse w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Gudang & Master</span></button>
-            <button onclick="superApp.switchMenu('outlet')" id="nav-outlet" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-store w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Cabang & Harga</span></button>
-            <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm">Kinerja Karyawan</span></button>
+            <p class="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mt-6 mb-2">Akses Admin (Owner)</p>
+            <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-user-check w-8 text-blue-500 group-hover:text-blue-600 transition"></i><span class="font-bold text-sm text-blue-600 ml-3">Audit & Approval</span></button>
+            <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-robot w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Asisten AI Owner</span></button>
+            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-warehouse w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Gudang & Master</span></button>
+            <button onclick="superApp.switchMenu('outlet')" id="nav-outlet" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-store w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Cabang & Harga</span></button>
+            <button onclick="superApp.switchMenu('staf')" id="nav-staf" class="nav-btn w-full flex items-center p-3 rounded-2xl text-slate-500 hover:bg-slate-50 transition group"><i class="fas fa-users-gear w-8 text-slate-400 group-hover:text-brand-500 transition"></i><span class="font-bold text-sm ml-3">Kinerja Karyawan</span></button>
         </div>
     </nav>
     <div class="px-6 mt-2 pt-4 border-t border-slate-100 flex flex-col gap-2 shrink-0 pb-6">
-        <button onclick="superApp.promptTutupShift()" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
-        <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm"><i class="fas fa-power-off mr-2"></i>Keluar / Logout</button>
+        <button onclick="superApp.promptTutupShift()" class="w-full py-3 bg-brand-50 text-brand-600 font-bold rounded-xl hover:bg-brand-100 transition text-sm shadow-sm"><i class="fas fa-door-closed mr-2"></i>Tutup Shift</button>
+        <button onclick="location.reload()" class="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-red-50 hover:text-red-500 transition text-sm shadow-sm"><i class="fas fa-power-off mr-2"></i>Keluar / Logout</button>
     </div>
   </aside>
 
-  <main id="main-app" class="flex-1 flex flex-col h-[100dvh] relative overflow-hidden hidden blur-lock min-w-0">
+  <main id="main-app" class="flex-1 flex flex-col h-[100dvh] relative overflow-hidden hidden min-w-0">
     <header class="h-16 lg:h-20 glass-header border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 z-10 shrink-0">
       <div class="flex items-center gap-4">
         <button class="lg:hidden text-slate-600 text-2xl" onclick="superApp.toggleSidebar()"><i class="fas fa-bars"></i></button>
@@ -119,14 +179,14 @@
         <button onclick="superApp.openCFD()" class="hidden lg:flex bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 hover:bg-indigo-100 transition shrink-0"><i class="fas fa-desktop"></i> Layar</button>
         <button onclick="superApp.toggleDarkMode()" class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200 transition shrink-0"><i class="fas fa-moon" id="dark-icon"></i></button>
         <button onclick="superApp.connectBluetooth()" id="btn-printer" class="hidden md:flex bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl px-4 py-2 font-bold text-sm shadow-sm items-center gap-2 shrink-0 transition"><i class="fas fa-print"></i> <span id="printer-status">Printer</span></button>
-        <select id="select-outlet" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm outline-none shadow-sm focus:border-brand-500 hidden md:block text-slate-800 shrink-0" onchange="superApp.changeOutlet(this.value)"></select>
+        <select id="select-outlet" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm outline-none shadow-sm focus:border-brand-500 hidden md:block text-slate-800 shrink-0 transition" onchange="superApp.changeOutlet(this.value)"></select>
         <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shadow-inner shrink-0" id="header-initial">A</div>
       </div>
     </header>
 
     <div class="flex-1 overflow-y-auto w-full relative p-4 lg:p-6 custom-scroll" id="main-content-scroll">
       
-      <div id="view-pos" class="app-view flex flex-col md:flex-row h-full gap-4 lg:gap-6 min-h-0">
+      <div id="view-pos" class="app-view flex flex-col md:flex-row h-full gap-4 lg:gap-6 min-h-0 transition-all duration-300">
         <div class="flex-1 flex flex-col min-h-0">
           <div class="mb-4 relative shrink-0">
              <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
@@ -192,7 +252,7 @@
                 <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Audit Barang Masuk</button>
             </div>
             <div id="audit-content-opname" class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-3 px-4">Waktu</th><th class="pb-3 px-4">Outlet & Kasir</th><th class="pb-3 px-4">Item</th><th class="pb-3 px-4 text-center">Sys vs Fisik</th><th class="pb-3 px-4 text-right">Selisih</th><th class="pb-3 px-4">Catatan Kasir</th><th class="pb-3 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-3 px-4">Waktu</th><th class="pb-3 px-4">Outlet & Kasir</th><th class="pb-3 px-4">Item</th><th class="pb-3 px-4 text-center">Sys vs Fisik</th><th class="pb-3 px-4 text-right">Selisih</th><th class="pb-3 px-4">Alasan Kasir</th><th class="pb-3 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
             <div id="audit-content-terima" class="hidden flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 custom-scroll relative">
                 <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-3 px-4">Waktu</th><th class="pb-3 px-4">Outlet & Kasir</th><th class="pb-3 px-4">Item Masuk</th><th class="pb-3 px-4 text-center">Qty Diterima</th><th class="pb-3 px-4">Catatan Kasir</th><th class="pb-3 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
@@ -234,7 +294,7 @@
             </div>
 
             <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
-                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekap Penjualan Produk</h3>
+                <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekapitulasi Penjualan per Produk</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm"><tr><th class="py-4 px-5">Nama Menu / Varian</th><th class="py-4 px-5 text-center">Total Terjual (Pcs)</th><th class="py-4 px-5 text-right">Total Pendapatan (Rp)</th></tr></thead><tbody id="report-rekap-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
                 </div>
@@ -275,7 +335,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 shrink-0" id="ai-insight-cards"></div>
             <h3 class="font-extrabold text-lg mb-4 shrink-0 flex items-center gap-2 text-slate-700"><i class="fas fa-lightbulb text-yellow-500"></i> Rekomendasi Distribusi AI</h3>
             <div class="flex-1 overflow-x-auto overflow-y-auto bg-white rounded-2xl border border-slate-200 min-h-[300px] lg:min-h-0 relative custom-scroll shadow-inner">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-4 px-5">Cabang Target</th><th class="py-4 px-5">Item Kritis</th><th class="py-4 px-5 text-center">Avg. Terjual/Hari</th><th class="py-4 px-5 text-center">Prediksi Sisa Umur Stok</th><th class="py-4 px-5 text-center">Aksi (Cepat)</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-100 z-10 shadow-sm"><tr><th class="py-4 px-5">Cabang Target</th><th class="py-4 px-5">Item Kritis</th><th class="py-4 px-5 text-center">Tren Penjualan</th><th class="py-4 px-5 text-center">Sisa Umur Stok</th><th class="py-4 px-5 text-center">Aksi Pintar</th></tr></thead><tbody id="ai-rekomendasi-tbody" class="font-bold divide-y divide-slate-100"></tbody></table>
             </div>
         </div>
       </div>
@@ -374,7 +434,7 @@
               <button onclick="superApp.setCash('pas')" class="col-span-4 py-3 border border-slate-200 rounded-xl font-bold bg-slate-900 text-white shadow-sm hover:bg-slate-800 transition">UANG PAS</button>
           </div>
           <div class="flex items-center gap-2 mb-6">
-            <input type="text" inputmode="numeric" pattern="[0-9]*" id="pay-cash-input" class="flex-1 border-2 border-slate-200 bg-white rounded-xl px-5 py-4 font-black text-xl text-slate-800 outline-none focus:border-brand-500 transition" placeholder="Nominal manual..." oninput="superApp.formatRupiahInput(this); superApp.calcChange()">
+            <input type="text" inputmode="numeric" id="pay-cash-input" class="flex-1 border-2 border-slate-200 bg-white rounded-xl px-5 py-4 font-black text-xl text-slate-800 outline-none focus:border-brand-500 transition" placeholder="Nominal manual..." oninput="superApp.formatRupiahInput(this); superApp.calcChange()">
             <button onclick="superApp.setCash(0)" class="p-4 bg-red-50 text-red-500 rounded-xl font-bold hover:bg-red-100 transition"><i class="fas fa-backspace text-xl"></i></button>
           </div>
           <div class="flex justify-between items-center bg-slate-50 p-5 rounded-2xl mb-6 border border-slate-100 text-slate-800 shadow-inner"><span class="font-bold text-slate-500">Kembalian:</span><span class="text-2xl font-black" id="pay-change">Rp 0</span></div>
