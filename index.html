@@ -13,34 +13,37 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    body{font-family:'Plus Jakarta Sans',sans-serif;-webkit-tap-highlight-color:transparent}
-    .no-scrollbar::-webkit-scrollbar{display:none}
-    .nav-active{background-color:#f97316;color:white;box-shadow:0 4px 15px rgba(249,115,22,0.3)}
-    .nav-active i{color:white !important}
-    .modal-enter{opacity:0;transform:scale(0.95);transition:all 0.3s cubic-bezier(0.4,0,0.2,1)}
-    .modal-enter-active{opacity:1;transform:scale(1)}
-    @keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-    .toast-animate{animation:slideInRight 0.3s ease-out forwards}
-    .blur-lock{filter:blur(8px);pointer-events:none;user-select:none}
-    .pdf-container{background:white !important;color:black !important;padding:20px !important}
-    .dark body{background-color:#0f172a;color:#f8fafc}
-    .dark .bg-white{background-color:#1e293b;border-color:#334155}
-    .dark .bg-slate-50{background-color:#0f172a}
-    .dark .text-slate-800{color:#f8fafc}
-    .dark .text-slate-500{color:#94a3b8}
-    .dark .border-slate-100,.dark .border-slate-200{border-color:#334155}
-    .numpad-btn{background:var(--tw-bg-opacity,#f8fafc);border-radius:1rem;font-size:1.5rem;font-weight:800;padding:1rem;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;transition:all 0.1s;cursor:pointer}
-    .dark .numpad-btn{background:#334155;border-color:#475569;color:white}
-    .numpad-btn:active{transform:scale(0.95)}
-    .item-empty{opacity:0.4;filter:grayscale(1);pointer-events:none}
-    @keyframes pulse-slow{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
-    .animate-pulse-slow{animation:pulse-slow 3s infinite}
-    @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
-    .slide-up{animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) forwards}
-    .skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#cbd5e1 50%,#e2e8f0 75%);background-size:200% 100%;animation:skeletonLoading 1.5s infinite}
-    .dark .skeleton{background:linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%);background-size:200% 100%}
-    @keyframes skeletonLoading{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    .fly-dot{position:fixed;width:20px;height:20px;background-color:#f97316;border-radius:50%;z-index:9999;pointer-events:none;transition:transform 0.5s cubic-bezier(0.2,1,0.3,1),opacity 0.5s ease-in}
+    body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .nav-active { background-color: #f97316; color: white; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); }
+    .nav-active i { color: white !important; }
+    .modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .modal-enter-active { opacity: 1; transform: scale(1); }
+    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast-animate { animation: slideInRight 0.3s ease-out forwards; }
+    .blur-lock { filter: blur(8px); pointer-events: none; user-select: none; }
+    .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
+    
+    .dark body { background-color: #0f172a; color: #f8fafc; }
+    .dark .bg-white { background-color: #1e293b; border-color: #334155; }
+    .dark .bg-slate-50 { background-color: #0f172a; }
+    .dark .text-slate-800 { color: #f8fafc; }
+    .dark .text-slate-500 { color: #94a3b8; }
+    .dark .border-slate-100, .dark .border-slate-200 { border-color: #334155; }
+    .numpad-btn { background: var(--tw-bg-opacity, #f8fafc); border-radius: 1rem; font-size: 1.5rem; font-weight: 800; padding: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: all 0.1s; cursor: pointer; }
+    .dark .numpad-btn { background: #334155; border-color: #475569; color: white; }
+    .numpad-btn:active { transform: scale(0.95); }
+    .item-empty { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+    
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
+    .animate-pulse-slow { animation: pulse-slow 3s infinite; }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+    
+    .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
+    .dark .skeleton { background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%); background-size: 200% 100%; }
+    @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; }
   </style>
   <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{500:'#f97316',600:'#ea580c'}}}}}</script>
 </head>
@@ -226,18 +229,20 @@
       <div id="view-terima" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4">
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 shrink-0">
-                <div><h3 class="font-extrabold text-xl">Penerimaan Barang</h3><p class="text-xs text-slate-500 font-bold mt-1">Input barang masuk <span class="text-brand-500" id="lbl-terima-outlet"></span></p></div>
+                <div><h3 class="font-extrabold text-xl">Penerimaan Barang Pusat</h3><p class="text-xs text-slate-500 font-bold mt-1">Input barang yang tiba dari gudang ke cabang <span class="text-brand-500" id="lbl-terima-outlet"></span></p></div>
                 <div class="flex gap-2 w-full md:w-auto">
-                    <button onclick="superApp.openDistribusiModal('', superApp.outlet)" class="flex-1 md:flex-none bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition"><i class="fas fa-exchange-alt mr-2"></i>Minta Stok Toko Lain</button>
+                    <button onclick="superApp.openTransferModal()" class="flex-1 md:flex-none bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition"><i class="fas fa-exchange-alt mr-2"></i>Minta Stok Toko Lain</button>
                     <button onclick="superApp.submitTerimaBarang()" class="flex-1 md:flex-none bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition"><i class="fas fa-paper-plane mr-2"></i>Lapor Datang</button>
                 </div>
             </div>
+            
             <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative no-scrollbar">
                 <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10">A. Bahan Baku Utama</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku / Produk</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-100"></tbody></table>
                 <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10">B. Barang Pendukung</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 px-4 text-center">Jumlah Diterima (Pcs)</th><th class="pb-3 px-4 w-1/2">Catatan Kurir / Kondisi</th></tr></thead><tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-100"></tbody></table>
             </div>
+
             <div class="grid grid-cols-1 gap-4 md:hidden flex-1 overflow-y-auto min-h-0 no-scrollbar content-start" id="terima-mobile-cards"></div>
         </div>
       </div>
@@ -246,14 +251,16 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 shrink-0">
                 <div><h3 class="font-extrabold text-xl">Opname Fisik Stok</h3><p class="text-xs text-slate-500 font-bold mt-1">Sesuaikan fisik bahan baku di Cabang <span class="text-brand-500" id="lbl-opname-outlet"></span></p></div>
-                <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Lapor Audit Owner</button>
+                <button onclick="superApp.submitOpname()" class="bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-600 shadow-md transition w-full md:w-auto"><i class="fas fa-paper-plane mr-2"></i>Lapor Audit Owner (WA)</button>
             </div>
+            
             <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative no-scrollbar">
                 <h4 class="font-extrabold text-brand-600 mb-3 bg-brand-50 p-3 rounded-xl border border-brand-100 sticky top-0 z-10">A. Bahan Baku Utama</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm mb-8"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Bahan Baku</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-utama" class="font-bold divide-y divide-slate-100"></tbody></table>
                 <h4 class="font-extrabold text-slate-600 mb-3 bg-slate-100 p-3 rounded-xl border border-slate-200 sticky top-0 z-10">B. Barang Pendukung</h4>
                 <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-400 border-b border-slate-200"><tr><th class="pb-3 px-4 min-w-[150px]">Pendukung</th><th class="pb-3 text-center px-4">Sistem</th><th class="pb-3 px-4">Input Fisik</th><th class="pb-3 text-right px-4">Selisih</th><th class="pb-3 px-4 w-1/3">Keterangan</th></tr></thead><tbody id="opname-tbody-pendukung" class="font-bold divide-y divide-slate-100"></tbody></table>
             </div>
+
             <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 no-scrollbar content-start" id="opname-mobile-cards"></div>
         </div>
       </div>
@@ -262,17 +269,20 @@
         <div class="bg-white p-4 lg:p-8 rounded-3xl shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             <div class="flex items-center gap-4 mb-6 border-b border-slate-200 pb-4 shrink-0">
                 <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 text-2xl shadow-sm"><i class="fas fa-user-check"></i></div>
-                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan penyesuaian stok cabang.</p></div>
+                <div><h3 class="font-extrabold text-2xl">Audit & Approval</h3><p class="text-sm font-bold text-slate-500">Persetujuan penyesuaian stok cabang dari laporan kasir.</p></div>
             </div>
+            
             <div class="flex gap-2 bg-slate-50 p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4 shrink-0">
                 <button onclick="superApp.toggleAuditTab('opname')" id="tab-audit-opname" class="px-4 py-2 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-slate-200">Audit Opname Fisik</button>
-                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk</button>
+                <button onclick="superApp.toggleAuditTab('terima')" id="tab-audit-terima" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Barang Masuk & Transfer</button>
             </div>
+
             <div id="audit-content-opname" class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item</th><th class="pb-2 px-4 text-center">Sys vs Fisik</th><th class="pb-2 px-4 text-right">Selisih</th><th class="pb-2 px-4">Alasan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-opname-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
+
             <div id="audit-content-terima" class="hidden flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100 min-h-0 no-scrollbar relative">
-                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
+                <table class="w-full text-left whitespace-nowrap text-sm"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="pb-2 px-4">Waktu</th><th class="pb-2 px-4">Outlet & Kasir</th><th class="pb-2 px-4">Item Masuk</th><th class="pb-2 px-4 text-center">Qty Diterima</th><th class="pb-2 px-4">Catatan Kasir</th><th class="pb-2 px-4 text-center">Aksi (Audit)</th></tr></thead><tbody id="audit-terima-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
             </div>
         </div>
       </div>
@@ -281,12 +291,12 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 shrink-0">
             <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200 overflow-x-auto w-full md:w-auto">
                 <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="flex-1 md:flex-none px-4 py-2 bg-slate-100 text-slate-800 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-slate-200">Histori Transaksi</button>
-                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Rekap Jualan</button>
-                <button onclick="superApp.toggleReportTab('kas')" id="tab-kas" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Kas Keluar</button>
-                <button onclick="superApp.toggleReportTab('selisih')" id="tab-selisih" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold whitespace-nowrap border border-transparent">Audit Selisih</button>
+                <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-transparent">Rekap Jualan</button>
+                <button onclick="superApp.toggleReportTab('kas')" id="tab-kas" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-transparent">Kas Keluar</button>
+                <button onclick="superApp.toggleReportTab('selisih')" id="tab-selisih" class="flex-1 md:flex-none px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-lg text-xs font-bold shadow-sm whitespace-nowrap border border-transparent">Audit Selisih</button>
             </div>
             <div class="flex gap-2 flex-wrap items-center w-full md:w-auto">
-                <input type="text" id="filter-search-trx" placeholder="Cari Resi..." class="flex-1 md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm focus:border-brand-500" onkeyup="superApp.renderReport()">
+                <input type="text" id="filter-search-trx" placeholder="Cari No. Resi..." class="flex-1 md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm focus:border-brand-500" onkeyup="superApp.renderReport()">
                 <input type="date" id="filter-start" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
                 <span class="text-slate-400 font-bold">-</span>
                 <input type="date" id="filter-end" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-sm text-slate-600 outline-none shadow-sm" onchange="superApp.renderReport()">
@@ -294,8 +304,10 @@
                 <button onclick="superApp.exportPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800"><i class="fas fa-file-pdf mr-2 text-red-400"></i></button>
             </div>
         </div>
+        
         <div id="pdf-export-area" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 lg:p-8 flex-1 flex flex-col min-h-0 relative">
             <div class="text-center mb-8 border-b border-slate-200 pb-4 shrink-0"><h2 class="text-2xl font-black uppercase tracking-widest text-slate-800">Laporan Operasional</h2><p class="text-slate-500 font-bold" id="report-title-label"></p><p class="text-xs text-slate-400" id="report-date-label"></p></div>
+
             <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 shrink-0">
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-xs font-bold text-slate-400">Total Transaksi</p><h4 class="text-xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
@@ -308,6 +320,7 @@
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Resi & Waktu</th><th class="py-3 px-4">Kasir / Outlet</th><th class="py-3 px-4">Metode</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Total Bayar</th><th class="py-3 px-4 text-center" data-html2canvas-ignore="true">Aksi</th></tr></thead><tbody id="report-trx-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
+
             <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-brand-600 border-l-4 border-brand-500 pl-3 shrink-0">B. Rekapitulasi Penjualan per Produk</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 mb-4 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
@@ -318,12 +331,14 @@
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">SKU Item</th><th class="py-3 px-4">Tujuan</th><th class="py-3 px-4 text-right">Qty Kirim</th><th class="py-3 px-4 text-xs">Keterangan</th></tr></thead><tbody id="report-mutasi-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
+
             <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-red-500 border-l-4 border-red-500 pl-3 shrink-0">D. Log Kas Keluar (Pengeluaran Laci)</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800"><thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10"><tr><th class="py-3 px-4">Waktu</th><th class="py-3 px-4">Cabang & Kasir</th><th class="py-3 px-4">Keterangan</th><th class="py-3 px-4 text-right">Nominal Pengeluaran</th></tr></thead><tbody id="report-kas-tbody" class="font-bold divide-y divide-slate-200"></tbody></table>
                 </div>
             </div>
+
             <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-2 text-purple-600 border-l-4 border-purple-500 pl-3 shrink-0">E. Riwayat Audit Selisih Stok (Opname)</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 min-h-[300px] lg:min-h-0 relative no-scrollbar">
@@ -436,7 +451,6 @@
     <div class="bg-white rounded-[2rem] w-full max-w-md p-6 lg:p-8 shadow-2xl modal-enter text-slate-800" id="modal-payment-content">
       <div class="flex justify-between items-center mb-6"><h3 class="font-extrabold text-xl">Pembayaran Instan</h3><button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button></div>
       <div class="bg-brand-50 p-5 rounded-2xl mb-5 text-center border border-brand-100"><h2 class="text-3xl font-black text-brand-600" id="pay-total">Rp 0</h2></div>
-      
       <div class="mb-4">
           <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Metode Pembayaran</label>
           <div class="grid grid-cols-2 gap-2">
@@ -444,7 +458,6 @@
               <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3 border-2 border-slate-200 bg-white text-slate-600 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500"><i class="fas fa-qrcode mr-2"></i>QRIS/TRANSFER</button>
           </div>
       </div>
-      
       <div id="tunai-section">
           <div class="grid grid-cols-4 gap-2 mb-4">
               <button onclick="superApp.addPayNumpad(10000)" class="py-2 border border-slate-200 rounded-xl font-bold bg-white text-slate-800 shadow-sm hover:border-brand-500 transition text-sm">10k</button>
@@ -459,7 +472,6 @@
           </div>
           <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 text-slate-800"><span class="font-bold">Kembalian:</span><span class="text-xl font-black" id="pay-change">Rp 0</span></div>
       </div>
-
       <button onclick="superApp.executeCheckout()" class="w-full bg-brand-500 text-white py-4 rounded-xl font-extrabold shadow-lg hover:bg-brand-600 transition" id="btn-execute-pay">Selesaikan & Cetak</button>
     </div>
   </div>
@@ -491,13 +503,22 @@
         payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
         activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
         offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
+        retryCount: 0,
 
+        // =========================================================================
+        // PEMBERSIH ZONA WAKTU (ULTIMATE REGEX FORMATTER)
+        // =========================================================================
         cleanDateOnly: function(str) {
             if(!str) return '';
             let s = String(str);
-            if(s.includes('T')) {
+            // 1. Jika teks punya format DD/MM/YYYY yang sah, langsung potong dan ambil!
+            let match = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+            if (match) return match[0];
+            
+            // 2. Jika lolos dan ternyata format satelit Google (ISO T/Z)
+            if (s.includes('T')) {
                 let d = new Date(s);
-                if(!isNaN(d)) {
+                if (!isNaN(d.getTime())) {
                     let pad = n => n < 10 ? '0' + n : n;
                     return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
                 }
@@ -507,9 +528,29 @@
         cleanTimeOnly: function(str) {
             if(!str) return '';
             let s = String(str);
+            // 1. Cari format jam yang sah (HH.MM.SS atau HH:MM:SS)
+            let match = s.match(/(\d{2})[.:](\d{2})[.:](\d{2})/);
+            if (match) return `${match[1]}.${match[2]}.${match[3]}`;
+            
+            // 2. Jika gagal, ambil kasar dari format Google
             if(s.includes('T') && s.includes('Z')) return s.split('T')[1].split('.')[0].replace(/:/g, '.'); 
             let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
         },
+        parseDateId: function(dateStr) {
+            if(!dateStr) return new Date(0);
+            let s = String(dateStr);
+            // Scan cari DD/MM/YYYY
+            let match = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+            if (match) {
+                // Di JavaScript, Bulan dimulai dari index 0 (0 = Jan, 11 = Des)
+                return new Date(match[3], match[2] - 1, match[1]); 
+            }
+            let firstPart = s.split(' ')[0];
+            if (firstPart.includes('T')) firstPart = firstPart.split('T')[0];
+            let d = new Date(firstPart);
+            return isNaN(d.getTime()) ? new Date(0) : d;
+        },
+
         getEmptyState: function(icon, title, desc) {
             return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`;
         },
@@ -542,12 +583,6 @@
                 if(document.documentElement.classList.contains('dark')) { ic.classList.replace('fa-moon', 'fa-sun'); ic.classList.replace('text-slate-600', 'text-yellow-400'); } 
                 else { ic.classList.replace('fa-sun', 'fa-moon'); ic.classList.replace('text-yellow-400', 'text-slate-600'); }
             }
-        },
-        parseDateId: function(dateStr) {
-            if(!dateStr) return new Date(0);
-            let s = String(dateStr); if(s.includes('T')) return new Date(s);
-            let p = s.split(' ')[0].split('/'); if(p.length === 3) return new Date(p[2], p[1]-1, p[0]);
-            return new Date(s); 
         },
 
         apiPost: async function(payload) {
@@ -924,10 +959,10 @@
             const lbl = document.getElementById('lbl-opname-outlet'); if(lbl) lbl.innerText = this.outlet;
             
             let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
 
             sortedMaster.forEach(m => {
-                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
+                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                     let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                     let stokSistem = sData ? Number(sData.Stok_Toko) : 0;
                     
@@ -950,7 +985,7 @@
                         </div>
                     </div>`;
 
-                    if (m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    if (String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
                     else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
@@ -993,7 +1028,7 @@
             let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
             
             (this.db.masterProduk || []).forEach(m => {
-                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
+                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                     let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
                     let fisikStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
                     
@@ -1006,7 +1041,7 @@
                         let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
                         
                         items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                        let itemName = m.Nama_Produk;
+                        let itemName = m.Nama_Produk || 'Unknown';
                         waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
                     }
                 }
@@ -1041,7 +1076,7 @@
                 let html = '';
                 (this.db.opname || []).forEach(op => {
                     if(op.Status_Approval === 'Pending') {
-                        let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
+                        let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
                         let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
                         let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
@@ -1067,8 +1102,9 @@
                 let html = '';
                 (this.db.mutasi || []).forEach(mt => {
                     if(mt.Status_Approval === 'Pending') {
-                        let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU;
-                        let wStr = String(mt.Waktu).includes('T') ? this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu) : mt.Waktu;
+                        let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
+                        let safeWaktu = String(mt.Waktu||'');
+                        let wStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
 
                         html += `<tr class="border-b border-slate-50">
                             <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
@@ -1105,10 +1141,10 @@
         // TRANSFER & TERIMA BARANG (KASIR)
         openTransferModal: function() {
             let opt = ''; 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
             
             sortedMaster.forEach(m => {
-                if(m.Kategori.toLowerCase()==='bahan' || m.Kategori.toLowerCase()==='pendukung') {
+                if(String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung') {
                     let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                     let sisa = sData ? Number(sData.Stok_Toko) : 0;
                     if(sisa > 0) { opt += `<option value="${m.SKU}">${m.Nama_Produk} (Sisa: ${sisa})</option>`; }
@@ -1158,10 +1194,10 @@
             const lbl = document.getElementById('lbl-terima-outlet'); if(lbl) lbl.innerText = this.outlet;
             
             let htmlUtamaDesk = ''; let htmlPdkDesk = ''; let htmlUtamaMobile = ''; let htmlPdkMobile = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
 
             sortedMaster.forEach(m => {
-                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
+                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                     let strHtml = `<tr class="border-b border-slate-50">
                         <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
                         <td class="py-3 px-4 text-center"><input type="number" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td>
@@ -1175,7 +1211,7 @@
                         </div>
                     </div>`;
 
-                    if(m.Kategori.toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
+                    if(String(m.Kategori||'').toLowerCase() === 'bahan') { htmlUtamaDesk += strHtml; htmlUtamaMobile += strMobile; }
                     else { htmlPdkDesk += strHtml; htmlPdkMobile += strMobile; }
                 }
             });
@@ -1193,7 +1229,7 @@
             let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
             
             (this.db.masterProduk || []).forEach(m => {
-                if(m.Kategori.toLowerCase() === 'bahan' || m.Kategori.toLowerCase() === 'pendukung') {
+                if(String(m.Kategori||'').toLowerCase() === 'bahan' || String(m.Kategori||'').toLowerCase() === 'pendukung') {
                     let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
                     let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
                     
@@ -1228,7 +1264,7 @@
             this.filteredProducts = [];
             if(this.db && this.db.masterProduk) {
                 this.db.masterProduk.forEach(master => {
-                    if(master.Kategori.toLowerCase() !== 'bahan' && master.Kategori.toLowerCase() !== 'pendukung') { 
+                    if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') { 
                         let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
                         let stokReference = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                         let stokBahan = (this.db.hargaStokOutlet || []).find(x => x.SKU === stokReference && x.ID_Outlet === this.outlet);
@@ -1239,7 +1275,7 @@
                     }
                 });
             }
-            this.filteredProducts.sort((a,b) => a.nama.localeCompare(b.nama));
+            this.filteredProducts.sort((a,b) => String(a.nama||'').localeCompare(String(b.nama||'')));
             
             this.renderProducts(); 
             this.renderReport(); 
@@ -1278,7 +1314,7 @@
             let pList = document.getElementById('product-list');
             if(pList) {
                 if(this.isLoadingData) return; 
-                pList.innerHTML = this.filteredProducts.filter(p => p.nama.toLowerCase().includes(key.toLowerCase())).map(p => this.createProductCard(p)).join('');
+                pList.innerHTML = this.filteredProducts.filter(p => String(p.nama||'').toLowerCase().includes(key.toLowerCase())).map(p => this.createProductCard(p)).join('');
             }
         },
         renderProducts: function() {
@@ -1423,26 +1459,27 @@
             
             let dStartEl = document.getElementById('filter-start'); let dEndEl = document.getElementById('filter-end');
             let dStart = dStartEl ? dStartEl.value : ''; let dEnd = dEndEl ? dEndEl.value : '';
-            let dateStart = dStart ? new Date(dStart) : new Date(0);
-            let dateEnd = dEnd ? new Date(dEnd) : new Date(8640000000000000);
-            dateStart.setHours(0,0,0,0); dateEnd.setHours(23,59,59,999);
+            let dateStart = dStart ? new Date(dStart + "T00:00:00") : new Date(0);
+            let dateEnd = dEnd ? new Date(dEnd + "T23:59:59") : new Date(8640000000000000);
             
             let searchTrxEl = document.getElementById('filter-search-trx');
-            let searchTrx = searchTrxEl ? searchTrxEl.value.toLowerCase() : '';
+            let searchTrx = searchTrxEl ? String(searchTrxEl.value||'').toLowerCase() : '';
 
             const rdl = document.getElementById('report-date-label'); if(rdl) rdl.innerText = new Date().toLocaleString('id-ID');
             const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal} ${dStart ? `| Tgl: ${dStart} s/d ${dEnd}` : ''}`;
 
             let totalRev = 0, totalTunai = 0, totalQris = 0, countTrx = 0, totalKas = 0, trxHtml = ''; let productSales = {};
+            
             [...(this.db.transactions || [])].reverse().forEach((t, i) => {
                 let trxDate = this.parseDateId(t.Tanggal);
                 if((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
                     
-                    if(searchTrx && !t.ID_TRX.toLowerCase().includes(searchTrx)) return;
+                    let safeID = String(t.ID_TRX || '');
+                    if(searchTrx && !safeID.toLowerCase().includes(searchTrx)) return;
 
                     if (t.Status === 'Sukses') { 
-                        totalRev += t.Total_Bayar || 0; countTrx++;
-                        if(t.Metode_Bayar === 'QRIS') totalQris += t.Total_Bayar || 0; else totalTunai += t.Total_Bayar || 0;
+                        totalRev += Number(t.Total_Bayar) || 0; countTrx++;
+                        if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += Number(t.Total_Bayar) || 0; else totalTunai += Number(t.Total_Bayar) || 0;
                     }
                     let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Batal</span>`;
                     let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
@@ -1451,13 +1488,15 @@
                     let cleanTime = this.cleanTimeOnly(t.Waktu);
 
                     if(i < 500) {
-                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${t.ID_TRX}</div><div class="text-[10px] text-slate-400">${cleanDate} ${cleanTime}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(t.Total_Bayar||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${t.ID_TRX}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
+                        trxHtml += `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${safeID || 'N/A'}</div><div class="text-[10px] text-slate-400">${cleanDate} ${cleanTime}</div></td><td class="py-2 px-4 whitespace-nowrap text-xs">${t.Kasir || t.Outlet}</td><td class="py-2 px-4 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-2 px-4 whitespace-nowrap">${statBadge}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td><td class="py-2 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${safeID}')" class="bg-slate-900 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Detail</button></td></tr>`;
                     }
                     if (t.Status === 'Sukses') {
                         let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                         items.forEach(item => {
-                            if(!productSales[item.nama]) productSales[item.nama] = { qty: 0, rev: 0 };
-                            productSales[item.nama].qty += item.qty; productSales[item.nama].rev += (item.price * item.qty);
+                            let safeNama = item.nama || 'Unknown';
+                            if(!productSales[safeNama]) productSales[safeNama] = { qty: 0, rev: 0 };
+                            productSales[safeNama].qty += Number(item.qty) || 0;
+                            productSales[safeNama].rev += (Number(item.price)||0) * (Number(item.qty)||0);
                         });
                     }
                 }
@@ -1473,10 +1512,10 @@
             
             let mutasiHtml = '';
             [...(this.db.mutasi || [])].reverse().forEach((m, i) => {
-                let mDate = this.parseDateId(m.Waktu.split(' ')[0]);
+                let mDate = this.parseDateId(m.Waktu);
                 if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
-                    let mWaktuStr = String(m.Waktu).includes('T') ? this.cleanDateOnly(m.Waktu) + ' ' + this.cleanTimeOnly(m.Waktu) : m.Waktu;
-                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan}</td></tr>`;
+                    let mWaktuStr = this.cleanDateOnly(m.Waktu) + ' ' + this.cleanTimeOnly(m.Waktu);
+                    if(i < 100) mutasiHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${mWaktuStr}</td><td class="py-2 px-4 whitespace-nowrap text-brand-600 font-bold">${m.SKU || '-'}</td><td class="py-2 px-4 whitespace-nowrap">${m.Outlet_Tujuan || '-'}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black">${m.Qty || 0} Pcs</td><td class="py-2 px-4 whitespace-normal min-w-[150px] text-xs italic">${m.Keterangan || '-'}</td></tr>`;
                 }
             });
             const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || `<tr><td colspan="5" class="text-center py-10 h-32">${this.getEmptyState('fa-truck', 'Belum Ada Mutasi', 'Tidak ada data distribusi di rentang ini')}</td></tr>`;
@@ -1485,10 +1524,10 @@
             [...(this.db.kasKeluar || [])].reverse().forEach((k, i) => {
                 let kDate = this.parseDateId(k.Tanggal);
                 if((filterVal === 'Semua' || k.Outlet === filterVal) && kDate >= dateStart && kDate <= dateEnd) {
-                    totalKas += Number(k.Nominal);
+                    totalKas += Number(k.Nominal) || 0;
                     let kDateStr = this.cleanDateOnly(k.Tanggal);
                     let kTimeStr = this.cleanTimeOnly(k.Waktu);
-                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${kTimeStr}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${Number(k.Nominal).toLocaleString('id-ID')}</td></tr>`;
+                    if(i < 100) kasHtml += `<tr><td class="py-2 px-4 whitespace-nowrap text-xs">${kDateStr} ${kTimeStr}</td><td class="py-2 px-4 whitespace-nowrap">${k.Outlet} (${k.Kasir})</td><td class="py-2 px-4 whitespace-normal min-w-[150px]">${k.Keterangan}</td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-red-500">Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td></tr>`;
                 }
             });
             const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
@@ -1496,16 +1535,16 @@
             
             let selisihHtml = '';
             [...(this.db.opname || [])].reverse().forEach((op, i) => {
-                let opDate = this.parseDateId(op.Waktu.split(' ')[0]);
+                let opDate = this.parseDateId(op.Waktu);
                 if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU;
+                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
                     let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
                     let badge = '';
                     if(op.Status_Approval === 'Pending') badge = '<span class="bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded text-[10px]">Pending</span>';
                     else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px]">Disetujui</span>';
                     else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px]">Ditolak</span>';
                     
-                    let opWaktuStr = String(op.Waktu).includes('T') ? this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu) : op.Waktu;
+                    let opWaktuStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
                     if(i < 500) {
                         selisihHtml += `<tr class="border-b border-slate-50">
@@ -1587,7 +1626,7 @@
             this.setLoading(false);
         },
 
-        // 6. AI ASSISTANT (FIXED NaN BUG)
+        // 6. AI ASSISTANT
         generateAIReport: function() {
             const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
             if(!aiCards || !aiRekBody || !this.db) return;
@@ -1608,7 +1647,7 @@
 
             let warnings = [];
             (this.db.masterProduk || []).forEach(mp => {
-                if(mp.Kategori.toLowerCase() === 'pendukung' || mp.Kategori.toLowerCase() === 'bahan') {
+                if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
                     let totalMasuk = 0;
                     (this.db.mutasi || []).forEach(m => { 
                         if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; 
@@ -1635,7 +1674,11 @@
             (this.db.transactions || []).forEach(t => {
                 if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                    items.forEach(item => { if(!productSales[item.nama]) productSales[item.nama] = 0; productSales[item.nama] += Number(item.qty)||0; });
+                    items.forEach(item => { 
+                        let safeNama = item.nama || 'Unknown';
+                        if(!productSales[safeNama]) productSales[safeNama] = 0; 
+                        productSales[safeNama] += Number(item.qty)||0; 
+                    });
                 }
             });
             let topSellers = []; 
@@ -1704,13 +1747,13 @@
             const gBodyPendukung = document.getElementById('gudang-tbody-pendukung');
             let htmlUtama = ''; let htmlPendukung = '';
 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
             
             sortedMaster.forEach(g => {
-                if(g.Kategori.toLowerCase() === 'bahan' || g.Kategori.toLowerCase() === 'pendukung') {
+                if(String(g.Kategori||'').toLowerCase() === 'bahan' || String(g.Kategori||'').toLowerCase() === 'pendukung') {
                     let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
                     let row = `<tr class="border-b border-slate-50"><td class="py-2 px-4 whitespace-normal min-w-[150px] font-bold">${g.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">SKU: ${g.SKU}</span></td><td class="py-2 px-4 whitespace-nowrap text-right font-black text-brand-500">${stok}</td><td class="py-2 px-4 whitespace-nowrap text-center"><button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
-                    if(g.Kategori.toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
+                    if(String(g.Kategori||'').toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
                 }
             });
             if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-6 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku')}</td></tr>`;
@@ -1720,7 +1763,7 @@
             if(masterBody) {
                 let html = '';
                 sortedMaster.forEach(m => {
-                    if(m.Kategori.toLowerCase() !== 'bahan' && m.Kategori.toLowerCase() !== 'pendukung') {
+                    if(String(m.Kategori||'').toLowerCase() !== 'bahan' && String(m.Kategori||'').toLowerCase() !== 'pendukung') {
                         let bahanName = '-';
                         if(m.SKU_Bahan) { let b = (this.db.masterProduk || []).find(x=>x.SKU===m.SKU_Bahan); if(b) bahanName = b.Nama_Produk; }
                         let imgT = m.Gambar_URL ? `<img src="${m.Gambar_URL}" class="w-8 h-8 rounded object-cover inline-block mr-2" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';">` : '';
@@ -1739,14 +1782,14 @@
             if(mOutBody) {
                 let html = '';
                 sortedMaster.forEach(master => {
-                    if(master.Kategori.toLowerCase() !== 'bahan' && master.Kategori.toLowerCase() !== 'pendukung') {
+                    if(String(master.Kategori||'').toLowerCase() !== 'bahan' && String(master.Kategori||'').toLowerCase() !== 'pendukung') {
                         let oData = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
                         if(oData) {
                             let hrg = oData.Harga_Jual; 
                             let refBahan = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                             let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
                             let stk = sData ? sData.Stok_Toko : 0;
-                            html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 whitespace-normal min-w-[150px] font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 px-4 whitespace-nowrap text-right text-brand-500 font-bold">Rp ${hrg.toLocaleString('id-ID')}</td><td class="py-3 px-4 whitespace-nowrap text-right font-black">${stk}</td><td class="py-3 px-4 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Set</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
+                            html += `<tr class="border-b border-slate-50"><td class="py-3 px-4 whitespace-normal min-w-[150px] font-bold text-xs">${master.Nama_Produk}</td><td class="py-3 px-4 whitespace-nowrap text-right text-brand-500 font-bold">Rp ${Number(hrg).toLocaleString('id-ID')}</td><td class="py-3 px-4 whitespace-nowrap text-right font-black">${stk}</td><td class="py-3 px-4 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-tag"></i> Set</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-2 py-1 rounded text-[10px] font-bold ml-1"><i class="fas fa-trash"></i></button></td></tr>`;
                         }
                     }
                 });
@@ -1756,8 +1799,8 @@
         openCrudBahan: function(action = 'add', sku = '') {
             let m = action === 'edit' ? (this.db.masterProduk || []).find(x => x.SKU === sku) : {};
             let nextId = action === 'edit' ? sku : 'SUP-' + Math.floor(Math.random()*9000+1000);
-            let isBahanSel = m.Kategori === 'Bahan' ? 'selected' : '';
-            let isPendukungSel = m.Kategori === 'Pendukung' ? 'selected' : '';
+            let isBahanSel = String(m.Kategori||'').toLowerCase() === 'bahan' ? 'selected' : '';
+            let isPendukungSel = String(m.Kategori||'').toLowerCase() === 'pendukung' ? 'selected' : '';
 
             let inputs = `<input type="hidden" id="frm-mst-sku" value="${nextId}">` + 
                          this.makeInput('Nama Bahan / Barang Pendukung', 'mst-nama', m.Nama_Produk||'') + 
@@ -1770,9 +1813,9 @@
             let nextId = action === 'edit' ? sku : 'MNU-' + Math.floor(Math.random()*9000+1000);
             let opt = '<option value="">-- Menu Mandiri (Tidak potong stok bahan) --</option>'; 
             
-            let sortedBahan = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedBahan = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
             sortedBahan.forEach(p => { 
-                if(p.Kategori.toLowerCase()==='bahan') {
+                if(String(p.Kategori||'').toLowerCase()==='bahan') {
                     let sel = (m.SKU_Bahan === p.SKU) ? 'selected' : '';
                     opt += `<option value="${p.SKU}" ${sel}>${p.Nama_Produk}</option>`; 
                 }
@@ -1792,10 +1835,10 @@
         },
         openAddOutletProduct: function() {
             let opt = '';
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
             
             sortedMaster.forEach(p => { 
-                if(p.Kategori.toLowerCase() !== 'bahan' && p.Kategori.toLowerCase() !== 'pendukung') {
+                if(String(p.Kategori||'').toLowerCase() !== 'bahan' && String(p.Kategori||'').toLowerCase() !== 'pendukung') {
                     let isExist = (this.db.hargaStokOutlet || []).find(x => x.SKU === p.SKU && x.ID_Outlet === this.outlet);
                     if(!isExist) opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; 
                 }
@@ -1832,8 +1875,8 @@
         },
         openRestokModal: function() {
             let opt = ''; 
-            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => a.Nama_Produk.localeCompare(b.Nama_Produk));
-            sortedMaster.forEach(p => { if(p.Kategori.toLowerCase()==='bahan' || p.Kategori.toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
+            let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
+            sortedMaster.forEach(p => { if(String(p.Kategori||'').toLowerCase()==='bahan' || String(p.Kategori||'').toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
             let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Induk</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none text-sm bg-white text-slate-800">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number');
             this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
         },
@@ -1857,12 +1900,12 @@
             let sortedMaster = [...(this.db.stokGudang || [])].sort((a,b) => {
                 let nameA = this.db.masterProduk.find(x => x.SKU === a.SKU)?.Nama_Produk || a.SKU;
                 let nameB = this.db.masterProduk.find(x => x.SKU === b.SKU)?.Nama_Produk || b.SKU;
-                return nameA.localeCompare(nameB);
+                return String(nameA||'').localeCompare(String(nameB||''));
             });
             
             sortedMaster.forEach(g => {
                 let m = (this.db.masterProduk || []).find(x => x.SKU === g.SKU);
-                if(m && (m.Kategori.toLowerCase()==='bahan' || m.Kategori.toLowerCase()==='pendukung')) {
+                if(m && (String(m.Kategori||'').toLowerCase()==='bahan' || String(m.Kategori||'').toLowerCase()==='pendukung')) {
                     let sel = (prefillSku === g.SKU) ? 'selected' : '';
                     opt += `<option value="${g.SKU}" ${sel}>${m.Nama_Produk} (Sisa Pusat: ${g.Stok_Pusat})</option>`; 
                 }
@@ -1930,7 +1973,7 @@
             this.setLoading(false);
         },
 
-        // STAF (INTERACTIVE LEADERBOARD)
+        // STAF
         renderStaf: function() {
             const filterEl = document.getElementById('staf-filter-outlet');
             if(filterEl && filterEl.options.length <= 1) {
