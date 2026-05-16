@@ -175,9 +175,48 @@ const superApp = {
     },
 
     // CFD DUAL MONITOR
+    cfdFocusHandlerAdded: false, // Flag agar event listener tidak terduplikasi
+
     openCFD: async function() {
-        try { if ('getScreenDetails' in window) { const screens = await window.getScreenDetails(); const extScreen = screens.screens.find(s => s !== screens.currentScreen); if (extScreen) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; } } } catch (e) {}
-        this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${window.screen.width},top=0,width=1024,height=768`);
+        try { 
+            if ('getScreenDetails' in window) { 
+                const screens = await window.getScreenDetails(); 
+                const extScreen = screens.screens.find(s => s !== screens.currentScreen); 
+                if (extScreen) { 
+                    this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW_AISNACK', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); 
+                } 
+            } 
+        } catch (e) {}
+        
+        // Fallback jika tidak support getScreenDetails
+        if (!this.cfdWindow || this.cfdWindow.closed) {
+            this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW_AISNACK', `left=${window.screen.width},top=0,width=1024,height=768`);
+        }
+
+        // --- SOLUSI AUTO-SWITCH MONITOR PELANGGAN ---
+        if (this.cfdWindow) {
+            this.cfdWindow.focus(); // Bawa ke depan saat pertama kali dibuka
+
+            // Daftarkan pendeteksi fokus otomatis (Hanya didaftarkan 1 kali)
+            if (!this.cfdFocusHandlerAdded) {
+                // Saat kasir mengklik aplikasi POS ini, tarik layar CFD maju ke depan menutupi POS lain
+                window.addEventListener('focus', () => {
+                    if (this.cfdWindow && !this.cfdWindow.closed) {
+                        this.cfdWindow.focus();
+                        this.syncStorage(); // Paksa sinkronisasi data seketika
+                    }
+                });
+                
+                // Pastikan CFD ikut tertutup jika aplikasi utama ditutup agar tidak nyangkut
+                window.addEventListener('beforeunload', () => {
+                    if (this.cfdWindow && !this.cfdWindow.closed) {
+                        this.cfdWindow.close();
+                    }
+                });
+
+                this.cfdFocusHandlerAdded = true;
+            }
+        }
     },
     changePromoImage: function() {
         let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
@@ -202,6 +241,7 @@ const superApp = {
     initCFD: function() {
         document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
         const cfdScreen = document.getElementById('cfd-screen'); if (cfdScreen) cfdScreen.classList.remove('hidden');
+        
         window.addEventListener('storage', (e) => { if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url') { let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if (data.outlet) this.renderCFD(data); } });
         let initialData = localStorage.getItem('ai_snack_cfd'); if (initialData) this.renderCFD(JSON.parse(initialData));
         let savedBg = localStorage.getItem('cfd_promo_url'); if (savedBg) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${savedBg}')`; }
