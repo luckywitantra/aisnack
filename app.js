@@ -570,7 +570,7 @@ const superApp = {
         this.payTotal = total; this.syncStorage();
     },
 
-    // PAYMENT & CHECKOUT
+    /* === 7. PAYMENT & CHECKOUT === */
     openPaymentModal: function() {
         if (this.cart.length === 0) return this.showToast("Pilih produk dahulu!", "error");
         const pt = document.getElementById('pay-total'); if (pt) pt.innerText = `Rp ${this.payTotal.toLocaleString('id-ID')}`;
@@ -592,6 +592,15 @@ const superApp = {
             this.setCash('pas');
         }
     },
+    // ---> INI FUNGSI YANG KEMARIN TERHAPUS <---
+    addPayNumpad: function(val) {
+        let input = document.getElementById('pay-cash-input');
+        if (input) {
+            let current = this.getNumericValue(input.value);
+            this.setCash(current + val);
+        }
+    },
+    // ------------------------------------------
     setCash: function(val) {
         let input = document.getElementById('pay-cash-input');
         if (input) {
@@ -640,7 +649,6 @@ const superApp = {
         }
         this.cart = []; this.renderCart(); this.closeModal('modal-payment'); this.setLoading(false);
     },
-
     // TERIMA BARANG & OPNAME
     renderTerimaBarang: function() {
         const lbl = document.getElementById('lbl-terima-outlet'); if (lbl) lbl.innerText = this.outlet;
