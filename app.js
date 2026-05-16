@@ -1,14 +1,97 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
+/* ========================================== */
+/* 1. MESIN VIRTUAL KEYBOARD (IN-APP)         */
+/* ========================================== */
+const osKeyboard = {
+    targetElement: null,
+    mode: 'numeric', 
+    isOpen: false,
+    layouts: {
+        numeric: [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['C', '0', '000']
+        ],
+        text: [
+            ['1','2','3','4','5','6','7','8','9','0'],
+            ['Q','W','E','R','T','Y','U','I','O','P'],
+            ['A','S','D','F','G','H','J','K','L'],
+            ['Z','X','C','V','B','N','M','SPACE']
+        ]
+    },
+    open: function(el, type = 'text') {
+        this.targetElement = el;
+        this.mode = type;
+        this.isOpen = true;
+        this.render();
+        const vk = document.getElementById('virtual-keyboard');
+        const ov = document.getElementById('virtual-keyboard-overlay');
+        if (vk) { vk.classList.remove('hidden'); setTimeout(() => vk.classList.remove('translate-y-full'), 10); }
+        if (ov) { ov.classList.remove('hidden'); }
+    },
+    close: function() {
+        this.isOpen = false;
+        const vk = document.getElementById('virtual-keyboard');
+        const ov = document.getElementById('virtual-keyboard-overlay');
+        if (vk) { vk.classList.add('translate-y-full'); setTimeout(() => vk.classList.add('hidden'), 300); }
+        if (ov) { ov.classList.add('hidden'); }
+        this.targetElement = null;
+    },
+    render: function() {
+        const container = document.getElementById('vk-keys');
+        if (!container) return;
+        let html = '';
+        let rows = this.layouts[this.mode];
+        rows.forEach(row => {
+            html += `<div class="flex justify-center gap-1 sm:gap-2 w-full mb-1 sm:mb-2">`;
+            row.forEach(key => {
+                if (key === 'SPACE') {
+                    html += `<button class="flex-[3] py-3 sm:py-4 bg-white text-slate-800 font-bold rounded-xl shadow-sm border border-slate-200 hover:bg-brand-50 transition active:scale-95" onclick="osKeyboard.insert(' ')">SPASI</button>`;
+                } else if (key === 'C') {
+                    html += `<button class="flex-1 py-3 sm:py-4 bg-red-50 text-red-500 font-bold rounded-xl shadow-sm border border-red-200 hover:bg-red-100 transition active:scale-95" onclick="osKeyboard.clear()">C</button>`;
+                } else {
+                    html += `<button class="flex-1 py-3 sm:py-4 bg-white text-slate-800 font-bold rounded-xl shadow-sm border border-slate-200 hover:bg-brand-50 transition active:scale-95 text-lg" onclick="osKeyboard.insert('${key}')">${key}</button>`;
+                }
+            });
+            html += `</div>`;
+        });
+        
+        // Baris Aksi (Hapus & OK)
+        html += `<div class="flex justify-center gap-2 w-full mt-2">
+                    <button class="flex-1 py-4 bg-slate-200 text-slate-700 font-bold rounded-xl shadow-sm border border-slate-300 hover:bg-slate-300 transition active:scale-95" onclick="osKeyboard.backspace()"><i class="fas fa-backspace"></i> HAPUS</button>
+                    <button class="flex-[2] py-4 bg-brand-500 text-white font-black rounded-xl shadow-md hover:bg-brand-600 transition active:scale-95 text-lg" onclick="osKeyboard.close()"><i class="fas fa-check-circle"></i> SELESAI</button>
+                 </div>`;
+        container.innerHTML = html;
+    },
+    insert: function(char) {
+        if (!this.targetElement) return;
+        this.targetElement.value += char;
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    backspace: function() {
+        if (!this.targetElement) return;
+        this.targetElement.value = this.targetElement.value.slice(0, -1);
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    clear: function() {
+        if (!this.targetElement) return;
+        this.targetElement.value = '';
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+};
+
+/* ========================================== */
+/* 2. MESIN UTAMA APLIKASI (SUPERAPP)         */
+/* ========================================== */
 const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
 
-    /* ========================================== */
-    /* 1. FORMATTER & NATIVE INPUT ENGINE         */
-    /* ========================================== */
+    // FORMATTER
     formatRupiahInput: function(el) {
         let val = el.value.replace(/[^0-9]/g, '');
         el.value = val !== '' ? parseInt(val, 10).toLocaleString('id-ID') : '';
@@ -37,9 +120,7 @@ const superApp = {
         return new Date(0);
     },
 
-    /* ========================================== */
-    /* 2. GLOBAL UTILS & API SYNC                 */
-    /* ========================================== */
+    // UTILS
     pullFreshData: async function() {
         if (this.isProcessing) return; this.setLoading(true, "Menarik Data Terbaru...");
         try {
@@ -88,9 +169,7 @@ const superApp = {
         } else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-red-500'; txt.className = 'text-[10px] font-bold text-red-600 hidden md:inline'; txt.innerText = `Offline (${this.offlineQueue.length} Pending)`; }
     },
 
-    /* ========================================== */
-    /* 3. DUAL MONITOR (CFD)                      */
-    /* ========================================== */
+    // CFD DUAL MONITOR
     openCFD: async function() {
         try { if ('getScreenDetails' in window) { const screens = await window.getScreenDetails(); const extScreen = screens.screens.find(s => s !== screens.currentScreen); if (extScreen) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; } } } catch (e) {}
         this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW', `left=${window.screen.width},top=0,width=1024,height=768`);
@@ -137,9 +216,7 @@ const superApp = {
         }
     },
 
-    /* ========================================== */
-    /* 4. STARTUP & LOGIN                         */
-    /* ========================================== */
+    // STARTUP & LOGIN
     init: async function() {
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
 
@@ -160,7 +237,6 @@ const superApp = {
                 if (logStat) { logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; }
             }
 
-            // Fetch data di background tanpa disable PIN
             let fetchPromise = (async () => {
                 let data = null;
                 for (let i = 0; i < 3; i++) {
@@ -188,7 +264,6 @@ const superApp = {
         }
     },
     addPin: function(num) {
-        // Tahan jika data belum termuat
         if (!this.db || !this.db.users) {
             this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning');
             return;
@@ -251,9 +326,7 @@ const superApp = {
         this.isProcessing = false;
     },
 
-    /* ========================================== */
-    /* 5. SHIFT & KAS KELUAR                      */
-    /* ========================================== */
+    // SHIFT & KAS KELUAR
     checkShiftStatus: function() {
         const shiftOutName = document.getElementById('shift-outlet-name'); if (shiftOutName) shiftOutName.innerText = this.outlet;
         let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
@@ -386,9 +459,7 @@ const superApp = {
         this.setLoading(false);
     },
 
-    /* ========================================== */
-    /* 6. POS CORE (RENDER, CART & FILTER)        */
-    /* ========================================== */
+    // POS CORE
     refreshData: function() {
         const hSub = document.getElementById('header-subtitle'); if (hSub) hSub.innerText = `${this.outlet}`;
         const lOutManage = document.getElementById('label-outlet-manage'); if (lOutManage) lOutManage.innerText = this.outlet;
@@ -494,9 +565,7 @@ const superApp = {
         this.payTotal = total; this.syncStorage();
     },
 
-    /* ========================================== */
-    /* 7. PAYMENT & CHECKOUT                      */
-    /* ========================================== */
+    // PAYMENT & CHECKOUT
     openPaymentModal: function() {
         if (this.cart.length === 0) return this.showToast("Pilih produk dahulu!", "error");
         const pt = document.getElementById('pay-total'); if (pt) pt.innerText = `Rp ${this.payTotal.toLocaleString('id-ID')}`;
@@ -567,16 +636,14 @@ const superApp = {
         this.cart = []; this.renderCart(); this.closeModal('modal-payment'); this.setLoading(false);
     },
 
-    /* ========================================== */
-    /* 8. TERIMA BARANG & OPNAME (NATIVE INPUT)   */
-    /* ========================================== */
+    // TERIMA BARANG & OPNAME
     renderTerimaBarang: function() {
         const lbl = document.getElementById('lbl-terima-outlet'); if (lbl) lbl.innerText = this.outlet;
         let hu = ''; let hp = ''; let hum = ''; let hpm = '';
         [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
             if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="number" min="0" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
-                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="number" min="0" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan..."></div></div>`;
+                let strHtml = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center"><input type="text" id="trm-qty-${m.SKU}" class="w-24 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold cursor-pointer" readonly onclick="osKeyboard.open('trm-qty-${m.SKU}', 'numeric')" placeholder="0"></td><td class="py-3 px-4"><input type="text" id="trm-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-3 py-1 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('trm-note-${m.SKU}', 'text')" placeholder="Keterangan kurir/kondisi..."></td></tr>`;
+                let strMobile = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><div class="flex gap-2"><input type="text" id="trm-qty-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm cursor-pointer" readonly onclick="osKeyboard.open('trm-qty-mob-${m.SKU}', 'numeric')" placeholder="Qty"><input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('trm-note-mob-${m.SKU}', 'text')" placeholder="Catatan..."></div></div>`;
                 if (String(m.Kategori || '').toLowerCase() === 'bahan') { hu += strHtml; hum += strMobile; } else { hp += strHtml; hpm += strMobile; }
             }
         });
@@ -596,10 +663,10 @@ const superApp = {
                 let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
                 let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
 
-                if (qtyStr !== '' && parseInt(qtyStr) > 0) {
+                if (qtyStr !== '' && parseInt(this.getNumericValue(qtyStr)) > 0) {
                     let noteDesk = document.getElementById(`trm-note-${m.SKU}`); let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
-                    items.push({ sku: m.SKU, qty: parseInt(qtyStr), catatan: note });
+                    items.push({ sku: m.SKU, qty: parseInt(this.getNumericValue(qtyStr)), catatan: note });
                     waText += `📦 *${m.Nama_Produk}*\nQty Diterima: *${qtyStr} Pcs*\nCatatan: ${note || '-'}\n\n`;
                 }
             }
@@ -623,8 +690,8 @@ const superApp = {
                 let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
                 let sys = sData ? Number(sData.Stok_Toko) : 0;
 
-                let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td><td class="py-3 px-4 text-center"><input type="number" min="0" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800" oninput="superApp.calcOpname('${m.SKU}')" placeholder="0"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800" placeholder="Kondisi Fisik..."></td></tr>`;
-                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="number" min="0" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm" oninput="superApp.calcOpnameMob('${m.SKU}')" placeholder="Fisik"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800" placeholder="Catatan Kondisi..."></div></div>`;
+                let desk = `<tr class="border-b border-slate-50"><td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td><td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td><td class="py-3 px-4 text-center"><input type="text" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')" placeholder="0"></td><td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">-</td><td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik..."></td></tr>`;
+                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3"><div class="flex justify-between items-start"><div><h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4><p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p></div><span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">-</span></div><div class="flex gap-2"><input type="text" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm cursor-pointer" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')" placeholder="Fisik"><input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Catatan Kondisi..."></div></div>`;
 
                 if (String(m.Kategori || '').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
             }
@@ -636,7 +703,7 @@ const superApp = {
     },
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = parseInt(fisikEl ? fisikEl.value : 0);
+        let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = this.getNumericValue(fisikEl ? fisikEl.value : 0);
         let selEl = document.getElementById(`opn-selisih-${sku}`); if (!selEl) return;
         if (isNaN(fisik) || (fisikEl && fisikEl.value === '')) { selEl.innerText = '-'; selEl.className = 'py-3 px-4 text-right font-black text-slate-300'; return; }
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
@@ -644,7 +711,7 @@ const superApp = {
     },
     calcOpnameMob: function(sku) {
         const sysEl = document.getElementById(`opn-sys-mob-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
-        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = parseInt(fisikEl ? fisikEl.value : 0);
+        let fisikEl = document.getElementById(`opn-fisik-mob-${sku}`); let fisik = this.getNumericValue(fisikEl ? fisikEl.value : 0);
         let selEl = document.getElementById(`opn-selisih-mob-${sku}`); if (!selEl) return;
         if (isNaN(fisik) || (fisikEl && fisikEl.value === '')) { selEl.innerText = '-'; selEl.className = 'font-black text-slate-300 text-lg'; return; }
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
@@ -665,7 +732,7 @@ const superApp = {
                 if (fisikStr !== '') {
                     let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
                     let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
-                    let fisik = parseInt(fisikStr);
+                    let fisik = this.getNumericValue(fisikStr);
                     let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
 
@@ -687,9 +754,7 @@ const superApp = {
         this.setLoading(false);
     },
 
-    /* ========================================== */
-    /* 9. AUDIT & BULK APPROVAL (OWNER)           */
-    /* ========================================== */
+    // AUDIT & BULK APPROVAL (OWNER)
     toggleAuditTab: function(tab) {
         const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
         const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
@@ -708,10 +773,10 @@ const superApp = {
                     let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
                     let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
-                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-4 w-10"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td><td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Disetujui', 'opname')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i></button><button onclick="superApp.processApproval('${op.Waktu}', '${op.SKU}', '${op.Outlet}', ${op.Stok_Fisik}, 'Ditolak', 'opname')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i></button></td></tr>`;
+                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td><td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td></tr>`;
                 }
             });
-            tbodyOp.innerHTML = html || `<tr><td colspan="8" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
+            tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
         }
 
         const tbodyTr = document.getElementById('audit-terima-tbody');
@@ -722,10 +787,10 @@ const superApp = {
                     let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
                     let safeWaktu = String(mt.Waktu || ''); let wStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
 
-                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-4 w-10"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td><td class="py-3 px-4 text-center whitespace-nowrap"><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Disetujui', 'terima')" class="bg-green-100 text-green-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-green-200 mr-1 transition"><i class="fas fa-check"></i></button><button onclick="superApp.processApproval('${mt.ID_Mutasi}', '', '', 0, 'Ditolak', 'terima')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-red-200 transition"><i class="fas fa-times"></i></button></td></tr>`;
+                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td><td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td><td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span></td><td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td><td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td><td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td></tr>`;
                 }
             });
-            tbodyTr.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
+            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
         }
         this.checkBulkAudit();
     },
@@ -760,22 +825,8 @@ const superApp = {
         } catch (e) { this.showToast("Gagal memproses", "error"); }
         this.setLoading(false);
     },
-    processApproval: async function(id1, sku, outlet, fisik, status, type) {
-        if (this.isProcessing) return;
-        if (!confirm(`Anda yakin ingin ${status} laporan ini?`)) return;
-        this.setLoading(true, "Memproses Audit...");
-        try {
-            if (type === 'opname') { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'approve_opname', waktu: id1, sku: sku, outlet: outlet, fisik: fisik, status_app: status }) }); } 
-            else if (type === 'terima') { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'approve_mutasi', id_mutasi: id1, status_app: status }) }); }
-            this.showToast(`Laporan ${status}!`);
-            const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
-        } catch (e) { this.showToast("Gagal memproses", "error"); }
-        this.setLoading(false);
-    },
 
-    /* ========================================== */
-    /* 10. TRANSFER OWNER                         */
-    /* ========================================== */
+    // TRANSFER OWNER
     openTransferModalOwner: function() {
         let outletOpts = ''; (this.db.outlets || []).forEach(o => { outletOpts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`; });
         let opt = ''; [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
@@ -787,10 +838,14 @@ const superApp = {
             <div><label class="text-xs font-bold text-slate-500 block mb-1">Barang yang Ditransfer</label><select id="frm-trf-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500" onchange="superApp.updateTransferStokInfo()">${opt}</select></div>
             <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl text-sm font-bold mb-2 hidden shadow-inner border border-blue-100 flex items-center justify-between" id="trf-stok-info-box"><span><i class="fas fa-box-open mr-2"></i> Stok Tersedia</span> <span id="trf-stok-info" class="text-xl font-black">0</span></div>
             <div><label class="text-xs font-bold text-slate-500 block mb-1">Toko Tujuan</label><select id="frm-trf-out-tujuan" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 transition focus:border-brand-500">${outletOpts}</select></div>
-            ${this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'number', '', false, '')}
+            ${this.makeInput('Jumlah Kirim (Pcs)', 'trf-qty', '', 'text', '', false, 'superApp.formatRupiahInput(this)')}
         `;
         this.buildForm("Transfer Stok Antar Toko", inputs, "superApp.executeTransferOwner()");
-        setTimeout(() => { this.updateTransferStokInfo(); }, 100);
+        setTimeout(() => {
+            let trfInput = document.getElementById('frm-trf-qty');
+            if (trfInput) { trfInput.setAttribute('readonly', 'readonly'); trfInput.classList.add('cursor-pointer'); trfInput.onclick = () => osKeyboard.open('frm-trf-qty', 'numeric'); }
+            this.updateTransferStokInfo();
+        }, 100);
     },
     updateTransferStokInfo: function() {
         const asal = document.getElementById('frm-trf-out-asal'); const sku = document.getElementById('frm-trf-sku'); const info = document.getElementById('trf-stok-info'); const box = document.getElementById('trf-stok-info-box');
@@ -804,7 +859,7 @@ const superApp = {
         const elAsal = document.getElementById('frm-trf-out-asal'); const elSku = document.getElementById('frm-trf-sku'); const elQty = document.getElementById('frm-trf-qty'); const elTujuan = document.getElementById('frm-trf-out-tujuan');
 
         if (!elSku || !elQty || !elTujuan) return;
-        let sku = elSku.value; let qty = parseInt(elQty.value, 10); let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : this.outlet;
+        let sku = elSku.value; let qty = this.getNumericValue(elQty.value); let targetOutlet = elTujuan.value; let asalOutlet = elAsal ? elAsal.value : this.outlet;
 
         if (asalOutlet === targetOutlet) return this.showToast("Toko asal dan tujuan tidak boleh sama", "error");
         if (!qty || parseInt(qty) <= 0) return this.showToast("Qty tidak valid", "error");
@@ -825,9 +880,7 @@ const superApp = {
         } else { this.setLoading(false); }
     },
 
-    /* ========================================== */
-    /* 11. REPORT & ANALYTICS                     */
-    /* ========================================== */
+    /* === 11. REPORT & ANALYTICS === */
     toggleReportTab: function(tab) {
         const rt = document.getElementById('report-content-trx'); if(rt) rt.classList.add('hidden'); 
         const rr = document.getElementById('report-content-rekap'); if(rr) rr.classList.add('hidden');
@@ -1012,7 +1065,7 @@ const superApp = {
         this.setLoading(false);
     },
 
-    /* === 12. AI ASSISTANT === */
+    // AI ASSISTANT
     generateAIReport: function() {
         const aiCards = document.getElementById('ai-insight-cards'); const aiRekBody = document.getElementById('ai-rekomendasi-tbody');
         if(!aiCards || !aiRekBody || !this.db) return;
@@ -1021,31 +1074,23 @@ const superApp = {
         if(filterEl && filterEl.options.length <= 1) {
             let opts = '<option value="Semua">Semua Cabang Terpantau</option>';
             (this.db.outlets || []).forEach(o => opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`);
-            filterEl.innerHTML = opts;
-            filterEl.value = this.outlet;
+            filterEl.innerHTML = opts; filterEl.value = this.outlet;
         }
         let aiOutlet = filterEl ? filterEl.value : this.outlet;
 
         let oldestDate = new Date();
         (this.db.transactions || []).forEach(t => { let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
-        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24));
-        if(daysActive < 1) daysActive = 1;
+        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)); if(daysActive < 1) daysActive = 1;
 
         let warnings = [];
         (this.db.masterProduk || []).forEach(mp => {
             if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
                 let totalMasuk = 0;
-                (this.db.mutasi || []).forEach(m => { 
-                    if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; 
-                });
+                (this.db.mutasi || []).forEach(m => { if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; });
                 
                 let sisa = 0;
-                if(aiOutlet === 'Semua') {
-                    (this.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; });
-                } else {
-                    let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet);
-                    sisa = sData ? Number(sData.Stok_Toko)||0 : 0;
-                }
+                if(aiOutlet === 'Semua') { (this.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; }); } 
+                else { let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet); sisa = sData ? Number(sData.Stok_Toko)||0 : 0; }
 
                 let pemakaian = totalMasuk - sisa; if(pemakaian < 0) pemakaian = 0; 
                 let velocity = pemakaian / daysActive; velocity = Number(velocity) || 0; 
@@ -1060,47 +1105,20 @@ const superApp = {
         (this.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                items.forEach(item => { 
-                    let safeNama = item.nama || 'Unknown';
-                    if(!productSales[safeNama]) productSales[safeNama] = 0; 
-                    productSales[safeNama] += Number(item.qty)||0; 
-                });
+                items.forEach(item => { let safeNama = item.nama || 'Unknown'; if(!productSales[safeNama]) productSales[safeNama] = 0; productSales[safeNama] += Number(item.qty)||0; });
             }
         });
         let topSellers = []; 
-        for (const [nama, qty] of Object.entries(productSales)) { 
-            let v = Number(qty)/daysActive;
-            topSellers.push({ name: nama, vel: Number(v)||0 }); 
-        }
-        topSellers.sort((a,b) => b.vel - a.vel); 
-        let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
+        for (const [nama, qty] of Object.entries(productSales)) { let v = Number(qty)/daysActive; topSellers.push({ name: nama, vel: Number(v)||0 }); }
+        topSellers.sort((a,b) => b.vel - a.vel); let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
 
         let lblCabang = aiOutlet === 'Semua' ? 'Keseluruhan Cabang' : `Cabang ${aiOutlet}`;
-
         let trendHtml = top1.vel > 5 ? `<span class="text-green-300 text-sm ml-2 bg-green-900/30 px-2 py-1 rounded-lg"><i class="fas fa-arrow-trend-up"></i> Naik</span>` : `<span class="text-orange-200 text-sm ml-2 bg-orange-900/30 px-2 py-1 rounded-lg"><i class="fas fa-minus"></i> Stabil</span>`;
 
         aiCards.innerHTML = `
-            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div>
-                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div>
-                <p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p>
-                <h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4>
-                <p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p>
-            </div>
-            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div>
-                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div>
-                <p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p>
-                <h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4>
-                <p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p>
-            </div>
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div>
-                <div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div>
-                <p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p>
-                <h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4>
-                <p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p>
-            </div>
+            <div class="bg-gradient-to-br from-orange-400 to-brand-600 p-8 rounded-3xl shadow-[0_10px_30px_rgba(249,115,22,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-fire"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-fire text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Terlaris</span></div><p class="text-[10px] font-black text-brand-100 uppercase tracking-widest mt-6 relative z-10">Paling Laku di ${lblCabang}</p><h4 class="text-3xl font-black truncate relative z-10">${top1.name}</h4><p class="text-sm font-bold text-brand-100 flex items-center relative z-10 mt-1">${top1.vel.toFixed(1)} Pcs/hari ${trendHtml}</p></div>
+            <div class="bg-gradient-to-br from-red-500 to-rose-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(225,29,72,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-triangle-exclamation"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-triangle-exclamation text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">Kritis</span></div><p class="text-[10px] font-black text-rose-100 uppercase tracking-widest mt-6 relative z-10">Perhatian Stok Menipis</p><h4 class="text-3xl font-black relative z-10">${warnings.length} Item</h4><p class="text-sm font-bold text-rose-100 relative z-10 mt-1">Prediksi habis < 4 hari</p></div>
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-700 p-8 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white transform hover:-translate-y-2 transition duration-300 relative overflow-hidden"><div class="absolute top-0 right-0 opacity-10 text-9xl transform translate-x-4 -translate-y-4"><i class="fas fa-brain"></i></div><div class="flex justify-between items-start mb-2 relative z-10"><div class="bg-white/20 p-3 rounded-xl"><i class="fas fa-brain text-2xl"></i></div><span class="text-xs font-black bg-white/20 px-3 py-1 rounded-full shadow-sm">AI Engine</span></div><p class="text-[10px] font-black text-indigo-100 uppercase tracking-widest mt-6 relative z-10">Data Dipelajari</p><h4 class="text-3xl font-black relative z-10">${daysActive} Hari</h4><p class="text-sm font-bold text-indigo-100 relative z-10 mt-1">Tingkat Akurasi Tinggi</p></div>
         `;
 
         if(warnings.length > 0) {
@@ -1109,7 +1127,7 @@ const superApp = {
         } else { aiRekBody.innerHTML = `<tr><td colspan="5" class="text-center py-12 h-32">${this.getEmptyState('fa-shield-halved', 'Stok Aman', 'Semua stok terpantau aman (Tidak ada prediksi krisis).')}</td></tr>`; }
     },
 
-    /* === 13. GUDANG & MASTER DATA === */
+    // GUDANG & MASTER DATA
     handleImageUpload: function(event, inputId, maxWidth = 150) {
         const file = event.target.files[0]; if (!file) return;
         this.showToast("Memproses Gambar...", "warning");
@@ -1230,10 +1248,12 @@ const superApp = {
         if(opt === '') return this.showToast("Semua produk master sudah ada di cabang ini!", "warning");
         let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Master Produk</label><select id="frm-add-out-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm bg-white outline-none text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', '', 'text', '', false, 'superApp.formatRupiahInput(this)');
         this.buildForm("Tambah Menu ke Cabang", inputs, `superApp.executeEditHarga(document.getElementById('frm-add-out-sku').value)`);
+        setTimeout(() => { let el = document.getElementById('frm-edit-hrg'); if(el) { el.setAttribute('readonly', 'readonly'); el.onclick = () => osKeyboard.open(el, 'numeric'); } }, 100);
     },
     openEditHargaOutlet: function(sku, nama, currHarga) {
         let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Produk</label><input type="text" disabled value="${nama}" class="w-full border-2 border-slate-200 bg-slate-100 rounded-xl px-4 py-3 font-bold text-sm outline-none text-slate-600"></div>` + this.makeInput(`Set Harga Jual di Cabang ${this.outlet} (Rp)`, 'edit-hrg', Number(currHarga).toLocaleString('id-ID'), 'text', '', false, 'superApp.formatRupiahInput(this)');
         this.buildForm("Pengaturan Harga Cabang", inputs, `superApp.executeEditHarga('${sku}')`);
+        setTimeout(() => { let el = document.getElementById('frm-edit-hrg'); if(el) { el.setAttribute('readonly', 'readonly'); el.onclick = () => osKeyboard.open(el, 'numeric'); } }, 100);
     },
     executeEditHarga: async function(sku) {
         if(this.isProcessing) return;
@@ -1262,6 +1282,7 @@ const superApp = {
         [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||''))).forEach(p => { if(String(p.Kategori||'').toLowerCase()==='bahan' || String(p.Kategori||'').toLowerCase()==='pendukung') opt += `<option value="${p.SKU}">${p.Nama_Produk}</option>`; });
         let inputs = `<div><label class="text-xs font-bold text-slate-500 block mb-1">Pilih Bahan Baku Induk</label><select id="frm-rstk-sku" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition">${opt}</select></div>` + this.makeInput('Jumlah Masuk dari Supplier (Pcs)', 'rstk-qty', '', 'number', '', false, '');
         this.buildForm("Pembelian / Restok Gudang", inputs, "superApp.executeRestok()");
+        setTimeout(() => { let el = document.getElementById('frm-rstk-qty'); if(el) { el.setAttribute('readonly', 'readonly'); el.onclick = () => osKeyboard.open(el, 'numeric'); } }, 100);
     },
     executeRestok: async function() {
         if(this.isProcessing) return;
@@ -1302,6 +1323,7 @@ const superApp = {
                      `<div><label class="text-xs font-bold text-slate-500 block mb-1">Tujuan Cabang</label><select id="frm-dist-out" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none text-sm bg-white text-slate-800 focus:border-brand-500 transition">${outletOpts}</select></div>` +
                      this.makeInput('Jumlah Kirim (Pcs)', 'dist-qty', '', 'number', '', false, '');
         this.buildForm("Kirim Stok Gudang -> Cabang", inputs, "superApp.executeDistribusi()");
+        setTimeout(() => { let el = document.getElementById('frm-dist-qty'); if(el) { el.setAttribute('readonly', 'readonly'); el.onclick = () => osKeyboard.open(el, 'numeric'); } }, 100);
     },
     executeDistribusi: async function() {
         if(this.isProcessing) return;
@@ -1354,7 +1376,7 @@ const superApp = {
         this.setLoading(false);
     },
 
-    /* === 14. STAF & KINERJA === */
+    // STAF & KINERJA
     renderStaf: function() {
         const filterEl = document.getElementById('staf-filter-outlet');
         if(filterEl && filterEl.options.length <= 1) {
@@ -1397,10 +1419,9 @@ const superApp = {
         if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
     },
 
-    /* === 15. SYSTEM UTILS (UI & BLUETOOTH) === */
+    // SYSTEM UTILS (UI & BLUETOOTH)
     makeInput: function(label, id, val='', type='text', hint='', dis=false, customEvent='') { 
-        let im = (type === 'number' || customEvent.includes('formatRupiah')) ? 'inputmode="numeric"' : '';
-        return `<div><label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">${label}</label><input type="${type}" ${im} id="frm-${id}" value="${val}" ${dis?'disabled':''} ${customEvent?'oninput="'+customEvent+'"':''} class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 transition ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; 
+        return `<div><label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">${label}</label><input type="${type}" id="frm-${id}" value="${val}" ${dis?'disabled':''} ${customEvent?'oninput="'+customEvent+'"':''} class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:border-brand-500 text-sm outline-none bg-white text-slate-800 transition ${dis?'opacity-50':''}">${hint?`<p class="text-[10px] text-slate-400 mt-1">${hint}</p>`:''}</div>`; 
     },
     buildForm: function(title, inputsHtml, actionFunctionStr) {
         const titleEl = document.getElementById('modal-form-title'); if(titleEl) titleEl.innerText = title; 
