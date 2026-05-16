@@ -21,8 +21,13 @@ const osKeyboard = {
             ['Z','X','C','V','B','N','M','SPACE']
         ]
     },
-    open: function(el, type = 'text') {
-        this.targetElement = el;
+    open: function(elOrId, type = 'text') {
+        // PERBAIKAN: Deteksi pintar. Jika yang masuk adalah string (ID), maka cari elemennya.
+        this.targetElement = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+        
+        // Jika elemen tetap tidak ditemukan, batalkan eksekusi agar tidak error
+        if (!this.targetElement) return;
+
         this.mode = type;
         this.isOpen = true;
         this.render();
