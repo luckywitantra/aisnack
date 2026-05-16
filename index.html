@@ -482,24 +482,7 @@
       <div id="vk-keys" class="flex flex-col items-center w-full max-w-4xl mx-auto"></div>
   </div>
 
-  <script>
-    document.addEventListener("visibilitychange", () => {
-        if (superApp.cfdWindow && !superApp.cfdWindow.closed) {
-            if (document.hidden) {
-                // Menutup CFD sementara jika kasir minimize atau pindah ke layar POS lain
-                superApp.cfdWindow.close();
-            }
-        }
-    });
-
-    window.addEventListener('focus', () => {
-        // Jika kasir kembali mengklik Ai-Snack, dan CFD statusnya harusnya buka, maka buka kembali
-        if(localStorage.getItem('cfd_wants_open') === 'true' && (!superApp.cfdWindow || superApp.cfdWindow.closed)) {
-            // Kasih delay dikit agar tidak bentrok dengan Chrome popup blocker
-            setTimeout(() => { superApp.openCFD(true); }, 300);
-        }
-    });
-  </script>
+ 
 
   <script src="app.js"></script>
 
