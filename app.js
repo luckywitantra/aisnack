@@ -1,11 +1,98 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
+/* ========================================== */
+/* 1. MESIN VIRTUAL KEYBOARD (IN-APP)         */
+/* ========================================== */
+const osKeyboard = {
+    targetElement: null,
+    mode: 'numeric', 
+    isOpen: false,
+    layouts: {
+        numeric: [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['C', '0', '000']
+        ],
+        text: [
+            ['1','2','3','4','5','6','7','8','9','0'],
+            ['Q','W','E','R','T','Y','U','I','O','P'],
+            ['A','S','D','F','G','H','J','K','L'],
+            ['Z','X','C','V','B','N','M','SPACE']
+        ]
+    },
+    open: function(elOrId, type = 'text') {
+        // Deteksi pintar: Jika yang masuk adalah teks ID, cari elemennya. Jika Object HTML, langsung gunakan.
+        this.targetElement = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+        if (!this.targetElement) return;
+
+        this.mode = type;
+        this.isOpen = true;
+        this.render();
+        const vk = document.getElementById('virtual-keyboard');
+        const ov = document.getElementById('virtual-keyboard-overlay');
+        if (vk) { vk.classList.remove('hidden'); setTimeout(() => vk.classList.remove('translate-y-full'), 10); }
+        if (ov) { ov.classList.remove('hidden'); }
+    },
+    close: function() {
+        this.isOpen = false;
+        const vk = document.getElementById('virtual-keyboard');
+        const ov = document.getElementById('virtual-keyboard-overlay');
+        if (vk) { vk.classList.add('translate-y-full'); setTimeout(() => vk.classList.add('hidden'), 300); }
+        if (ov) { ov.classList.add('hidden'); }
+        this.targetElement = null;
+    },
+    render: function() {
+        const container = document.getElementById('vk-keys');
+        if (!container) return;
+        let html = '';
+        let rows = this.layouts[this.mode];
+        rows.forEach(row => {
+            html += `<div class="flex justify-center gap-1 sm:gap-2 w-full mb-1 sm:mb-2">`;
+            row.forEach(key => {
+                if (key === 'SPACE') {
+                    html += `<button class="flex-[3] py-3 sm:py-4 bg-white text-slate-800 font-bold rounded-xl shadow-sm border border-slate-200 hover:bg-brand-50 transition active:scale-95" onclick="osKeyboard.insert(' ')">SPASI</button>`;
+                } else if (key === 'C') {
+                    html += `<button class="flex-1 py-3 sm:py-4 bg-red-50 text-red-500 font-bold rounded-xl shadow-sm border border-red-200 hover:bg-red-100 transition active:scale-95" onclick="osKeyboard.clear()">C</button>`;
+                } else {
+                    html += `<button class="flex-1 py-3 sm:py-4 bg-white text-slate-800 font-bold rounded-xl shadow-sm border border-slate-200 hover:bg-brand-50 transition active:scale-95 text-lg" onclick="osKeyboard.insert('${key}')">${key}</button>`;
+                }
+            });
+            html += `</div>`;
+        });
+        
+        // Baris Aksi (Hapus & OK)
+        html += `<div class="flex justify-center gap-2 w-full mt-2">
+                    <button class="flex-1 py-4 bg-slate-200 text-slate-700 font-bold rounded-xl shadow-sm border border-slate-300 hover:bg-slate-300 transition active:scale-95" onclick="osKeyboard.backspace()"><i class="fas fa-backspace"></i> HAPUS</button>
+                    <button class="flex-[2] py-4 bg-brand-500 text-white font-black rounded-xl shadow-md hover:bg-brand-600 transition active:scale-95 text-lg" onclick="osKeyboard.close()"><i class="fas fa-check-circle"></i> SELESAI</button>
+                 </div>`;
+        container.innerHTML = html;
+    },
+    insert: function(char) {
+        if (!this.targetElement) return;
+        this.targetElement.value += char;
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    backspace: function() {
+        if (!this.targetElement) return;
+        this.targetElement.value = this.targetElement.value.slice(0, -1);
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    clear: function() {
+        if (!this.targetElement) return;
+        this.targetElement.value = '';
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+};
+
+
+
 const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
-
+    
     /* ========================================== */
     /* 1. FORMATTER & NATIVE INPUT ENGINE         */
     /* ========================================== */
