@@ -331,6 +331,130 @@ const superApp = {
         this.isProcessing = false;
     },
 
+    // STARTUP & LOGIN
+    init: async function() {
+        if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && this.cfdWindow && !this.cfdWindow.closed) {
+                this.cfdWindow.close(); 
+            }
+        });
+
+        document.addEventListener("click", () => {
+            if (this.currentUser && localStorage.getItem('cfd_wants_open') === 'true') {
+                if (!this.cfdWindow || this.cfdWindow.closed) { this.openCFD(true); } 
+                else { this.cfdWindow.focus(); }
+            }
+        });
+
+        window.addEventListener('beforeunload', () => { if (this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
+        window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
+        window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
+        
+        try { let queue = localStorage.getItem('aisnack_offline_queue'); this.offlineQueue = queue ? JSON.parse(queue) : []; } catch (e) { this.offlineQueue = []; }
+
+        try {
+            const logStat = document.getElementById('login-status');
+            let cacheDb = localStorage.getItem('aisnack_db_cache');
+            
+            if (cacheDb) {
+                this.db = JSON.parse(cacheDb);
+                if (logStat) { logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; }
+            } else {
+                if (logStat) { logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; }
+            }
+
+            let fetchPromise = (async () => {
+                let data = null;
+                for (let i = 0; i < 3; i++) {
+                    try { const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); data = await res.json(); if (data && data.status === 'sukses') break; } 
+                    catch (e) { if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; await new Promise(r => setTimeout(r, 2000)); }
+                }
+                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
+
+                this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                let promoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD'); if (promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
+
+                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
+                let todayStr = `${yyyy}-${mm}-${dd}`; const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
+                if (fs && !fs.value) fs.value = todayStr; if (fe && !fe.value) fe.value = todayStr;
+
+                if (logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
+            })();
+
+            if (!cacheDb) await fetchPromise;
+
+        } catch (err) {
+            const logStat = document.getElementById('login-status');
+            if (logStat && this.db) { logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; } 
+            else if (logStat) { logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
+        }
+    },
+    addPin: function(num) {
+        if (!this.db || !this.db.users) {
+            this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning');
+            return;
+        }
+
+        if (this.pinBuffer.length < 4) {
+            this.pinBuffer += num;
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
+            if (dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); }
+        }
+        if (this.pinBuffer.length === 4) setTimeout(() => this.processLogin(), 200);
+    },
+    delPin: function() {
+        if (this.pinBuffer.length > 0) {
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`);
+            if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
+            this.pinBuffer = this.pinBuffer.slice(0, -1);
+        }
+    },
+    clearPin: function() {
+        this.pinBuffer = '';
+        for (let i = 1; i <= 4; i++) {
+            const dot = document.getElementById(`dot-${i}`);
+            if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); }
+        }
+    },
+    processLogin: function() {
+        if (this.isProcessing) return; this.isProcessing = true;
+        if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); this.isProcessing = false; return; }
+
+        let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
+        if (user) {
+            this.currentUser = user; this.outlet = user.Outlet === 'Pusat' ? ((this.db.outlets || [])[0]?.ID_Outlet || 'Penajam') : user.Outlet;
+            const sbRole = document.getElementById('sb-role'); if (sbRole) sbRole.innerText = user.Role;
+            const hInit = document.getElementById('header-initial'); if (hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
+
+            let isAdmin = String(user.Role).toLowerCase().includes('admin');
+            const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
+
+            if (isAdmin) {
+                if (adminMenus) adminMenus.classList.remove('hidden'); if (selOut) selOut.classList.remove('hidden'); if (repOut) repOut.classList.remove('hidden');
+                let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
+                (this.db.outlets || []).forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
+                if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
+                if (repOut) repOut.innerHTML = outFilters;
+                const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'flex';
+            } else {
+                if (adminMenus) adminMenus.classList.add('hidden');
+                if (selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`; selOut.disabled = true; }
+                if (repOut) repOut.classList.add('hidden');
+                const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'none';
+            }
+
+            const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
+            const sbar = document.getElementById('sidebar'); if (sbar) sbar.classList.remove('hidden');
+            const mainApp = document.getElementById('main-app'); if (mainApp) mainApp.classList.remove('hidden');
+
+            this.updateNetworkUI(); this.syncOfflineQueue(); this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
+        } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
+        this.isProcessing = false;
+    },
+
+    
     // SHIFT & KAS KELUAR
     checkShiftStatus: function() {
         const shiftOutName = document.getElementById('shift-outlet-name'); if (shiftOutName) shiftOutName.innerText = this.outlet;
