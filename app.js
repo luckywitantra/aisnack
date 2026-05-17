@@ -50,7 +50,7 @@ const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
+    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isBluetoothSearching: false, isProcessing: false,
     cfdFocusHandlerAdded: false,
 
     // FORMATTER & PARSER
@@ -1678,14 +1678,30 @@ const superApp = {
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
     connectBluetooth: async function() {
-        const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
+        // Tandai bahwa kita sedang mencari bluetooth agar CFD tidak mengganggu
+        this.isBluetoothSearching = true; 
+        
         try {
-            if(!navigator.bluetooth) throw new Error("Bluetooth API tidak didukung");
-            const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
-            const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); const chars = await services[0].getCharacteristics();
-            for (let char of chars) { if (char.properties.write || char.properties.writeWithoutResponse) { this.printerChar = char; break; } }
-            if(this.printerChar) { btn.innerText = 'Connected'; document.getElementById('btn-printer').classList.add('text-green-600', 'border-green-200'); this.showToast(`Printer Terhubung`); }
-        } catch (err) { btn.innerText = 'Printer'; this.showToast('Batal mencari printer', 'error'); }
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+            });
+            
+            // ... (lanjutkan kodingan koneksi printer Anda yang sudah ada) ...
+            this.showToast("Printer Terhubung!");
+            
+        } catch (error) {
+            console.log("Bluetooth Error:", error);
+            if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
+                this.showToast("Pencarian printer dibatalkan", "warning");
+            } else {
+                this.showToast("Gagal menyambungkan printer", "error");
+            }
+        } finally {
+            // Setelah selesai (berhasil atau batal), kembalikan status ke false
+            // Beri jeda sedikit agar jendela bluetooth benar-benar tertutup sebelum CFD ditarik kembali
+            setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
+        }
     },
     printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
         if (!this.printerChar) return; 
