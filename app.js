@@ -1741,22 +1741,43 @@ const superApp = {
         }
     },
     printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
-        if (!this.printerChar) return; 
+        // PERBAIKAN 1: Sesuaikan dengan nama variabel di connectBluetooth
+        if (!this.printerCharacteristic) {
+            this.showToast("Printer belum terhubung!", "error");
+            return;
+        } 
+        
         try {
             let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
             let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
             let antrianStr = antrian ? `\nANTRIAN : ${antrian}` : '';
             
+            // ESC/POS Commands:
+            // \x1B\x61\x01 = Align Center
+            // \x1B\x45\x01 = Bold ON
+            // \x1B\x45\x00 = Bold OFF
             let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
-            str += `Cabang: ${outlet}\nNo. Resi: ${id}${antrianStr}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
+            str += `Cabang: ${outlet}\nNo. Resi: ${id}${antrianStr}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod || 'Tunai'}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
+            
             items.forEach(i => {
                 str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
             });
-            str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
+            
+            str += `--------------------------------\n\x1B\x61\x02\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\x1B\x61\x01\nTerima Kasih!\n\n\n\n`; // Tambah extra \n untuk feed kertas
+            
             const data = new TextEncoder().encode(str);
-            for (let i = 0; i < data.length; i += 100) await this.printerChar.writeValue(data.slice(i, i + 100));
-        } catch(e) { throw e; }
+            
+            // PERBAIKAN 2: Gunakan chunkSize 20 jika 100 masih gagal (beberapa printer lawas hanya kuat 20)
+            const chunkSize = 20; 
+            for (let i = 0; i < data.length; i += chunkSize) {
+                // PERBAIKAN 3: Kirim ke printerCharacteristic
+                await this.printerCharacteristic.writeValue(data.slice(i, i + chunkSize));
+            }
+        } catch(e) { 
+            console.error("Gagal Cetak:", e);
+            this.showToast("Gagal mencetak struk", "error");
+            throw e; 
+        }
     }
-};
 
 window.onload = () => superApp.init();
