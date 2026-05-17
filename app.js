@@ -50,7 +50,7 @@ const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, printerCharacteristic: null, printerDevice: null, isBluetoothSearching: false, isProcessing: false,
+    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isProcessing: false,
     cfdFocusHandlerAdded: false,
 
     // FORMATTER & PARSER
@@ -1678,106 +1678,31 @@ const superApp = {
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
     connectBluetooth: async function() {
-        // Tandai bahwa kita sedang mencari bluetooth agar CFD tidak mengganggu
-        this.isBluetoothSearching = true; 
-        const btnPrinter = document.getElementById('btn-printer');
-        const statusPrinter = document.getElementById('printer-status');
-        
+        const btn = document.getElementById('printer-status'); if(!btn) return; btn.innerText = 'Mencari...';
         try {
-            // 1. Meminta Izin akses perangkat
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-            });
-            
-            this.setLoading(true, "Menghubungkan ke Printer...");
-
-            // 2. Melakukan Koneksi ke GATT Server
-            const server = await device.gatt.connect();
-            
-            // 3. Mendapatkan Service Printer
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            
-            // 4. Mendapatkan Characteristic untuk Menulis Data (Write)
-            // Umumnya printer thermal menggunakan UUID 2af1 atau yang sama dengan service
-            this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-            
-            // Simpan referensi perangkat agar bisa dideteksi jika terputus
-            this.printerDevice = device;
-
-            // 5. Update UI menjadi Terhubung
-            if (btnPrinter) {
-                btnPrinter.classList.replace('text-slate-600', 'text-green-600');
-                btnPrinter.classList.add('bg-green-50', 'border-green-200');
-            }
-            if (statusPrinter) statusPrinter.innerText = "Printer Ready";
-
-            this.showToast("Printer Terhubung!", "success");
-            this.setLoading(false);
-
-            // Handler jika printer tiba-tiba mati atau keluar jangkauan
-            device.addEventListener('gattserverdisconnected', () => {
-                this.printerCharacteristic = null;
-                if (statusPrinter) statusPrinter.innerText = "Printer Off";
-                if (btnPrinter) {
-                    btnPrinter.classList.remove('bg-green-50', 'border-green-200');
-                    btnPrinter.classList.replace('text-green-600', 'text-slate-600');
-                }
-                this.showToast("Koneksi printer terputus", "warning");
-            });
-            
-        } catch (error) {
-            this.setLoading(false);
-            console.log("Bluetooth Error:", error);
-            if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
-                this.showToast("Pencarian printer dibatalkan", "warning");
-            } else {
-                this.showToast("Gagal menyambungkan printer", "error");
-            }
-        } finally {
-            // Setelah selesai (berhasil atau batal), kembalikan status ke false
-            // Beri jeda 2 detik agar popup sistem benar-benar hilang sebelum CFD ambil fokus
-            setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
-        }
+            if(!navigator.bluetooth) throw new Error("Bluetooth API tidak didukung");
+            const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
+            const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); const chars = await services[0].getCharacteristics();
+            for (let char of chars) { if (char.properties.write || char.properties.writeWithoutResponse) { this.printerChar = char; break; } }
+            if(this.printerChar) { btn.innerText = 'Connected'; document.getElementById('btn-printer').classList.add('text-green-600', 'border-green-200'); this.showToast(`Printer Terhubung`); }
+        } catch (err) { btn.innerText = 'Printer'; this.showToast('Batal mencari printer', 'error'); }
     },
     printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
-        // PERBAIKAN 1: Sesuaikan dengan nama variabel di connectBluetooth
-        if (!this.printerCharacteristic) {
-            this.showToast("Printer belum terhubung!", "error");
-            return;
-        } 
-        
+        if (!this.printerChar) return; 
         try {
             let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
             let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
             let antrianStr = antrian ? `\nANTRIAN : ${antrian}` : '';
             
-            // ESC/POS Commands:
-            // \x1B\x61\x01 = Align Center
-            // \x1B\x45\x01 = Bold ON
-            // \x1B\x45\x00 = Bold OFF
             let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
-            str += `Cabang: ${outlet}\nNo. Resi: ${id}${antrianStr}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod || 'Tunai'}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
-            
+            str += `Cabang: ${outlet}\nNo. Resi: ${id}${antrianStr}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
             items.forEach(i => {
                 str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
             });
-            
-            str += `--------------------------------\n\x1B\x61\x02\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\x1B\x61\x01\nTerima Kasih!\n\n\n\n`; // Tambah extra \n untuk feed kertas
-            
+            str += `--------------------------------\n\x1B\x61\x01\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\nTerima Kasih!\n\n\n`;
             const data = new TextEncoder().encode(str);
-            
-            // PERBAIKAN 2: Gunakan chunkSize 20 jika 100 masih gagal (beberapa printer lawas hanya kuat 20)
-            const chunkSize = 20; 
-            for (let i = 0; i < data.length; i += chunkSize) {
-                // PERBAIKAN 3: Kirim ke printerCharacteristic
-                await this.printerCharacteristic.writeValue(data.slice(i, i + chunkSize));
-            }
-        } catch(e) { 
-            console.error("Gagal Cetak:", e);
-            this.showToast("Gagal mencetak struk", "error");
-            throw e; 
-        }
+            for (let i = 0; i < data.length; i += 100) await this.printerChar.writeValue(data.slice(i, i + 100));
+        } catch(e) { throw e; }
     }
 };
 
