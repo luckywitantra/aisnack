@@ -1778,6 +1778,7 @@ const superApp = {
             this.showToast("Gagal mencetak struk", "error");
             throw e; 
         }
-    },
+    }
+};
 
 window.onload = () => superApp.init();
