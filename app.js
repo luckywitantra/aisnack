@@ -50,7 +50,7 @@ const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, isBluetoothSearching: false, isProcessing: false,
+    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, printerCharacteristic: null, printerDevice: null, isBluetoothSearching: false, isProcessing: false,
     cfdFocusHandlerAdded: false,
 
     // FORMATTER & PARSER
@@ -1680,17 +1680,54 @@ const superApp = {
     connectBluetooth: async function() {
         // Tandai bahwa kita sedang mencari bluetooth agar CFD tidak mengganggu
         this.isBluetoothSearching = true; 
+        const btnPrinter = document.getElementById('btn-printer');
+        const statusPrinter = document.getElementById('printer-status');
         
         try {
+            // 1. Meminta Izin akses perangkat
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
                 optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
             });
             
-            // ... (lanjutkan kodingan koneksi printer Anda yang sudah ada) ...
-            this.showToast("Printer Terhubung!");
+            this.setLoading(true, "Menghubungkan ke Printer...");
+
+            // 2. Melakukan Koneksi ke GATT Server
+            const server = await device.gatt.connect();
+            
+            // 3. Mendapatkan Service Printer
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            
+            // 4. Mendapatkan Characteristic untuk Menulis Data (Write)
+            // Umumnya printer thermal menggunakan UUID 2af1 atau yang sama dengan service
+            this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+            
+            // Simpan referensi perangkat agar bisa dideteksi jika terputus
+            this.printerDevice = device;
+
+            // 5. Update UI menjadi Terhubung
+            if (btnPrinter) {
+                btnPrinter.classList.replace('text-slate-600', 'text-green-600');
+                btnPrinter.classList.add('bg-green-50', 'border-green-200');
+            }
+            if (statusPrinter) statusPrinter.innerText = "Printer Ready";
+
+            this.showToast("Printer Terhubung!", "success");
+            this.setLoading(false);
+
+            // Handler jika printer tiba-tiba mati atau keluar jangkauan
+            device.addEventListener('gattserverdisconnected', () => {
+                this.printerCharacteristic = null;
+                if (statusPrinter) statusPrinter.innerText = "Printer Off";
+                if (btnPrinter) {
+                    btnPrinter.classList.remove('bg-green-50', 'border-green-200');
+                    btnPrinter.classList.replace('text-green-600', 'text-slate-600');
+                }
+                this.showToast("Koneksi printer terputus", "warning");
+            });
             
         } catch (error) {
+            this.setLoading(false);
             console.log("Bluetooth Error:", error);
             if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
                 this.showToast("Pencarian printer dibatalkan", "warning");
@@ -1699,7 +1736,7 @@ const superApp = {
             }
         } finally {
             // Setelah selesai (berhasil atau batal), kembalikan status ke false
-            // Beri jeda sedikit agar jendela bluetooth benar-benar tertutup sebelum CFD ditarik kembali
+            // Beri jeda 2 detik agar popup sistem benar-benar hilang sebelum CFD ambil fokus
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
         }
     },
