@@ -447,10 +447,61 @@ const superApp = {
             const mainApp = document.getElementById('main-app'); if (mainApp) mainApp.classList.remove('hidden');
 
             this.updateNetworkUI(); this.syncOfflineQueue(); this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
+            
+            // --- BAGIAN INI YANG DISEMPURNAKAN ---
+            // 1. TULIS DATA OUTLET KE MEMORI (Wajib agar Jendela CFD Menarik Data)
+            localStorage.setItem('aisnack_active_outlet', this.outlet);
+            
+            // 2. Jalankan Sapaan Layar Utama & Cadangan
+            this.updateCFDGreeting(); 
+            if (!this.cfdTimer) {
+                this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
+            }
+            // -------------------------------------
+
         } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
         this.isProcessing = false;
     },
 
+    // FUNGSI PENYAPA CFD (Mendukung Multi-Window)
+    updateCFDGreeting: function() {
+        // 1. Simpan nama cabang ke memori agar jendela CFD tidak lupa saat di-refresh
+        if (this.outlet) {
+            localStorage.setItem('aisnack_active_outlet', this.outlet);
+        }
+        let namaOutlet = this.outlet || localStorage.getItem('aisnack_active_outlet') || "Ai-Snack";
+
+        // 2. Logika Pembaca Waktu
+        const hour = new Date().getHours();
+        let ucapanWaktu = "Selamat Malam!"; 
+        if (hour >= 5 && hour < 11) {
+            ucapanWaktu = "Selamat Pagi!";
+        } else if (hour >= 11 && hour < 15) {
+            ucapanWaktu = "Selamat Siang!";
+        } else if (hour >= 15 && hour < 18) {
+            ucapanWaktu = "Selamat Sore!";
+        }
+
+        // 3. UBAH DI LAYAR UTAMA (KASIR)
+        const greetTimeEl = document.getElementById('cfd-greeting-time');
+        const greetOutletEl = document.getElementById('cfd-greeting-outlet');
+        if (greetTimeEl) greetTimeEl.innerText = ucapanWaktu;
+        if (greetOutletEl) greetOutletEl.innerText = `Selamat datang di ${namaOutlet}, silakan pesan di kasir`;
+
+        // 4. UBAH DI LAYAR CFD (MENYEBERANG KE JENDELA KEDUA SEBAGAI CADANGAN)
+        if (this.cfdWindow && !this.cfdWindow.closed) {
+            try {
+                const cfdTimeEl = this.cfdWindow.document.getElementById('cfd-greeting-time');
+                const cfdOutletEl = this.cfdWindow.document.getElementById('cfd-greeting-outlet');
+                if (cfdTimeEl) cfdTimeEl.innerText = ucapanWaktu;
+                if (cfdOutletEl) cfdOutletEl.innerText = `Selamat datang di ${namaOutlet}, silakan pesan di kasir`;
+            } catch (e) {
+                console.log("Menunggu layar CFD siap...");
+            }
+        }
+    },
+    
+    
     // SHIFT & KAS KELUAR
     checkShiftStatus: function() {
         const shiftOutName = document.getElementById('shift-outlet-name'); if (shiftOutName) shiftOutName.innerText = this.outlet;
@@ -1263,6 +1314,119 @@ const superApp = {
             element.classList.remove('pdf-container'); this.toggleReportTab('trx'); this.showToast("PDF Diunduh!"); 
         });
     },
+    
+    sendReportToWA: function() {
+        // 1. Ambil data rentang tanggal dari filter
+        let startDate = document.getElementById('filter-start').value;
+        let endDate = document.getElementById('filter-end').value;
+        
+        // 2. Ambil data cabang
+        let outletFilterEl = document.getElementById('report-outlet-filter');
+        let outletName = (!outletFilterEl || outletFilterEl.classList.contains('hidden') || outletFilterEl.value === 'Semua') 
+                         ? (this.currentUser && String(this.currentUser.Role).toLowerCase().includes('admin') ? "Semua Cabang" : this.outlet) 
+                         : outletFilterEl.options[outletFilterEl.selectedIndex].text.replace('Hanya: ', '').replace('📍 ', '');
+
+        // 3. Ambil Ringkasan Angka Utama
+        let totTrx = document.getElementById('rep-total-trx').innerText; // Ini angka jumlah struk
+        let totTunai = document.getElementById('rep-total-tunai').innerText;
+        let totQris = document.getElementById('rep-total-qris').innerText;
+        let totKas = document.getElementById('rep-total-kas').innerText;
+
+        // KALKULASI TOTAL PENDAPATAN (TUNAI + QRIS)
+        // Bersihkan teks "Rp" dan titik, lalu ubah ke angka murni untuk dijumlahkan
+        let numTunai = Number(totTunai.replace(/[^0-9]/g, '')) || 0;
+        let numQris = Number(totQris.replace(/[^0-9]/g, '')) || 0;
+        let totalOmset = numTunai + numQris;
+        let totOmsetStr = `Rp ${totalOmset.toLocaleString('id-ID')}`;
+
+        // --- 4. EKSTRAKSI DATA DETAIL DARI TABEL LAYAR ---
+        
+        // A. Ekstrak Rekap Jualan (Item)
+        let rekapTbody = document.getElementById('report-rekap-tbody');
+        let rekapText = '';
+        if (rekapTbody && rekapTbody.rows.length > 0 && rekapTbody.rows[0].cells.length >= 3) {
+            for (let row of rekapTbody.rows) {
+                // Abaikan teks kosong "Belum Ada Penjualan" jika tabel masih kosong
+                if (row.cells[0].innerText.includes('Belum Ada Penjualan')) continue;
+                rekapText += `▪️ ${row.cells[0].innerText} = ${row.cells[1].innerText} (${row.cells[2].innerText})\n`;
+            }
+            if(rekapText === '') rekapText = "▪️ Nihil / Tidak ada penjualan.\n";
+        } else { rekapText = "▪️ Nihil / Tidak ada penjualan.\n"; }
+
+        // B. Ekstrak Kas Keluar
+        let kasTbody = document.getElementById('report-kas-tbody');
+        let kasText = '';
+        if (kasTbody && kasTbody.rows.length > 0 && kasTbody.rows[0].cells.length >= 4) {
+            for (let row of kasTbody.rows) {
+                if (row.cells[0].innerText.includes('Tidak Ada Kas Keluar')) continue;
+                kasText += `▪️ ${row.cells[2].innerText} : ${row.cells[3].innerText}\n`; 
+            }
+            if(kasText === '') kasText = "▪️ Nihil / Tidak ada pengeluaran.\n";
+        } else { kasText = "▪️ Nihil / Tidak ada pengeluaran.\n"; }
+
+        // BAGIAN AUDIT FISIK TELAH DIHAPUS
+
+        // --- 5. SUSUN TEKS PESAN WHATSAPP ---
+        let text = `*📊 LAPORAN OPERASIONAL AI-SNACK*\n`;
+        text += `📍 Cabang: *${outletName}*\n`;
+        text += `📅 Periode: *${startDate} s/d ${endDate}*\n`;
+        text += `👤 User: ${this.currentUser ? this.currentUser.Username : 'Sistem'}\n`;
+        text += `-----------------------------------\n`;
+        text += `*RINGKASAN KEUANGAN:*\n`;
+        text += `🛒 Jml Transaksi   : *${totTrx} Struk*\n`;
+        text += `💵 Omset Tunai     : *${totTunai}*\n`;
+        text += `📱 Omset QRIS      : *${totQris}*\n`;
+        text += `💰 TOTAL PENDAPATAN: *${totOmsetStr}*\n`;
+        text += `💸 Kas Keluar      : *${totKas}*\n`;
+        text += `-----------------------------------\n`;
+        text += `*🛍️ DETAIL ITEM TERJUAL:*\n${rekapText}\n`;
+        text += `*🧾 RINCIAN KAS KELUAR:*\n${kasText}\n`;
+        text += `-----------------------------------\n`;
+        text += `_Laporan ditarik secara otomatis dari Sistem POS Ai-Snack._`;
+
+        // 6. Siapkan Link URL WhatsApp
+        let waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+        const btnGoWa = document.getElementById('btn-go-wa');
+        const btnCopyWa = document.getElementById('btn-copy-wa');
+        const modalWa = document.getElementById('modal-wa-confirm');
+
+        // Sambungkan perintah ke tombol di dalam popup
+        if (btnGoWa) {
+            btnGoWa.onclick = () => { 
+                window.open(waUrl, '_blank'); 
+                this.closeModal('modal-wa-confirm');
+            };
+        }
+        
+        if (btnCopyWa) {
+            btnCopyWa.onclick = () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    this.showToast("Teks laporan berhasil disalin ke memori HP/PC!", "success");
+                }).catch(() => {
+                    this.showToast("Gagal menyalin teks", "error");
+                });
+            };
+        }
+
+        // 7. Tampilkan Popup Animasi WA
+        if (modalWa) {
+            modalWa.classList.remove('hidden');
+            modalWa.classList.add('flex');
+    
+            const modalContent = document.getElementById('modal-wa-confirm-content');
+            if (modalContent) {
+                setTimeout(() => modalContent.classList.add('modal-enter-active'), 10);
+            }
+       
+            const title = modalWa.querySelector('h3');
+            const desc = modalWa.querySelector('p');
+            if(title) title.innerText = "Laporan Siap!";
+            // Teks deskripsi di dalam modal juga sudah diubah agar tidak menyebut Audit lagi
+            if(desc) desc.innerText = "Seluruh rincian jualan dan kas sudah dirangkum otomatis. Lanjutkan kirim ke Grup WhatsApp?";
+        }
+    },
+
     openDetailTrx: function(trxId) {
         let trx = (this.db.transactions || []).find(x => x.ID_TRX === trxId); if(!trx) return;
         this.activeReprintTrx = trx; let items = []; try { items = JSON.parse(trx.Items_JSON || '[]'); } catch(e){}
@@ -1332,35 +1496,59 @@ const superApp = {
         (this.db.transactions || []).forEach(t => { let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d; });
         let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)); if(daysActive < 1) daysActive = 1;
 
-        let warnings = [];
-        (this.db.masterProduk || []).forEach(mp => {
-            if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
-                let totalMasuk = 0;
-                (this.db.mutasi || []).forEach(m => { if(m.SKU === mp.SKU && (aiOutlet === 'Semua' || m.Outlet_Tujuan === aiOutlet)) totalMasuk += Number(m.Qty)||0; });
-                
-                let sisa = 0;
-                if(aiOutlet === 'Semua') { (this.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; }); } 
-                else { let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet); sisa = sData ? Number(sData.Stok_Toko)||0 : 0; }
-
-                let pemakaian = totalMasuk - sisa; if(pemakaian < 0) pemakaian = 0; 
-                let velocity = pemakaian / daysActive; velocity = Number(velocity) || 0; 
-                let daysRem = velocity > 0 ? (sisa / velocity) : 999;
-                
-                if(daysRem < 4 && sisa > 0) { warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity, stock: sisa, days: Math.floor(daysRem) }); } 
-                else if (sisa <= 0) { warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity, stock: 0, days: 0 }); }
-            }
-        });
-
+        // --- REKOMENDASI PERBAIKAN LOGIKA VELOCITY ---
+        // 1. Kumpulkan dulu total barang terjual dari transaksi Sukses
         let productSales = {};
         (this.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && (aiOutlet === 'Semua' || t.Outlet === aiOutlet)) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-                items.forEach(item => { let safeNama = item.nama || 'Unknown'; if(!productSales[safeNama]) productSales[safeNama] = 0; productSales[safeNama] += Number(item.qty)||0; });
+                items.forEach(item => { 
+                    let safeNama = item.nama || 'Unknown'; 
+                    if(!productSales[safeNama]) productSales[safeNama] = 0; 
+                    productSales[safeNama] += Number(item.qty)||0; 
+                });
             }
         });
+
+        let warnings = [];
+        (this.db.masterProduk || []).forEach(mp => {
+            if(String(mp.Kategori||'').toLowerCase() === 'pendukung' || String(mp.Kategori||'').toLowerCase() === 'bahan') {
+                
+                // Cek sisa stok saat ini
+                let sisa = 0;
+                if(aiOutlet === 'Semua') { 
+                    (this.db.hargaStokOutlet || []).forEach(x => { if(x.SKU === mp.SKU) sisa += Number(x.Stok_Toko)||0; }); 
+                } else { 
+                    let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === mp.SKU && x.ID_Outlet === aiOutlet); 
+                    sisa = sData ? Number(sData.Stok_Toko)||0 : 0; 
+                }
+
+                // 2. Gunakan jumlah barang terjual untuk menghitung Velocity (Bukan Total Masuk - Sisa)
+                // Jika produk adalah bahan mentah, asumsinya 1 Pcs Terjual memotong 1 Pcs Bahan (BOM sederhana)
+                // Jika Anda punya tabel Resep/BOM, logikanya harus disesuaikan di sini.
+                let pemakaianReal = productSales[mp.Nama_Produk] || 0; 
+
+                let velocity = pemakaianReal / daysActive; 
+                velocity = Number(velocity) || 0; 
+                
+                // Jika velocity 0 (belum pernah terjual), asumsi aman (999 hari)
+                let daysRem = velocity > 0 ? (sisa / velocity) : 999;
+                
+                if(daysRem < 4 && sisa > 0) { 
+                    warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity, stock: sisa, days: Math.floor(daysRem) }); 
+                } else if (sisa <= 0) { 
+                    warnings.push({ sku: mp.SKU, name: mp.Nama_Produk, type: mp.Kategori, vel: velocity, stock: 0, days: 0 }); 
+                }
+            }
+        });
+
         let topSellers = []; 
-        for (const [nama, qty] of Object.entries(productSales)) { let v = Number(qty)/daysActive; topSellers.push({ name: nama, vel: Number(v)||0 }); }
-        topSellers.sort((a,b) => b.vel - a.vel); let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
+        for (const [nama, qty] of Object.entries(productSales)) { 
+            let v = Number(qty)/daysActive; 
+            topSellers.push({ name: nama, vel: Number(v)||0 }); 
+        }
+        topSellers.sort((a,b) => b.vel - a.vel); 
+        let top1 = topSellers.length > 0 ? topSellers[0] : {name: '-', vel: 0};
 
         let lblCabang = aiOutlet === 'Semua' ? 'Keseluruhan Cabang' : `Cabang ${aiOutlet}`;
         let trendHtml = top1.vel > 5 ? `<span class="text-green-300 text-sm ml-2 bg-green-900/30 px-2 py-1 rounded-lg"><i class="fas fa-arrow-trend-up"></i> Naik</span>` : `<span class="text-orange-200 text-sm ml-2 bg-orange-900/30 px-2 py-1 rounded-lg"><i class="fas fa-minus"></i> Stabil</span>`;
