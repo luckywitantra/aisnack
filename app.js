@@ -147,53 +147,44 @@ const superApp = {
             }
         }
     },
-    changePromoImage: function() {
-        // Buat elemen input file bayangan di dalam memori browser
+   changePromoImage: function(type) {
         let fileInput = document.createElement('input'); 
         fileInput.type = 'file'; 
-        fileInput.accept = 'image/*'; // Hanya menerima file gambar
+        fileInput.accept = 'image/*'; 
         
         fileInput.onchange = (event) => {
             const file = event.target.files[0]; 
-            if (!file) return; 
-            if (this.isProcessing) return; 
+            if (!file || this.isProcessing) return; 
             
-            this.setLoading(true, "Mengunggah Gambar ke Google Drive Toko...");
+            let loadingText = type === 'standby' ? "Mengunggah Promo Standby..." : "Mengunggah Promo Transaksi...";
+            this.setLoading(true, loadingText);
             
             const reader = new FileReader();
             reader.onload = (e) => {
-                const base64Data = e.target.result;
-                
-                // Tembakkan data gambar langsung ke server Google Drive melalui API
                 this.apiPost({ 
-                    action: 'update_promo_drive', 
-                    base64: base64Data, 
+                    action: 'update_promo_dual',
+                    promoType: type,
+                    base64: e.target.result, 
                     fileName: file.name, 
                     mimeType: file.type 
                 }).then(res => { 
                     if (res.status === 'sukses') { 
-                        // Simpan link Google Drive publik tersebut ke memori lokal kasir
-                        localStorage.setItem('cfd_promo_url', res.url); 
+                        const storageKey = type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi';
+                        localStorage.setItem(storageKey, res.url); 
                         this.syncStorage(); 
-                        
-                        // Perbarui visual background jika layar CFD sedang terbuka di PC kasir tersebut
-                        const bg = document.getElementById('cfd-promo-bg'); 
-                        if (bg) bg.style.backgroundImage = `url('${res.url}')`;
-                        
                         this.setLoading(false); 
-                        this.showToast("Promo Berhasil Ter-upload ke Google Drive & Diperbarui Secara Global!"); 
+                        this.showToast(`Promo ${type.toUpperCase()} Berhasil Diperbarui!`); 
                     } else {
                         this.setLoading(false);
-                        this.showToast("Gagal menyimpan ke Drive: " + res.pesan, "error");
+                        this.showToast("Gagal upload: " + res.pesan, "error");
                     }
                 }).catch(() => {
-                    this.setLoading(false);
-                    this.showToast("Koneksi gagal saat mengunggah laporan", "error");
+                    this.setLoading(false); this.showToast("Koneksi bermasalah", "error");
                 });
             }; 
             reader.readAsDataURL(file);
         }; 
-        fileInput.click(); // Pemicu klik fisik otomatis agar popup berkas di PC/HP kasir terbuka
+        fileInput.click();
     },
 
     // Fungsi untuk merubah gambar logo secara serempak di seluruh sudut aplikasi
@@ -248,15 +239,25 @@ const superApp = {
     
     syncStorage: function(status = 'ordering', antrian = null) {
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') return;
-        localStorage.setItem('ai_snack_cfd', JSON.stringify({ outlet: this.outlet || 'Ai-Snack', items: this.cart, total: this.payTotal, kembali: this.payChange, status: status, antrian: antrian, timestamp: new Date().getTime(), promoUrl: localStorage.getItem('cfd_promo_url') }));
+        localStorage.setItem('ai_snack_cfd', JSON.stringify({ 
+            outlet: this.outlet || 'Ai-Snack', 
+            items: this.cart, 
+            total: this.payTotal, 
+            kembali: this.payChange, 
+            status: status, 
+            antrian: antrian, 
+            timestamp: new Date().getTime(), 
+            promoStandbyUrl: localStorage.getItem('cfd_promo_standby'),
+            promoScreenUrl: localStorage.getItem('cfd_promo_transaksi')
+        }));
     },
-    initCFD: function() {
+    
+   initCFD: function() {
         document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
         const cfdScreen = document.getElementById('cfd-screen'); if (cfdScreen) cfdScreen.classList.remove('hidden');
         
-        // Saya juga menambahkan deteksi 'app_logo_url' di sini agar logo di CFD langsung berubah seketika (real-time) saat kasir mengganti logo
         window.addEventListener('storage', (e) => { 
-            if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url' || e.key === 'app_logo_url') { 
+            if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_standby' || e.key === 'cfd_promo_transaksi' || e.key === 'app_logo_url') { 
                 let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if (data.outlet) this.renderCFD(data); 
                 let newLogo = localStorage.getItem('app_logo_url'); if (newLogo) this.updateAppLogos(newLogo);
             } 
@@ -264,17 +265,19 @@ const superApp = {
         
         let initialData = localStorage.getItem('ai_snack_cfd'); if (initialData) this.renderCFD(JSON.parse(initialData));
         
-        let savedBg = localStorage.getItem('cfd_promo_url'); 
-        if (savedBg) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${savedBg}')`; }
+        let bgStandby = localStorage.getItem('cfd_promo_standby'); 
+        let bgScreen = localStorage.getItem('cfd_promo_transaksi'); 
+        if (bgStandby) { const bg1 = document.getElementById('cfd-bg-standby'); if (bg1) bg1.style.backgroundImage = `url('${bgStandby}')`; }
+        if (bgScreen) { const bg2 = document.getElementById('cfd-bg-screen'); if (bg2) bg2.style.backgroundImage = `url('${bgScreen}')`; }
         
-        // --- LETAK KODINGAN LOGO YANG BENAR (DI DALAM initCFD) ---
         let savedLogo = localStorage.getItem('app_logo_url');
         if (savedLogo) { this.updateAppLogos(savedLogo); }
-    }, // <--- Pastikan tanda koma penutup fungsinya ada di sini
-
+    },
+    
     renderCFD: function(data) {
         const outNameEl = document.getElementById('cfd-outlet-name'); if (outNameEl) outNameEl.innerText = `Cabang ${data.outlet}`;
-        if (data.promoUrl) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${data.promoUrl}')`; }
+        if (data.promoStandbyUrl) { const bg1 = document.getElementById('cfd-bg-standby'); if (bg1) bg1.style.backgroundImage = `url('${data.promoStandbyUrl}')`; }
+        if (data.promoScreenUrl) { const bg2 = document.getElementById('cfd-bg-screen'); if (bg2) bg2.style.backgroundImage = `url('${data.promoScreenUrl}')`; }
         const cfdStandby = document.getElementById('cfd-standby'); const cfdSuccess = document.getElementById('cfd-success');
         
         if (data.status === 'paid') { 
@@ -367,9 +370,12 @@ const superApp = {
                     this.updateAppLogos(logoData.Nilai); 
                 }
                 
-                // Set Promo CFD
-                let promoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD'); 
-                if (promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
+                // Set DUAL Promo CFD
+                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
+                if (pStandby) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
+                
+                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
+                if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
                 // Set Tanggal Filter Report
                 let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
