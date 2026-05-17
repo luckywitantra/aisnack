@@ -545,8 +545,22 @@
     });
 
     window.addEventListener('focus', () => {
-        if(localStorage.getItem('cfd_wants_open') === 'true' && (!superApp.cfdWindow || superApp.cfdWindow.closed)) {
-            setTimeout(() => { superApp.openCFD(true); }, 300);
+        // CFD hanya akan ditarik ke depan jika:
+        // 1. User memang ingin buka CFD (cfd_wants_open == true)
+        // 2. Kita TIDAK sedang mencari printer (isBluetoothSearching == false)
+        if(localStorage.getItem('cfd_wants_open') === 'true' && 
+           (!superApp.cfdWindow || superApp.cfdWindow.closed) && 
+           !superApp.isBluetoothSearching) {
+            
+            setTimeout(() => { 
+                // Cek sekali lagi sebelum benar-benar membuka
+                if(!superApp.isBluetoothSearching) {
+                    superApp.openCFD(true); 
+                }
+            }, 500);
+        } else if (superApp.cfdWindow && !superApp.cfdWindow.closed && !superApp.isBluetoothSearching) {
+            // Jika jendela sudah ada, fokuskan kembali tapi tetap cek status bluetooth
+            superApp.cfdWindow.focus();
         }
     });
   </script>
