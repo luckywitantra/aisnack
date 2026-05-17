@@ -126,6 +126,8 @@ const superApp = {
     },
 
     // CFD DUAL MONITOR SMART SYNC + ANTRIAN
+    cfdSuccessTimeout: null, // Tambahkan variabel global untuk menyimpan memori waktu
+
     openCFD: async function(isAutoRestore = false) {
         localStorage.setItem('cfd_wants_open', 'true');
         try { 
@@ -146,21 +148,104 @@ const superApp = {
         }
     },
     changePromoImage: function() {
-        let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
+        // Buat elemen input file bayangan di dalam memori browser
+        let fileInput = document.createElement('input'); 
+        fileInput.type = 'file'; 
+        fileInput.accept = 'image/*'; // Hanya menerima file gambar
+        
         fileInput.onchange = (event) => {
-            const file = event.target.files[0]; if (!file) return; if (this.isProcessing) return; this.setLoading(true, "Mengunggah Promo...");
+            const file = event.target.files[0]; 
+            if (!file) return; 
+            if (this.isProcessing) return; 
+            
+            this.setLoading(true, "Mengunggah Gambar ke Google Drive Toko...");
+            
             const reader = new FileReader();
             reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas'); let w = img.width; let h = img.height; const maxW = 1920; 
-                    if (w > maxW) { h = Math.round((h * maxW) / w); w = maxW; } canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h); const base64 = canvas.toDataURL('image/jpeg', 0.8);
-                    this.apiPost({ action: 'update_promo', url: base64 }).then(res => { if (res.status === 'sukses') { localStorage.setItem('cfd_promo_url', base64); this.syncStorage(); this.setLoading(false); this.showToast("Promo Diperbarui!"); } }).catch(() => this.setLoading(false));
-                }; img.src = e.target.result;
-            }; reader.readAsDataURL(file);
-        }; fileInput.click();
+                const base64Data = e.target.result;
+                
+                // Tembakkan data gambar langsung ke server Google Drive melalui API
+                this.apiPost({ 
+                    action: 'update_promo_drive', 
+                    base64: base64Data, 
+                    fileName: file.name, 
+                    mimeType: file.type 
+                }).then(res => { 
+                    if (res.status === 'sukses') { 
+                        // Simpan link Google Drive publik tersebut ke memori lokal kasir
+                        localStorage.setItem('cfd_promo_url', res.url); 
+                        this.syncStorage(); 
+                        
+                        // Perbarui visual background jika layar CFD sedang terbuka di PC kasir tersebut
+                        const bg = document.getElementById('cfd-promo-bg'); 
+                        if (bg) bg.style.backgroundImage = `url('${res.url}')`;
+                        
+                        this.setLoading(false); 
+                        this.showToast("Promo Berhasil Ter-upload ke Google Drive & Diperbarui Secara Global!"); 
+                    } else {
+                        this.setLoading(false);
+                        this.showToast("Gagal menyimpan ke Drive: " + res.pesan, "error");
+                    }
+                }).catch(() => {
+                    this.setLoading(false);
+                    this.showToast("Koneksi gagal saat mengunggah laporan", "error");
+                });
+            }; 
+            reader.readAsDataURL(file);
+        }; 
+        fileInput.click(); // Pemicu klik fisik otomatis agar popup berkas di PC/HP kasir terbuka
     },
+
+    // Fungsi untuk merubah gambar logo secara serempak di seluruh sudut aplikasi
+    updateAppLogos: function(url) {
+        if (!url) return;
+        document.querySelectorAll('.app-logo-img').forEach(img => {
+            img.src = url;
+        });
+    },
+
+    // Fungsi pengunggah file logo baru langsung menuju Google Drive
+    changeAppLogo: function() {
+        let fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        
+        fileInput.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (this.isProcessing) return;
+            
+            this.setLoading(true, "Mengunggah Logo Baru ke Google Drive...");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Data = e.target.result;
+                
+                this.apiPost({
+                    action: 'update_logo_drive',
+                    base64: base64Data,
+                    fileName: file.name,
+                    mimeType: file.type
+                }).then(res => {
+                    if (res.status === 'sukses') {
+                        localStorage.setItem('app_logo_url', res.url);
+                        this.updateAppLogos(res.url); // Ubah visual logo kasir saat itu juga
+                        this.syncStorage(); // Sinkronkan ke layar pelanggan (CFD)
+                        this.setLoading(false);
+                        this.showToast("Logo Aplikasi Berhasil Diperbarui Secara Global!");
+                    } else {
+                        this.setLoading(false);
+                        this.showToast("Gagal menyimpan logo: " + res.pesan, "error");
+                    }
+                }).catch(() => {
+                    this.setLoading(false);
+                    this.showToast("Koneksi internet bermasalah saat upload", "error");
+                });
+            };
+            reader.readAsDataURL(file);
+        };
+        fileInput.click();
+    },
+    
     syncStorage: function(status = 'ordering', antrian = null) {
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') return;
         localStorage.setItem('ai_snack_cfd', JSON.stringify({ outlet: this.outlet || 'Ai-Snack', items: this.cart, total: this.payTotal, kembali: this.payChange, status: status, antrian: antrian, timestamp: new Date().getTime(), promoUrl: localStorage.getItem('cfd_promo_url') }));
@@ -168,10 +253,25 @@ const superApp = {
     initCFD: function() {
         document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
         const cfdScreen = document.getElementById('cfd-screen'); if (cfdScreen) cfdScreen.classList.remove('hidden');
-        window.addEventListener('storage', (e) => { if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url') { let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if (data.outlet) this.renderCFD(data); } });
+        
+        // Saya juga menambahkan deteksi 'app_logo_url' di sini agar logo di CFD langsung berubah seketika (real-time) saat kasir mengganti logo
+        window.addEventListener('storage', (e) => { 
+            if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_url' || e.key === 'app_logo_url') { 
+                let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if (data.outlet) this.renderCFD(data); 
+                let newLogo = localStorage.getItem('app_logo_url'); if (newLogo) this.updateAppLogos(newLogo);
+            } 
+        });
+        
         let initialData = localStorage.getItem('ai_snack_cfd'); if (initialData) this.renderCFD(JSON.parse(initialData));
-        let savedBg = localStorage.getItem('cfd_promo_url'); if (savedBg) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${savedBg}')`; }
-    },
+        
+        let savedBg = localStorage.getItem('cfd_promo_url'); 
+        if (savedBg) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${savedBg}')`; }
+        
+        // --- LETAK KODINGAN LOGO YANG BENAR (DI DALAM initCFD) ---
+        let savedLogo = localStorage.getItem('app_logo_url');
+        if (savedLogo) { this.updateAppLogos(savedLogo); }
+    }, // <--- Pastikan tanda koma penutup fungsinya ada di sini
+
     renderCFD: function(data) {
         const outNameEl = document.getElementById('cfd-outlet-name'); if (outNameEl) outNameEl.innerText = `Cabang ${data.outlet}`;
         if (data.promoUrl) { const bg = document.getElementById('cfd-promo-bg'); if (bg) bg.style.backgroundImage = `url('${data.promoUrl}')`; }
@@ -179,20 +279,34 @@ const superApp = {
         
         if (data.status === 'paid') { 
             cfdSuccess.classList.remove('hidden'); 
-            // TAMPILKAN NOMOR ANTRIAN DI CFD
-            document.getElementById('cfd-kembali').innerHTML = `${data.kembali.toLocaleString('id-ID')}<br><span class="text-white text-4xl sm:text-5xl mt-6 block drop-shadow-md">NOMOR ANTRIAN ANDA:<br><span class="text-yellow-300 font-black text-6xl sm:text-8xl mt-2 block">${data.antrian || '-'}</span></span>`; 
-            setTimeout(() => { cfdSuccess.classList.add('hidden'); }, 7000); 
-        } else { cfdSuccess.classList.add('hidden'); }
+            
+            // PERBAIKAN 1: Null Safety pada data kembalian (Mencegah blank screen)
+            let kembalianAman = Number(data.kembali || 0).toLocaleString('id-ID');
+            
+            document.getElementById('cfd-kembali').innerHTML = `Rp ${kembalianAman}<br><span class="text-white text-4xl sm:text-5xl mt-6 block drop-shadow-md">NOMOR ANTRIAN ANDA:<br><span class="text-yellow-300 font-black text-6xl sm:text-8xl mt-2 block">${data.antrian || '-'}</span></span>`; 
+            
+            // PERBAIKAN 2: Mencegah timer bentrok jika transaksi terjadi sangat cepat
+            if(this.cfdSuccessTimeout) clearTimeout(this.cfdSuccessTimeout);
+            
+            this.cfdSuccessTimeout = setTimeout(() => { 
+                cfdSuccess.classList.add('hidden'); 
+            }, 7000); 
+            
+        } else { 
+            cfdSuccess.classList.add('hidden'); 
+        }
         
-        if (data.items.length === 0 && data.status !== 'paid') { cfdStandby.classList.remove('opacity-0', 'pointer-events-none'); } 
-        else {
+        if (data.items && data.items.length === 0 && data.status !== 'paid') { 
+            cfdStandby.classList.remove('opacity-0', 'pointer-events-none'); 
+        } 
+        else if (data.items) {
             cfdStandby.classList.add('opacity-0', 'pointer-events-none'); let html = '';
-            data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${i.price.toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div>`; });
+            data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${Number(i.price || 0).toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(Number(i.price || 0) * Number(i.qty || 0)).toLocaleString('id-ID')}</p></div>`; });
             const listEl = document.getElementById('cfd-cart-list'); if (listEl) listEl.innerHTML = html;
-            const totEl = document.getElementById('cfd-total'); if (totEl) totEl.innerText = `Rp ${data.total.toLocaleString('id-ID')}`;
+            const totEl = document.getElementById('cfd-total'); if (totEl) totEl.innerText = `Rp ${Number(data.total || 0).toLocaleString('id-ID')}`;
         }
     },
-
+    
     // STARTUP & LOGIN
     init: async function() {
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
@@ -203,39 +317,89 @@ const superApp = {
         window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
         window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
         
-        try { let queue = localStorage.getItem('aisnack_offline_queue'); this.offlineQueue = queue ? JSON.parse(queue) : []; } catch (e) { this.offlineQueue = []; }
+        try { 
+            let queue = localStorage.getItem('aisnack_offline_queue'); 
+            this.offlineQueue = queue ? JSON.parse(queue) : []; 
+        } catch (e) { 
+            this.offlineQueue = []; 
+        }
 
         try {
             const logStat = document.getElementById('login-status');
             let cacheDb = localStorage.getItem('aisnack_db_cache');
             
-            if (cacheDb) { this.db = JSON.parse(cacheDb); if (logStat) { logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; } } 
-            else { if (logStat) { logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; } }
+            if (cacheDb) { 
+                this.db = JSON.parse(cacheDb); 
+                if (logStat) { 
+                    logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; 
+                    logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
+                } 
+            } else { 
+                if (logStat) { 
+                    logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; 
+                    logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
+                } 
+            }
 
-            let fetchPromise = (async () => {
+            // Fungsi penarik data yang dirapikan
+            let performFetch = async () => {
                 let data = null;
                 for (let i = 0; i < 3; i++) {
-                    try { const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); data = await res.json(); if (data && data.status === 'sukses') break; } 
-                    catch (e) { if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; await new Promise(r => setTimeout(r, 2000)); }
+                    try { 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                        data = await res.json(); 
+                        if (data && data.status === 'sukses') break; 
+                    } catch (e) { 
+                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
+                        await new Promise(r => setTimeout(r, 2000)); 
+                    }
                 }
                 if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
 
-                this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                let promoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD'); if (promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
+                // --- PROSES DATA SUKSES ---
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                
+                // Set Logo
+                let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
+                if (logoData) {
+                    localStorage.setItem('app_logo_url', logoData.Nilai);
+                    this.updateAppLogos(logoData.Nilai); 
+                }
+                
+                // Set Promo CFD
+                let promoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_CFD'); 
+                if (promoData) localStorage.setItem('cfd_promo_url', promoData.Nilai);
 
+                // Set Tanggal Filter Report
                 let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
-                let todayStr = `${yyyy}-${mm}-${dd}`; const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
-                if (fs && !fs.value) fs.value = todayStr; if (fe && !fe.value) fe.value = todayStr;
+                let todayStr = `${yyyy}-${mm}-${dd}`; 
+                const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
+                if (fs && !fs.value) fs.value = todayStr; 
+                if (fe && !fe.value) fe.value = todayStr;
 
-                if (logStat) { logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; }
-            })();
+                if (logStat) { 
+                    logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
+                    logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
+                }
+            };
 
-            if (!cacheDb) await fetchPromise;
+            // Jika tidak ada cache lokal, tunggu sampai download selesai. Jika ada cache, biarkan download berjalan di background.
+            if (!cacheDb) {
+                await performFetch();
+            } else {
+                performFetch(); 
+            }
 
         } catch (err) {
             const logStat = document.getElementById('login-status');
-            if (logStat && this.db) { logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; } 
-            else if (logStat) { logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; }
+            if (logStat && this.db) { 
+                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
+                logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
+            } else if (logStat) { 
+                logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; 
+                logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; 
+            }
         }
     },
     addPin: function(num) {
@@ -269,11 +433,13 @@ const superApp = {
                 if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
                 if (repOut) repOut.innerHTML = outFilters;
                 const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'flex';
+                const btnLogo = document.getElementById('btn-ubah-logo'); if (btnLogo) btnLogo.style.display = 'flex';
             } else {
                 if (adminMenus) adminMenus.classList.add('hidden');
                 if (selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`; selOut.disabled = true; }
                 if (repOut) repOut.classList.add('hidden');
                 const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'none';
+                const btnLogoCancel = document.getElementById('btn-ubah-logo'); if (btnLogoCancel) btnLogoCancel.style.display = 'none';
             }
 
             const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
