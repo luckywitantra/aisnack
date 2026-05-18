@@ -925,14 +925,30 @@ const superApp = {
                 }
             });
         } else {
-            waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n📅 Waktu: ${waktu}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+            // Logika Opname diarahkan menggunakan Helper Pembuat Laporan AI
+            let itemsForWa = [];
+            let kasirName = '';
+            
             (this.db.opname || []).forEach(o => {
                 if (o.Outlet === this.outlet && String(o.Waktu) === waktu) {
-                    let nama = this.db.masterProduk.find(x => x.SKU === o.SKU)?.Nama_Produk || o.SKU;
-                    waText += `🔹 *${nama}*\nSys: ${o.Stok_Sistem} | Fisik: ${o.Stok_Fisik} | Selisih: *${o.Selisih}*\nCatatan: ${o.Keterangan_Fisik || '-'}\n\n`;
+                    kasirName = o.Kasir;
+                    let m = this.db.masterProduk.find(x => x.SKU === o.SKU) || {};
+                    itemsForWa.push({ 
+                        sku: o.SKU, 
+                        nama: m.Nama_Produk || o.SKU, 
+                        kategori: m.Kategori || 'Bahan', 
+                        sys: o.Stok_Sistem, 
+                        fisik: o.Stok_Fisik, 
+                        selisih: o.Selisih, 
+                        note: o.Keterangan_Fisik 
+                    });
                 }
             });
+            
+            // Panggil Fungsi Pabrik Teks (Helper)
+            waText = this.buildOpnameWaText(this.outlet, kasirName, waktu, itemsForWa);
         }
+        
         this.closeModal('modal-wa-history');
         this.showWaModal(waText);
     },
@@ -1018,12 +1034,65 @@ const superApp = {
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
         if (selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if (selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
     },
-    submitOpname: async function() {
+    buildOpnameWaText: function(outlet, kasir, waktu, items) {
+        // 1. Hitung Kecepatan Jualan (Velocity) dari Riwayat Transaksi
+        let productSales = {};
+        let oldestDate = new Date();
+        (this.db.transactions || []).forEach(t => {
+            let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d;
+            if(t.Status === 'Sukses' && t.Outlet === outlet) {
+                let parsedItems = []; try { parsedItems = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                parsedItems.forEach(item => {
+                    let nama = item.nama || 'Unknown';
+                    if(!productSales[nama]) productSales[nama] = 0;
+                    productSales[nama] += Number(item.qty) || 0;
+                });
+            }
+        });
+        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)) || 1;
+
+        // 2. Pisahkan Kategori & Urutkan A-Z
+        let bahanUtama = [];
+        let bahanPendukung = [];
+
+        items.forEach(item => {
+            // Kalkulasi sisa umur stok (Stok Fisik / Rata-rata terjual per hari)
+            let vel = (productSales[item.nama] || 0) / daysActive;
+            let estHari = vel > 0 ? (item.fisik / vel) : 999; 
+            item.estHari = Math.floor(estHari);
+
+            if(String(item.kategori).toLowerCase() === 'bahan') bahanUtama.push(item);
+            else bahanPendukung.push(item);
+        });
+
+        bahanUtama.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        bahanPendukung.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+
+        // 3. Susun Teks WhatsApp
+        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+
+        const renderItems = (arr, title, icon) => {
+            if(arr.length === 0) return '';
+            let txt = `${icon} *${title}*\n`;
+            arr.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`);
+                txt += `🔹 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih}*\n⏳ Estimasi Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
+            });
+            return txt;
+        };
+
+        waText += renderItems(bahanUtama, 'A. BAHAN BAKU UTAMA', '📦');
+        waText += renderItems(bahanPendukung, 'B. BARANG PENDUKUNG', '🧴');
+
+        return waText;
+    },
+   submitOpname: async function() {
         if (this.isProcessing) return;
         if (!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
         this.setLoading(true, "Menyimpan & Mengirim Audit...");
-        let items = [];
-        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+        
+        let itemsToSubmit = [];
+        let itemsForWa = [];
 
         (this.db.masterProduk || []).forEach(m => {
             if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
@@ -1037,15 +1106,20 @@ const superApp = {
                     let noteDesk = document.getElementById(`opn-note-${m.SKU}`); let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
                     let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
 
-                    items.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
-                    let itemName = m.Nama_Produk || 'Unknown';
-                    waText += `🔹 *${itemName}*\nSys: ${sys} | Fisik: ${fisik} | Selisih: *${fisik - sys}*\nCatatan: ${note || '-'}\n\n`;
+                    // Data untuk dikirim ke Google Sheets
+                    itemsToSubmit.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
+                    // Data mentah untuk diolah fungsi Helper WA
+                    itemsForWa.push({ sku: m.SKU, nama: m.Nama_Produk, kategori: m.Kategori, sys: sys, fisik: fisik, selisih: fisik - sys, note: note });
                 }
             }
         });
-        if (items.length === 0) { this.setLoading(false); return this.showToast("Tidak ada stok yang dihitung!", "error"); }
+        
+        if (itemsToSubmit.length === 0) { this.setLoading(false); return this.showToast("Tidak ada stok yang dihitung!", "error"); }
 
-        const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+        // Memanggil Helper untuk mencetak teks WA yang sudah disortir & dianalisa AI
+        let waText = this.buildOpnameWaText(this.outlet, this.currentUser.Username, new Date().toLocaleString('id-ID'), itemsForWa);
+
+        const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: itemsToSubmit };
         let res = await this.apiPost(payload);
         
         if (res.status === 'sukses') {
