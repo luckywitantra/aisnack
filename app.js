@@ -1958,10 +1958,14 @@ const superApp = {
         
         try {
             // 1. Meminta Izin akses perangkat
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-            });
+           // KODE PERBAIKAN:
+const device = await navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: [
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2' // Tambahan UUID umum untuk printer thermal generic
+    ]
+});
             
             this.setLoading(true, "Menghubungkan ke Printer...");
 
