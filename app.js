@@ -432,20 +432,26 @@ const superApp = {
             let isAdmin = String(user.Role).toLowerCase().includes('admin');
             const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
 
-            if (isAdmin) {
+           if (isAdmin) {
                 if (adminMenus) adminMenus.classList.remove('hidden'); if (selOut) selOut.classList.remove('hidden'); if (repOut) repOut.classList.remove('hidden');
                 let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                 (this.db.outlets || []).forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
                 if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
                 if (repOut) repOut.innerHTML = outFilters;
-                const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'flex';
+                
+                // TAMPILKAN 3 TOMBOL KHUSUS ADMIN (Owner)
+                const btnStandby = document.getElementById('btn-promo-standby'); if (btnStandby) btnStandby.style.display = 'flex';
+                const btnTransaksi = document.getElementById('btn-promo-transaksi'); if (btnTransaksi) btnTransaksi.style.display = 'flex';
                 const btnLogo = document.getElementById('btn-ubah-logo'); if (btnLogo) btnLogo.style.display = 'flex';
             } else {
                 if (adminMenus) adminMenus.classList.add('hidden');
                 if (selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`; selOut.disabled = true; }
                 if (repOut) repOut.classList.add('hidden');
-                const btnPromo = document.getElementById('btn-ubah-promo'); if (btnPromo) btnPromo.style.display = 'none';
-                const btnLogoCancel = document.getElementById('btn-ubah-logo'); if (btnLogoCancel) btnLogoCancel.style.display = 'none';
+                
+                // SEMBUNYIKAN 3 TOMBOL DARI KASIR BIASA
+                const btnStandby = document.getElementById('btn-promo-standby'); if (btnStandby) btnStandby.style.display = 'none';
+                const btnTransaksi = document.getElementById('btn-promo-transaksi'); if (btnTransaksi) btnTransaksi.style.display = 'none';
+                const btnLogo = document.getElementById('btn-ubah-logo'); if (btnLogo) btnLogo.style.display = 'none';
             }
 
             const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
@@ -454,18 +460,17 @@ const superApp = {
 
             this.updateNetworkUI(); this.syncOfflineQueue(); this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
             
-            // --- BAGIAN INI YANG DISEMPURNAKAN ---
-            // 1. TULIS DATA OUTLET KE MEMORI (Wajib agar Jendela CFD Menarik Data)
+            // Tulis data ke memori agar CFD tahu cabang yang aktif
             localStorage.setItem('aisnack_active_outlet', this.outlet);
             
-            // 2. Jalankan Sapaan Layar Utama & Cadangan
             this.updateCFDGreeting(); 
             if (!this.cfdTimer) {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
-            // -------------------------------------
 
-        } else { this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); }
+        } else { 
+            this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
+        }
         this.isProcessing = false;
     },
 
