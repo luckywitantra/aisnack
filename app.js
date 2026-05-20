@@ -1,4 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
+
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (IN-APP OSK)     */
 /* ========================================== */
@@ -808,7 +809,7 @@ const superApp = {
     },
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN
-       executeCheckout: async function() {
+    executeCheckout: async function() {
         // Kunci tombol agar tidak terklik ganda, tapi jangan pakai layar loading penuh
         if (this.isProcessing) return; 
         this.isProcessing = true;
@@ -875,7 +876,6 @@ const superApp = {
             console.log("Silent Sync tertunda, masuk ke antrean offline.");
         });
     },
-
 
     // TERIMA BARANG, OPNAME & WA MODAL
     showWaModal: function(waText) {
