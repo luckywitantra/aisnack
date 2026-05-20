@@ -810,7 +810,10 @@ const superApp = {
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN
     executeCheckout: async function() {
-        if (this.isProcessing) return; this.setLoading(true, "Memproses Transaksi...");
+        if (this.isProcessing) return; 
+        
+        // Ubah teks loading agar kasir tahu struk sedang diproses
+        this.setLoading(true, "Mencetak Struk...");
         
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
@@ -820,30 +823,49 @@ const superApp = {
         (this.db.transactions || []).forEach(t => {
             if (t.Outlet === this.outlet && this.cleanDateOnly(t.Tanggal) === todayStrLocal) { countToday++; }
         });
-        let noAntrian = countToday + 1; // Jadikan antrian selanjutnya
+        let noAntrian = countToday + 1;
 
         let trxID = 'TRX' + d.getTime();
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian };
 
+        // ========================================================
+        // 🚀 TRIK INSTAN: CETAK STRUK & UPDATE LAYAR CFD LEBIH DULU
+        // ========================================================
+        try { 
+            await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); 
+        } catch (e) {
+            console.log("Printer belum siap atau dibatalkan");
+        }
+        
+        // Update layar pelanggan (CFD) seketika tanpa nunggu Google
+        this.syncStorage('paid', noAntrian);
+        
+        // Ubah teks loading menjadi menyimpan data
+        this.setLoading(true, "Menyimpan ke Database...");
+
+        // ========================================================
+        // 💾 BARU SIMPAN KE GOOGLE SHEETS DI LATAR BELAKANG
+        // ========================================================
         let res = await this.apiPost(payload);
+        
         if (res.status === 'sukses') {
             this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
-            
-            // Masukkan Antrian ke Struk Cetak
-            try { await this.printReceipt(res.trx_id, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); } catch (e) {}
-            
-            // Masukkan Antrian ke Monitor Pelanggan (CFD)
-            this.syncStorage('paid', noAntrian);
 
+            // Masukkan data ke memori lokal kasir agar muncul di histori
             if (res.is_offline) {
-                this.db.transactions.push({ ID_TRX: res.trx_id, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian });
+                this.db.transactions.push({ ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian });
             } else {
                 const refreshRes = await fetch(API_URL, { redirect: 'follow' });
                 this.db = await refreshRes.json();
             }
             this.refreshData();
         }
-        this.cart = []; this.renderCart(); this.closeModal('modal-payment'); this.setLoading(false);
+        
+        // Bersihkan keranjang dan tutup modal secepat kilat
+        this.cart = []; 
+        this.renderCart(); 
+        this.closeModal('modal-payment'); 
+        this.setLoading(false);
     },
 
     // TERIMA BARANG, OPNAME & WA MODAL
