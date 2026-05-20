@@ -1975,89 +1975,74 @@ const superApp = {
         const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
-    connectBluetooth: async function() {
-        // 1. Mencegah klik ganda brutal dari kasir yang tidak sabar
-        if (this.isBluetoothSearching) return;
+        executeCheckout: async function() {
+        // Kunci tombol agar tidak terklik ganda, tapi jangan pakai layar loading penuh
+        if (this.isProcessing) return; 
+        this.isProcessing = true;
         
-        this.isBluetoothSearching = true; 
-        const btnPrinter = document.getElementById('btn-printer');
-        const statusPrinter = document.getElementById('printer-status');
+        let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+        let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         
-        try {
-            // 2. HARD RESET: Bersihkan sisa koneksi "hantu" sebelum mencari baru
-            if (this.printerDevice && this.printerDevice.gatt.connected) {
-                try { this.printerDevice.gatt.disconnect(); } catch(e) {}
-            }
-            this.printerDevice = null;
-            this.printerCharacteristic = null;
+        // Hitung Antrian Hari Ini
+        let countToday = 0;
+        (this.db.transactions || []).forEach(t => {
+            if (t.Outlet === this.outlet && this.cleanDateOnly(t.Tanggal) === todayStrLocal) { countToday++; }
+        });
+        let noAntrian = countToday + 1;
 
-            // 3. Mulai pemindaian perangkat
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, 
-                optionalServices: [
-                    '000018f0-0000-1000-8000-00805f9b34fb', // Standar
-                    '0000ff00-0000-1000-8000-00805f9b34fb', // Zjiang / Panda / VSC
-                    '0000e700-0000-1000-8000-00805f9b34fb'  // Eppos / Generic China
-                ]
-            });
-            
-            this.setLoading(true, "Menghubungkan ke Printer...");
+        let trxID = 'TRX' + d.getTime();
+        const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian };
 
-            const server = await device.gatt.connect();
-            
-            let service;
-            try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            
-            if(!service) throw new Error("Service Printer tidak ditemukan");
-
-            try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-
-            if(!this.printerCharacteristic) throw new Error("Characteristic Printer gagal diakses");
-
-            this.printerDevice = device;
-
-            if (btnPrinter) {
-                btnPrinter.classList.replace('text-slate-600', 'text-green-600');
-                btnPrinter.classList.add('bg-green-50', 'border-green-200');
-            }
-            if (statusPrinter) statusPrinter.innerText = "Printer Ready";
-
-            this.showToast("Printer Terhubung!", "success");
-            this.setLoading(false);
-
-            // 4. Pastikan tidak ada duplikasi pendengar (listener) error
-            device.ongattserverdisconnected = null; 
-            device.addEventListener('gattserverdisconnected', () => {
-                this.printerCharacteristic = null;
-                if (statusPrinter) statusPrinter.innerText = "Printer Off";
-                if (btnPrinter) {
-                    btnPrinter.classList.remove('bg-green-50', 'border-green-200');
-                    btnPrinter.classList.replace('text-green-600', 'text-slate-600');
-                }
-                this.showToast("Koneksi printer terputus", "warning");
-            });
-            
-        } catch (error) {
-            this.setLoading(false);
-            
-            // 5. PENYELAMATAN UTAMA: Nol-kan seluruh memori Bluetooth jika error/batal
-            this.printerDevice = null;
-            this.printerCharacteristic = null;
-            
-            if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
-                this.showToast("Pencarian dibatalkan. Silakan klik tombol Printer lagi.", "warning");
-            } else {
-                this.showToast("Gagal menyambung ke Printer.", "error");
-            }
-        } finally {
-            // 6. Beri waktu Chrome membersihkan cache internalnya (2 detik) sebelum bisa diklik lagi
-            setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
+        // 1. CETAK STRUK & UPDATE LAYAR CFD (INSTAN)
+        try { 
+            await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); 
+        } catch (e) {
+            console.log("Printer belum siap atau dibatalkan");
         }
+        this.syncStorage('paid', noAntrian);
+
+        // 2. CATAT KE MEMORI LOKAL SECARA PAKSA (OPTIMISTIC UI)
+        if (!this.db.transactions) this.db.transactions = [];
+        this.db.transactions.push({ 
+            ID_TRX: trxID, Tanggal: todayStrLocal, 
+            Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
+            Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, 
+            Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, 
+            Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, 
+            Status: 'Sukses', Antrian: noAntrian 
+        });
+        
+        // Amankan memori lokal agar tidak hilang jika di-refresh
+        localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+        
+        // Perbarui layar rekap & histori saat itu juga
+        this.refreshData(); 
+        
+        this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
+
+        // 3. BERSIHKAN LAYAR KASIR (0 DETIK - SIAP LAYANI PELANGGAN BERIKUTNYA)
+        this.cart = []; 
+        this.renderCart(); 
+        this.closeModal('modal-payment'); 
+        this.isProcessing = false; // Buka kunci tombol untuk pelanggan selanjutnya
+
+        // ========================================================
+        // 4. SILENT BACKGROUND SYNC (Proses Gaib Tanpa Ditunggu Kasir)
+        // ========================================================
+        this.apiPost(payload).then(res => {
+            // Jika sukses, Google Sheets sudah menerima data.
+            // Jika gagal secara aneh dari server (tapi internet nyala), lempar ke antrean offline.
+            if (res && res.status !== 'sukses' && !res.is_offline) {
+               this.offlineQueue.push(payload);
+               localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
+               this.updateNetworkUI();
+            }
+        }).catch(err => {
+            // Jika error koneksi, apiPost sudah otomatis memasukkannya ke offlineQueue.
+            console.log("Silent Sync tertunda, masuk ke antrean offline.");
+        });
     },
+
     
     // FUNGSI PENGINGAT & PENYAMBUNG OTOMATIS
     autoConnectPrinter: async function() {
