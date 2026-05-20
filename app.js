@@ -1951,38 +1951,44 @@ const superApp = {
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
     connectBluetooth: async function() {
-        // Tandai bahwa kita sedang mencari bluetooth agar CFD tidak mengganggu
         this.isBluetoothSearching = true; 
         const btnPrinter = document.getElementById('btn-printer');
         const statusPrinter = document.getElementById('printer-status');
         
         try {
-            // 1. Meminta Izin akses perangkat
-           // KODE PERBAIKAN:
-const device = await navigator.bluetooth.requestDevice({
-    acceptAllDevices: true,
-    optionalServices: [
-        '000018f0-0000-1000-8000-00805f9b34fb',
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2' // Tambahan UUID umum untuk printer thermal generic
-    ]
-});
+            // MODE SAPU JAGAT: Mengizinkan semua perangkat terdeteksi
+            // dengan daftar kunci UUID printer murah dari China
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [
+                    '000018f0-0000-1000-8000-00805f9b34fb', // Standar
+                    '0000ff00-0000-1000-8000-00805f9b34fb', // Zjiang / Panda / VSC
+                    '0000e700-0000-1000-8000-00805f9b34fb'  // Eppos / Generic China
+                ]
+            });
             
             this.setLoading(true, "Menghubungkan ke Printer...");
 
-            // 2. Melakukan Koneksi ke GATT Server
             const server = await device.gatt.connect();
             
-            // 3. Mendapatkan Service Printer
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            // LOGIKA PENCARI SERVICE OTOMATIS:
+            // Aplikasi akan mengecek pintu mana yang terbuka dari ketiga opsi di atas
+            let service;
+            try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
             
-            // 4. Mendapatkan Characteristic untuk Menulis Data (Write)
-            // Umumnya printer thermal menggunakan UUID 2af1 atau yang sama dengan service
-            this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-            
-            // Simpan referensi perangkat agar bisa dideteksi jika terputus
+            if(!service) throw new Error("Service Printer tidak ditemukan");
+
+            // LOGIKA PENCARI CHARACTERISTIC OTOMATIS:
+            try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+
+            if(!this.printerCharacteristic) throw new Error("Characteristic Printer gagal diakses");
+
             this.printerDevice = device;
 
-            // 5. Update UI menjadi Terhubung
             if (btnPrinter) {
                 btnPrinter.classList.replace('text-slate-600', 'text-green-600');
                 btnPrinter.classList.add('bg-green-50', 'border-green-200');
@@ -1992,7 +1998,6 @@ const device = await navigator.bluetooth.requestDevice({
             this.showToast("Printer Terhubung!", "success");
             this.setLoading(false);
 
-            // Handler jika printer tiba-tiba mati atau keluar jangkauan
             device.addEventListener('gattserverdisconnected', () => {
                 this.printerCharacteristic = null;
                 if (statusPrinter) statusPrinter.innerText = "Printer Off";
@@ -2012,11 +2017,10 @@ const device = await navigator.bluetooth.requestDevice({
                 this.showToast("Gagal menyambungkan printer", "error");
             }
         } finally {
-            // Setelah selesai (berhasil atau batal), kembalikan status ke false
-            // Beri jeda 2 detik agar popup sistem benar-benar hilang sebelum CFD ambil fokus
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
         }
     },
+    
     printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
         // PERBAIKAN 1: Sesuaikan dengan nama variabel di connectBluetooth
         if (!this.printerCharacteristic) {
