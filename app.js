@@ -468,6 +468,9 @@ const superApp = {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
 
+            // TAMBAHKAN BARIS INI: Coba auto-connect printer di latar belakang
+            setTimeout(() => { this.autoConnectPrinter(); }, 1500);
+
         } else { 
             this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
         }
@@ -2018,6 +2021,69 @@ const superApp = {
             }
         } finally {
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
+        }
+    },
+    
+    // FUNGSI PENGINGAT & PENYAMBUNG OTOMATIS
+    autoConnectPrinter: async function() {
+        // Cek apakah browser mendukung fitur pengingat Bluetooth
+        if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
+            console.log("Browser tidak mendukung auto-connect Bluetooth");
+            return;
+        }
+
+        try {
+            // Tarik memori perangkat yang pernah diizinkan oleh kasir
+            const devices = await navigator.bluetooth.getDevices();
+            
+            if (devices.length > 0) {
+                // Ambil printer pertama yang ada di ingatan
+                const device = devices[0];
+                console.log("Mencoba menyambung otomatis ke:", device.name);
+                
+                // Coba lakukan koneksi secara diam-diam (background)
+                const server = await device.gatt.connect();
+                
+                let service;
+                try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+                if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+                if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+                
+                if(!service) throw new Error("Service tidak cocok");
+
+                try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+                if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+                if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+
+                if (this.printerCharacteristic) {
+                    this.printerDevice = device;
+                    
+                    // Ubah UI menjadi hijau (Ready)
+                    const btnPrinter = document.getElementById('btn-printer');
+                    const statusPrinter = document.getElementById('printer-status');
+                    if (btnPrinter) {
+                        btnPrinter.classList.replace('text-slate-600', 'text-green-600');
+                        btnPrinter.classList.add('bg-green-50', 'border-green-200');
+                    }
+                    if (statusPrinter) statusPrinter.innerText = "Printer Ready";
+                    
+                    this.showToast("Printer otomatis tersambung!", "success");
+
+                    // Pasang alarm jika printer tiba-tiba dimatikan
+                    device.addEventListener('gattserverdisconnected', () => {
+                        this.printerCharacteristic = null;
+                        if (statusPrinter) statusPrinter.innerText = "Printer Off";
+                        if (btnPrinter) {
+                            btnPrinter.classList.remove('bg-green-50', 'border-green-200');
+                            btnPrinter.classList.replace('text-green-600', 'text-slate-600');
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.log("Auto-connect diblokir browser atau printer mati:", error);
+            // Gagal diam-diam tidak perlu memunculkan error mencolok ke kasir, 
+            // biarkan mereka pakai tombol manual jika auto-connect gagal.
         }
     },
     
