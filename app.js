@@ -468,6 +468,9 @@ const superApp = {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
 
+            // TAMBAHKAN BARIS INI: Coba auto-connect printer di latar belakang
+            setTimeout(() => { this.autoConnectPrinter(); }, 1500);
+
         } else { 
             this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
         }
@@ -1951,80 +1954,60 @@ const superApp = {
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
     connectBluetooth: async function() {
-        // 1. Kunci pengaman dari kasir yang menekan tombol berkali-kali
+        // 1. Mencegah klik ganda brutal dari kasir yang tidak sabar
         if (this.isBluetoothSearching) return;
-        this.isBluetoothSearching = true; 
         
+        this.isBluetoothSearching = true; 
         const btnPrinter = document.getElementById('btn-printer');
         const statusPrinter = document.getElementById('printer-status');
-        this.setLoading(true, "Mengecek Printer...");
-
+        
         try {
-            // 2. HARD RESET: Bersihkan memori hantu dari sisa koneksi sebelumnya
+            // 2. HARD RESET: Bersihkan sisa koneksi "hantu" sebelum mencari baru
             if (this.printerDevice && this.printerDevice.gatt.connected) {
                 try { this.printerDevice.gatt.disconnect(); } catch(e) {}
             }
             this.printerDevice = null;
             this.printerCharacteristic = null;
 
-            let device = null;
-            let server = null;
+            // 3. Mulai pemindaian perangkat
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [
+                    '000018f0-0000-1000-8000-00805f9b34fb', // Standar
+                    '0000ff00-0000-1000-8000-00805f9b34fb', // Zjiang / Panda / VSC
+                    '0000e700-0000-1000-8000-00805f9b34fb'  // Eppos / Generic China
+                ]
+            });
+            
+            this.setLoading(true, "Menghubungkan ke Printer...");
 
-            // 3. SMART RECONNECT: Coba masuk diam-diam tanpa pop-up browser
-            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
-                const devices = await navigator.bluetooth.getDevices();
-                if (devices.length > 0) {
-                    try {
-                        device = devices[0];
-                        server = await device.gatt.connect(); // Bangunkan printer!
-                    } catch (e) {
-                        console.log("Printer lama mati/error, melupakan device...", e);
-                        // Fitur baru: Hapus memori printer jika ternyata printernya sudah mati/rusak
-                        if (device.forget) await device.forget(); 
-                        device = null; 
-                        server = null;
-                    }
-                }
-            }
-
-            // 4. JIKA INGATAN KOSONG/GAGAL: Baru munculkan pop-up pencarian Chrome
-            if (!server) {
-                this.setLoading(true, "Mencari Perangkat Baru...");
-                device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, 
-                    optionalServices: [
-                        '000018f0-0000-1000-8000-00805f9b34fb', // Standar
-                        '0000ff00-0000-1000-8000-00805f9b34fb', // Zjiang / Panda / VSC
-                        '0000e700-0000-1000-8000-00805f9b34fb'  // Eppos / China Generik
-                    ]
-                });
-                this.setLoading(true, "Mengawinkan Perangkat...");
-                server = await device.gatt.connect();
-            }
-
-            // 5. DETEKSI OTOMATIS: Cari pintu data yang cocok dengan merk printer
+            const server = await device.gatt.connect();
+            
             let service;
             try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
             if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
             if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            
             if(!service) throw new Error("Service Printer tidak ditemukan");
 
             try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
             if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
             if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!this.printerCharacteristic) throw new Error("Characteristic gagal diakses");
 
-            // --- SUKSES MENYAMBUNG ---
+            if(!this.printerCharacteristic) throw new Error("Characteristic Printer gagal diakses");
+
             this.printerDevice = device;
+
             if (btnPrinter) {
                 btnPrinter.classList.replace('text-slate-600', 'text-green-600');
                 btnPrinter.classList.add('bg-green-50', 'border-green-200');
             }
             if (statusPrinter) statusPrinter.innerText = "Printer Ready";
 
-            this.showToast("Printer Terhubung & Siap Cetak!", "success");
+            this.showToast("Printer Terhubung!", "success");
             this.setLoading(false);
 
+            // 4. Pastikan tidak ada duplikasi pendengar (listener) error
             device.ongattserverdisconnected = null; 
             device.addEventListener('gattserverdisconnected', () => {
                 this.printerCharacteristic = null;
@@ -2039,17 +2022,17 @@ const superApp = {
         } catch (error) {
             this.setLoading(false);
             
-            // PENYELAMATAN ERROR: Bersihkan memori agar tombol bisa ditekan ulang!
+            // 5. PENYELAMATAN UTAMA: Nol-kan seluruh memori Bluetooth jika error/batal
             this.printerDevice = null;
             this.printerCharacteristic = null;
             
             if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
-                this.showToast("Pencarian dibatalkan.", "warning");
+                this.showToast("Pencarian dibatalkan. Silakan klik tombol Printer lagi.", "warning");
             } else {
                 this.showToast("Gagal menyambung ke Printer.", "error");
             }
         } finally {
-            // Beri jeda sistem 2 detik sebelum tombol boleh ditekan ulang
+            // 6. Beri waktu Chrome membersihkan cache internalnya (2 detik) sebelum bisa diklik lagi
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
         }
     },
