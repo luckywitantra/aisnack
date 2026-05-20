@@ -55,3 +55,10 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// Memaksa Service Worker baru untuk langsung mengambil alih (Update) saat tombol ditekan
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'skipWaiting') {
+        self.skipWaiting();
+    }
+});
