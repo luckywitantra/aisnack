@@ -112,7 +112,6 @@ const superApp = {
         let parts = s.split(' '); 
         return parts.length > 1 ? parts[1] : s;
     },
-    
     parseDateId: function(dateStr) {
         if (!dateStr) return new Date(0); let s = String(dateStr); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
         if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
@@ -355,8 +354,46 @@ const superApp = {
         }
     },
     
-    // STARTUP & LOGIN
+   // STARTUP & LOGIN
     init: async function() {
+        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(registration => {
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        // Jika ada service worker baru yang terinstal dan siap mengambil alih
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            const banner = document.getElementById('update-banner');
+                            if (banner) {
+                                banner.classList.remove('hidden');
+                                setTimeout(() => {
+                                    banner.classList.remove('translate-y-20', 'opacity-0');
+                                }, 100);
+                            }
+                            
+                            const btn = document.getElementById('btn-update-app');
+                            if (btn) {
+                                btn.onclick = () => {
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                                    newWorker.postMessage({ action: 'skipWaiting' });
+                                };
+                            }
+                        }
+                    });
+                });
+            }).catch(err => console.log('SW Reg Error:', err));
+
+            // Eksekusi muat ulang (reload) saat mesin PWA berhasil diperbarui
+            let refreshing;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+        }
+        // ----------------------------------------------
+
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
 
         document.addEventListener("visibilitychange", () => { if (document.hidden && this.cfdWindow && !this.cfdWindow.closed) { this.cfdWindow.close(); } });
@@ -477,7 +514,7 @@ const superApp = {
             let isAdmin = String(user.Role).toLowerCase().includes('admin');
             const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
 
-           if (isAdmin) {
+            if (isAdmin) {
                 if (adminMenus) adminMenus.classList.remove('hidden'); if (selOut) selOut.classList.remove('hidden'); if (repOut) repOut.classList.remove('hidden');
                 let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                 (this.db.outlets || []).forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
@@ -512,8 +549,6 @@ const superApp = {
             if (!this.cfdTimer) {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
-
-            
 
         } else { 
             this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
@@ -2057,7 +2092,7 @@ const superApp = {
                         server = await device.gatt.connect(); // Bangunkan printer!
                     } catch (e) {
                         console.log("Printer lama mati/error, melupakan device...", e);
-                        // Fitur baru: Hapus memori printer jika ternyata printernya sudah mati/rusak
+                        // Hapus memori printer jika ternyata printernya sudah mati/rusak
                         if (device.forget) await device.forget(); 
                         device = null; 
                         server = null;
@@ -2073,23 +2108,42 @@ const superApp = {
                     optionalServices: [
                         '000018f0-0000-1000-8000-00805f9b34fb', // Standar
                         '0000ff00-0000-1000-8000-00805f9b34fb', // Zjiang / Panda / VSC
-                        '0000e700-0000-1000-8000-00805f9b34fb'  // Eppos / China Generik
+                        '0000e700-0000-1000-8000-00805f9b34fb', // Eppos
+                        '0000fee7-0000-1000-8000-00805f9b34fb', // Beberapa Iware / Xprinter
+                        'e7810a71-73ae-499d-8c15-faa9aef0c3f2'  // BLE Serial khusus
                     ]
                 });
                 this.setLoading(true, "Mengawinkan Perangkat...");
                 server = await device.gatt.connect();
             }
 
-            // 5. DETEKSI OTOMATIS: Cari pintu data yang cocok dengan merk printer
+            // 5. DETEKSI OTOMATIS (ULTIMATE): Cari pintu data yang cocok dengan merk printer
             let service;
-            try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            const serviceUUIDs = [
+                '000018f0-0000-1000-8000-00805f9b34fb',
+                '0000ff00-0000-1000-8000-00805f9b34fb',
+                '0000e700-0000-1000-8000-00805f9b34fb',
+                '0000fee7-0000-1000-8000-00805f9b34fb',
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2'
+            ];
+
+            for (let uuid of serviceUUIDs) {
+                try { service = await server.getPrimaryService(uuid); if(service) break; } catch(e) {}
+            }
             if(!service) throw new Error("Service Printer tidak ditemukan");
 
-            try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-            if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
+            // 6. DETEKSI CHARACTERISTIC OTOMATIS (ULTIMATE)
+            const charUUIDs = [
+                '00002af1-0000-1000-8000-00805f9b34fb',
+                '0000ff02-0000-1000-8000-00805f9b34fb',
+                '0000e701-0000-1000-8000-00805f9b34fb',
+                '0000fec8-0000-1000-8000-00805f9b34fb', // Pasangan fee7
+                'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'  // Pasangan e781
+            ];
+
+            for (let uuid of charUUIDs) {
+                try { this.printerCharacteristic = await service.getCharacteristic(uuid); if(this.printerCharacteristic) break; } catch(e) {}
+            }
             if(!this.printerCharacteristic) throw new Error("Characteristic gagal diakses");
 
             // --- SUKSES MENYAMBUNG ---
@@ -2103,6 +2157,7 @@ const superApp = {
             this.showToast("Printer Terhubung & Siap Cetak!", "success");
             this.setLoading(false);
 
+            // Mencegah double-listener error
             device.ongattserverdisconnected = null; 
             device.addEventListener('gattserverdisconnected', () => {
                 this.printerCharacteristic = null;
@@ -2129,69 +2184,6 @@ const superApp = {
         } finally {
             // Beri jeda sistem 2 detik sebelum tombol boleh ditekan ulang
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
-        }
-    },
-    
-    // FUNGSI PENGINGAT & PENYAMBUNG OTOMATIS
-    autoConnectPrinter: async function() {
-        // Cek apakah browser mendukung fitur pengingat Bluetooth
-        if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
-            console.log("Browser tidak mendukung auto-connect Bluetooth");
-            return;
-        }
-
-        try {
-            // Tarik memori perangkat yang pernah diizinkan oleh kasir
-            const devices = await navigator.bluetooth.getDevices();
-            
-            if (devices.length > 0) {
-                // Ambil printer pertama yang ada di ingatan
-                const device = devices[0];
-                console.log("Mencoba menyambung otomatis ke:", device.name);
-                
-                // Coba lakukan koneksi secara diam-diam (background)
-                const server = await device.gatt.connect();
-                
-                let service;
-                try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-                if(!service) try { service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-                if(!service) try { service = await server.getPrimaryService('0000e700-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-                
-                if(!service) throw new Error("Service tidak cocok");
-
-                try { this.printerCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-                if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-                if(!this.printerCharacteristic) try { this.printerCharacteristic = await service.getCharacteristic('0000e701-0000-1000-8000-00805f9b34fb'); } catch(e) {}
-
-                if (this.printerCharacteristic) {
-                    this.printerDevice = device;
-                    
-                    // Ubah UI menjadi hijau (Ready)
-                    const btnPrinter = document.getElementById('btn-printer');
-                    const statusPrinter = document.getElementById('printer-status');
-                    if (btnPrinter) {
-                        btnPrinter.classList.replace('text-slate-600', 'text-green-600');
-                        btnPrinter.classList.add('bg-green-50', 'border-green-200');
-                    }
-                    if (statusPrinter) statusPrinter.innerText = "Printer Ready";
-                    
-                    this.showToast("Printer otomatis tersambung!", "success");
-
-                    // Pasang alarm jika printer tiba-tiba dimatikan
-                    device.addEventListener('gattserverdisconnected', () => {
-                        this.printerCharacteristic = null;
-                        if (statusPrinter) statusPrinter.innerText = "Printer Off";
-                        if (btnPrinter) {
-                            btnPrinter.classList.remove('bg-green-50', 'border-green-200');
-                            btnPrinter.classList.replace('text-green-600', 'text-slate-600');
-                        }
-                    });
-                }
-            }
-        } catch (error) {
-            console.log("Auto-connect diblokir browser atau printer mati:", error);
-            // Gagal diam-diam tidak perlu memunculkan error mencolok ke kasir, 
-            // biarkan mereka pakai tombol manual jika auto-connect gagal.
         }
     },
     
@@ -2237,3 +2229,4 @@ const superApp = {
 };
 
 window.onload = () => superApp.init();
+
