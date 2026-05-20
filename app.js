@@ -56,18 +56,63 @@ const superApp = {
     // FORMATTER & PARSER
     formatRupiahInput: function(el) { let val = el.value.replace(/[^0-9]/g, ''); el.value = val !== '' ? parseInt(val, 10).toLocaleString('id-ID') : ''; },
     getNumericValue: function(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; },
+    
     cleanDateOnly: function(str) {
-        if (!str) return ''; let s = String(str); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; }
-        if (s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; } }
+        if (!str) return ''; 
+        let s = String(str).trim();
+        
+        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
+        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
+            let d = new Date(s); 
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; 
+            } 
+        }
+        
+        // 2. Cek jika data berupa teks manual
+        let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; 
+        }
         return s.split(' ')[0];
     },
+
     cleanTimeOnly: function(str) {
-        if (!str) return ''; let s = String(str); let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { let pad = n => String(n).length < 2 ? '0' + n : n; return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; }
-        if (s.includes('T') && s.includes('Z')) { let d = new Date(s); if (!isNaN(d.getTime())) { let pad = n => n < 10 ? '0' + n : n; return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; } }
-        let parts = s.split(' '); return parts.length > 1 ? parts[1] : s;
+        if (!str) return '00.00.00'; 
+        let s = String(str).trim();
+
+        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
+        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
+            let d = new Date(s); 
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
+            } 
+        }
+
+        // 2. Cek jika data berupa Desimal Murni (Cara Google Sheets simpan nilai Waktu)
+        if (!isNaN(Number(s)) && Number(s) > 0 && Number(s) < 1) {
+            let totalSec = Math.floor(Number(s) * 86400);
+            let h = Math.floor(totalSec / 3600);
+            let m = Math.floor((totalSec % 3600) / 60);
+            let sec = totalSec % 60;
+            let pad = n => n < 10 ? '0' + n : n;
+            return `${pad(h)}.${pad(m)}.${pad(sec)}`;
+        }
+
+        // 3. Cek jika data berupa teks manual dari kasir (HH.MM.SS atau HH:MM:SS)
+        let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
+        }
+        
+        let parts = s.split(' '); 
+        return parts.length > 1 ? parts[1] : s;
     },
+    
     parseDateId: function(dateStr) {
         if (!dateStr) return new Date(0); let s = String(dateStr); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
         if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
