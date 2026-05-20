@@ -1,5 +1,4 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbzIG5gEXEfMeOiwJUd7SGROqcVWktQnsvQJFgW5HKBE5lXeH1hR6S1fIrCw1xpmLyl-rA/exec"; // <-- GANTI DENGAN URL API ANDA
-
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (IN-APP OSK)     */
 /* ========================================== */
