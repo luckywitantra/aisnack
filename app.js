@@ -123,10 +123,7 @@ const superApp = {
     // GLOBAL UTILS
     // Tambahkan parameter silent (default false)
     pullFreshData: async function(silent = false) {
-        // Jika sedang loading (karena aksi lain), jangan dipaksa
         if (this.isProcessing && !silent) return; 
-        
-        // Hanya tampilkan loading jika bukan mode senyap
         if (!silent) this.setLoading(true, "Menarik Data Terbaru...");
         
         try {
@@ -134,11 +131,43 @@ const superApp = {
             const data = await res.json();
             
             if (data && data.status === 'sukses') { 
+                
+                // --- 🚀 RADAR PENDETEKSI UPDATE VERSI KODINGAN ---
+                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+                if (serverVersion) {
+                    let localVersion = localStorage.getItem('app_version');
+                    
+                    // Jika baru pertama kali buka, simpan versinya
+                    if (!localVersion) {
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                    } 
+                    // JIKA VERSI DI GOOGLE SHEETS BERBEDA DENGAN DI HP KASIR
+                    else if (localVersion !== serverVersion.Nilai) {
+                        
+                        // 1. Tampilkan Pop-up Pembaruan Paksa
+                        alert(`🚀 UPDATE SISTEM TERSEDIA!\n\nKodingan versi baru (${serverVersion.Nilai}) telah dirilis oleh Owner.\n\nSistem akan dimuat ulang (Refresh) secara otomatis untuk menerapkan pembaruan.`);
+                        
+                        // 2. Perbarui ingatan memori versi di HP
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                        
+                        // 3. Paksa Service Worker PWA untuk memeriksa pembaruan file cache
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                                for(let registration of registrations) { registration.update(); }
+                            });
+                        }
+                        
+                        // 4. Paksa aplikasi memuat ulang (reload) detik itu juga
+                        window.location.reload(true);
+                        return; // Hentikan fungsi ke bawah agar data lama tidak ditimpa
+                    }
+                }
+                // ------------------------------------------------
+                
                 this.db = data; 
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
                 
-                // PENTING: Hanya refresh UI jika keranjang sedang kosong 
-                // agar tidak mengganggu kasir yang sedang mengetik pesanan
+                // Hanya perbarui layar jika keranjang kosong (tidak mengganggu transaksi)
                 if (this.cart.length === 0) {
                     this.refreshData(); 
                 }
@@ -151,6 +180,7 @@ const superApp = {
         
         if (!silent) this.setLoading(false);
     },
+    
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
         const container = document.getElementById('toast-container'); if (!container) return;
