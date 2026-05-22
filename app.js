@@ -2230,3 +2230,9 @@ const superApp = {
 
 window.onload = () => superApp.init();
 
+// Tambahkan ini di bawah window.onload = () => superApp.init();
+setInterval(() => {
+    if (superApp.isOnline) {
+        superApp.pullFreshData(); // Memaksa tarik data setiap 5 menit (300.000 ms)
+    }
+}, 60000);
