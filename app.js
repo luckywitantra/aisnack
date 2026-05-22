@@ -121,14 +121,35 @@ const superApp = {
     },
 
     // GLOBAL UTILS
-    pullFreshData: async function() {
-        if (this.isProcessing) return; this.setLoading(true, "Menarik Data Terbaru...");
+    // Tambahkan parameter silent (default false)
+    pullFreshData: async function(silent = false) {
+        // Jika sedang loading (karena aksi lain), jangan dipaksa
+        if (this.isProcessing && !silent) return; 
+        
+        // Hanya tampilkan loading jika bukan mode senyap
+        if (!silent) this.setLoading(true, "Menarik Data Terbaru...");
+        
         try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); const data = await res.json();
-            if (data && data.status === 'sukses') { this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); this.refreshData(); this.showToast("Data diperbarui!"); } 
-            else throw new Error("Gagal");
-        } catch (e) { this.showToast("Gagal menarik data.", "error"); }
-        this.setLoading(false);
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+            const data = await res.json();
+            
+            if (data && data.status === 'sukses') { 
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
+                
+                // PENTING: Hanya refresh UI jika keranjang sedang kosong 
+                // agar tidak mengganggu kasir yang sedang mengetik pesanan
+                if (this.cart.length === 0) {
+                    this.refreshData(); 
+                }
+                
+                if (!silent) this.showToast("Data diperbarui!"); 
+            } 
+        } catch (e) { 
+            if (!silent) this.showToast("Gagal menarik data.", "error"); 
+        }
+        
+        if (!silent) this.setLoading(false);
     },
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
@@ -2235,4 +2256,4 @@ setInterval(() => {
     if (superApp.isOnline) {
         superApp.pullFreshData(); // Memaksa tarik data setiap 5 menit (300.000 ms)
     }
-}, 60000);
+}, 300000);
