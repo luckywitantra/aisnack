@@ -158,7 +158,7 @@ const superApp = {
         this.showToast("Menyinkronkan data offline...", "warning"); let failedQueue = [];
         for (let i = 0; i < this.offlineQueue.length; i++) { try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(this.offlineQueue[i]) }); } catch (e) { failedQueue.push(this.offlineQueue[i]); } }
         this.offlineQueue = failedQueue; localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
-        if (this.offlineQueue.length === 0) { this.showToast("Tersinkronisasi!"); try { const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); } catch (e) {} }
+        if (this.offlineQueue.length === 0) { this.showToast("Tersinkronisasi!"); try { const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await res.json(); this.refreshData(); } catch (e) {} }
         this.updateNetworkUI();
     },
     updateNetworkUI: function() {
@@ -677,7 +677,7 @@ const superApp = {
                 this.db.kasKeluar.push({ ID_Kas: kasId, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Nominal: nom, Keterangan: ket, ID_Shift: this.activeShiftId });
             }
             this.closeModal('modal-kas-keluar'); this.showToast("Kas Keluar Tersimpan.");
-            if (!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+            if (!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
         }
         this.setLoading(false);
     },
@@ -1112,7 +1112,7 @@ const superApp = {
         if (res.status === 'sukses') {
             this.showToast("Berhasil Disimpan di Sistem!");
             this.showWaModal(waText);
-            if (!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
+            if (!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
             else { this.switchMenu('pos'); }
         }
         this.setLoading(false);
@@ -1243,7 +1243,7 @@ const superApp = {
         if (res.status === 'sukses') {
             this.showToast("Opname berhasil Disimpan!");
             this.showWaModal(waText);
-            if (!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
+            if (!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); this.switchMenu('pos'); }
             else { this.switchMenu('pos'); }
         }
         this.setLoading(false);
@@ -1316,7 +1316,7 @@ const superApp = {
                 await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_mutasi', items: items, status_app: status }) });
             }
             this.showToast(`Proses Masal Selesai!`);
-            const res = await fetch(API_URL, { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
         } catch (e) { this.showToast("Gagal memproses", "error"); }
         this.setLoading(false);
     },
@@ -1370,7 +1370,7 @@ const superApp = {
 
         if (res.status === 'sukses') {
             this.closeModal('modal-form'); this.showToast("Transfer dikirim! Menunggu Penerimaan di toko tujuan.");
-            if (!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            if (!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); }
             this.refreshData();
         } else { this.setLoading(false); }
     },
@@ -1671,7 +1671,7 @@ const superApp = {
             let cleanTime = this.cleanTimeOnly(t.Waktu);
             try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, 'Batal', cleanDate + ' ' + cleanTime, t.Antrian); } catch(e){}
 
-            if(!res.is_offline) { const refreshRes = await fetch(API_URL, { redirect: 'follow' }); this.db = await refreshRes.json(); }
+            if(!res.is_offline) { const refreshRes = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await refreshRes.json(); }
             this.refreshData(); this.closeModal('modal-detail');
         }
         this.setLoading(false);
@@ -1897,7 +1897,7 @@ const superApp = {
         let res = await this.apiPost(payload);
         if(res.status === 'sukses') {
             this.closeModal('modal-form'); 
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); }
             this.refreshData(); 
         }
         this.setLoading(false);
@@ -1908,7 +1908,7 @@ const superApp = {
         this.setLoading(true, "Menghapus dari Cabang...");
         const payload = { action: 'delete_outlet_product', sku: sku, outlet: this.outlet };
         let res = await this.apiPost(payload);
-        if(res.status === 'sukses') { this.showToast("Dihapus dari cabang."); if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); } }
+        if(res.status === 'sukses') { this.showToast("Dihapus dari cabang."); if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); } }
         this.setLoading(false);
     },
     openRestokModal: function() {
@@ -1927,7 +1927,7 @@ const superApp = {
         
         if(res.status === 'sukses') {
             this.closeModal('modal-form'); 
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); }
             this.refreshData(); 
         }
         this.setLoading(false);
@@ -1968,7 +1968,7 @@ const superApp = {
         
         if(res.status === 'sukses') {
             this.closeModal('modal-form'); 
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); }
             this.refreshData(); 
         }
         this.setLoading(false);
@@ -1994,7 +1994,7 @@ const superApp = {
         let res = await this.apiPost(payload);
         if(res.status === 'sukses') {
             this.closeModal('modal-form'); 
-            if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); }
+            if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); }
             this.refreshData(); 
         }
         this.setLoading(false);
@@ -2004,7 +2004,7 @@ const superApp = {
         if(!confirm(`Yakin hapus data ini?`)) return; this.setLoading(true, "Menghapus...");
         const payload = { action: 'delete', sheetName: sheet, id: id };
         let res = await this.apiPost(payload);
-        if(!res.is_offline) { const r = await fetch(API_URL, { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+        if(!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
         this.setLoading(false);
     },
 
