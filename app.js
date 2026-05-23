@@ -630,7 +630,7 @@ const superApp = {
         const greetTimeEl = document.getElementById('cfd-greeting-time');
         const greetOutletEl = document.getElementById('cfd-greeting-outlet');
         if (greetTimeEl) greetTimeEl.innerText = ucapanWaktu;
-        if (greetOutletEl) greetOutletEl.innerText = `Selamat datang di ${namaOutlet}, silakan pesan di kasir`;
+        if (greetOutletEl) greetOutletEl.innerText = `Selamat datang di Ai-CHA ${namaOutlet}, silakan pesan di kasir`;
 
         // 4. UBAH DI LAYAR CFD (MENYEBERANG KE JENDELA KEDUA SEBAGAI CADANGAN)
         if (this.cfdWindow && !this.cfdWindow.closed) {
@@ -638,7 +638,7 @@ const superApp = {
                 const cfdTimeEl = this.cfdWindow.document.getElementById('cfd-greeting-time');
                 const cfdOutletEl = this.cfdWindow.document.getElementById('cfd-greeting-outlet');
                 if (cfdTimeEl) cfdTimeEl.innerText = ucapanWaktu;
-                if (cfdOutletEl) cfdOutletEl.innerText = `Selamat datang di ${namaOutlet}, silakan pesan di kasir`;
+                if (cfdOutletEl) cfdOutletEl.innerText = `Selamat datang di Ai-CHA ${namaOutlet}, silakan pesan di kasir`;
             } catch (e) {
                 console.log("Menunggu layar CFD siap...");
             }
