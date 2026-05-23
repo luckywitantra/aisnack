@@ -237,7 +237,7 @@ const superApp = {
         if (this.cfdWindow) {
             this.cfdWindow.focus();
             if (!this.cfdFocusHandlerAdded) {
-                window.addEventListener('focus', () => { if (this.cfdWindow && !this.cfdWindow.closed && localStorage.getItem('cfd_wants_open') === 'true') { this.cfdWindow.focus(); this.syncStorage(); } });
+                window.addEventListener('focus', () => { if (this.cfdWindow && !this.cfdWindow.closed && localStorage.getItem('cfd_wants_open') === 'true') { this.syncStorage(); } });
                 this.cfdFocusHandlerAdded = true;
             }
         }
@@ -448,7 +448,7 @@ const superApp = {
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
 
         document.addEventListener("visibilitychange", () => { if (document.hidden && this.cfdWindow && !this.cfdWindow.closed) { this.cfdWindow.close(); } });
-        document.addEventListener("click", () => { if (this.currentUser && localStorage.getItem('cfd_wants_open') === 'true') { if (!this.cfdWindow || this.cfdWindow.closed) { this.openCFD(true); } else { this.cfdWindow.focus(); } } });
+        document.addEventListener("click", () => { if (this.currentUser && localStorage.getItem('cfd_wants_open') === 'true') { if (!this.cfdWindow || this.cfdWindow.closed) { this.openCFD(true); } } });
         window.addEventListener('beforeunload', () => { if (this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
         window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
         window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
