@@ -52,7 +52,7 @@
              
              <h1 id="cfd-greeting-time" class="text-8xl font-black !text-white mb-6 text-center drop-shadow-2xl tracking-tighter">Selamat Datang</h1>
              
-             <p id="cfd-greeting-outlet" class="text-6xl text-white font-bold text-center bg-slate-900/50 px-8 py-3 rounded-full backdrop-blur-sm shadow-lg">Silakan Lakukan Pemesanan di Kasir</p>
+             <p id="cfd-greeting-outlet" class="text-4xl text-white font-bold text-center bg-slate-900/50 px-8 py-3 rounded-full backdrop-blur-sm shadow-lg">Silakan Lakukan Pemesanan di Kasir</p>
          </div>
     </div>
     
@@ -553,6 +553,10 @@
       <div id="vk-keys" class="flex flex-col items-center w-full max-w-4xl mx-auto"></div>
   </div>
 
+<!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
+  <script src="app.js"></script>
+
+  <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
     // ========================================================
     // 1. LOGIKA MAIN APP (KASIR) - Mengatur Jendela & Fokus
@@ -566,21 +570,16 @@
     });
 
     window.addEventListener('focus', () => {
-        // CFD hanya akan ditarik ke depan jika:
-        // 1. User memang ingin buka CFD (cfd_wants_open == true)
-        // 2. Kita TIDAK sedang mencari printer (isBluetoothSearching == false)
         if(localStorage.getItem('cfd_wants_open') === 'true' && 
            (!superApp.cfdWindow || superApp.cfdWindow.closed) && 
            !superApp.isBluetoothSearching) {
             
             setTimeout(() => { 
-                // Cek sekali lagi sebelum benar-benar membuka
                 if(!superApp.isBluetoothSearching) {
                     superApp.openCFD(true); 
                 }
             }, 500);
         } else if (superApp.cfdWindow && !superApp.cfdWindow.closed && !superApp.isBluetoothSearching) {
-            // Jika jendela sudah ada, fokuskan kembali tapi tetap cek status bluetooth
             superApp.cfdWindow.focus();
         }
     });
@@ -591,34 +590,26 @@
     if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { 
         console.log("Memulai Monitor Pelanggan (CFD)...");
 
-        // Fungsi Mandiri Penyapa CFD
         const updateGreetingInternally = () => {
             const greetTimeEl = document.getElementById('cfd-greeting-time');
             const greetOutletEl = document.getElementById('cfd-greeting-outlet');
             if (!greetTimeEl || !greetOutletEl) return;
 
-            // Logika Pembaca Waktu
             const hour = new Date().getHours();
             let ucapanWaktu = "Selamat Malam!"; 
             if (hour >= 5 && hour < 11) ucapanWaktu = "Selamat Pagi!";
             else if (hour >= 11 && hour < 15) ucapanWaktu = "Selamat Siang!";
             else if (hour >= 15 && hour < 18) ucapanWaktu = "Selamat Sore!";
 
-            // Tarik Nama Cabang dari Memori Bersama (Suntikan Kasir)
             let namaOutlet = localStorage.getItem('aisnack_active_outlet') || "Ai-Snack";
 
-            // Tembakkan Teks ke Layar
             greetTimeEl.innerText = ucapanWaktu;
             greetOutletEl.innerText = `Selamat datang di Ai-CHA ${namaOutlet}, silakan pesan di kasir`;
         };
 
-        // 1. Panggil saat CFD pertama kali terbuka (jeda 0.5 detik agar siap)
         setTimeout(updateGreetingInternally, 500);
-
-        // 2. Pasang alarm internal (Cek jam setiap 1 menit)
         setInterval(updateGreetingInternally, 60000); 
         
-        // 3. Detektor Perubahan Memori (Merespon jika Kasir pindah Cabang)
         window.addEventListener('storage', (e) => {
             if (e.key === 'aisnack_active_outlet') {
                 updateGreetingInternally();
@@ -627,8 +618,8 @@
     }
   </script>
 
-  <script src="app.js"></script>
-<div id="update-banner" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-[1.5rem] shadow-2xl z-[99999] flex items-center gap-4 hidden w-11/12 max-w-md transition-transform duration-500 translate-y-20 opacity-0 border border-slate-700">
+  <!-- 3. BANNER UPDATE TETAP DI PALING BAWAH -->
+  <div id="update-banner" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-[1.5rem] shadow-2xl z-[99999] flex items-center gap-4 hidden w-11/12 max-w-md transition-transform duration-500 translate-y-20 opacity-0 border border-slate-700">
       <div class="bg-brand-500 w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg">
           <i class="fas fa-cloud-download-alt text-xl animate-bounce"></i>
       </div>
