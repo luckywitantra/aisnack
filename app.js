@@ -12,6 +12,12 @@ const osKeyboard = {
     open: function(elOrId, type = 'text') {
         this.targetElement = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
         if (!this.targetElement) return;
+        
+        // 🚀 PERBAIKAN 1: Pastikan elemen terkunci di memori browser HP
+        if (this.targetElement.id) {
+            this.targetElement = document.getElementById(this.targetElement.id);
+        }
+
         this.mode = type; this.isOpen = true; this.render();
         const vk = document.getElementById('virtual-keyboard'); const ov = document.getElementById('virtual-keyboard-overlay');
         if (vk) { vk.classList.remove('hidden'); setTimeout(() => vk.classList.remove('translate-y-full'), 10); }
@@ -38,9 +44,28 @@ const osKeyboard = {
         html += `<div class="flex justify-center gap-2 w-full mt-2"><button class="flex-1 py-4 bg-slate-200 text-slate-700 font-bold rounded-xl shadow-sm border border-slate-300 hover:bg-slate-300 transition active:scale-95" onclick="osKeyboard.backspace()"><i class="fas fa-backspace"></i> HAPUS</button><button class="flex-[2] py-4 bg-brand-500 text-white font-black rounded-xl shadow-md hover:bg-brand-600 transition active:scale-95 text-lg" onclick="osKeyboard.close()"><i class="fas fa-check-circle"></i> SELESAI</button></div>`;
         container.innerHTML = html;
     },
-    insert: function(char) { if (!this.targetElement) return; this.targetElement.value += char; this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); },
-    backspace: function() { if (!this.targetElement) return; this.targetElement.value = this.targetElement.value.slice(0, -1); this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); },
-    clear: function() { if (!this.targetElement) return; this.targetElement.value = ''; this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); }
+    insert: function(char) { 
+        if (!this.targetElement) return; 
+
+        // 🚀 PERBAIKAN 2: Jika isi inputannya persis angka "0" saja, hapus dulu!
+        // Ini memastikan saat user ngetik "5", jadinya "5", bukan "05"
+        if (this.targetElement.value === '0') {
+            this.targetElement.value = '';
+        }
+
+        this.targetElement.value += char; 
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+    },
+    backspace: function() { 
+        if (!this.targetElement) return; 
+        this.targetElement.value = this.targetElement.value.slice(0, -1); 
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+    },
+    clear: function() { 
+        if (!this.targetElement) return; 
+        this.targetElement.value = ''; 
+        this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+    }
 };
 
 /* ========================================== */
@@ -617,6 +642,9 @@ const superApp = {
             if (!this.cfdTimer) {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
+
+            // 🚀 PICU AUTO-CONNECT PRINTER DI SINI
+            this.autoConnectPrinter();
 
         } else { 
             this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
@@ -1234,16 +1262,22 @@ const superApp = {
     }
     this.setLoading(false);
 },
-   renderOpname: function() {
+  renderOpname: function() {
     const lbl = document.getElementById('lbl-opname-outlet'); if (lbl) lbl.innerText = this.outlet;
     let hu = ''; let hp = ''; let hum = ''; let hpm = '';
     
+    // Simpan data sys untuk disuntikkan ulang nanti
+    let autoFillData = []; 
+
     [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
         if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
             let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
             let sys = sData ? Number(sData.Stok_Toko) : 0;
 
-            // 🚀 PERUBAHAN UTAMA: Menambahkan value="${sys}" pada input agar langsung terisi stok sistem
+            // Simpan ID elemen dan valuenya ke array
+            autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
+
+            // (Kode HTML Anda tetap sama, value="${sys}" biarkan saja di situ)
             let desk = `<tr class="border-b border-slate-50">
                 <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
                 <td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td>
@@ -1275,6 +1309,17 @@ const superApp = {
     const tU = document.getElementById('opname-tbody-utama'); if (tU) tU.innerHTML = hu || this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
     const tP = document.getElementById('opname-tbody-pendukung'); if (tP) tP.innerHTML = hp || this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
     const mobCards = document.getElementById('opname-mobile-cards'); if (mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
+
+    // 🚀 KUNCI PERBAIKAN 3: Eksekusi injeksi value manual setelah DOM ter-render
+    // Ini adalah 'obat kuat' untuk masalah browser HP
+    setTimeout(() => {
+        autoFillData.forEach(item => {
+            let elDesk = document.getElementById(item.idDesk);
+            let elMob = document.getElementById(item.idMob);
+            if (elDesk) elDesk.value = item.val;
+            if (elMob) elMob.value = item.val;
+        });
+    }, 50); // Jeda 50ms sangat cukup agar HP sadar ada tabel baru
 },
     
     calcOpname: function(sku) {
@@ -1345,7 +1390,7 @@ const superApp = {
 
         return waText;
     },
-  submitOpname: async function() {
+submitOpname: async function() {
     if (this.isProcessing) return;
     if (!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
     this.setLoading(true, "Menyimpan & Mengirim Audit...");
@@ -1355,31 +1400,43 @@ const superApp = {
 
     (this.db.masterProduk || []).forEach(m => {
         if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-            // 1. Ambil nilai input
+            
+            // 1. 🚀 AMBIL DATA SISTEM DARI DATABASE (100% Akurat, bebas dari error pembacaan HTML)
+            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+            let sys = sData ? Number(sData.Stok_Toko) : 0;
+
+            // 2. Ambil elemen input dari kedua versi tampilan
             let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); 
             let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
-            let fisikStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
-
-            // 2. Ambil nilai stok sistem sebagai default
-            let sysDesk = document.getElementById(`opn-sys-${m.SKU}`); 
-            let sysMob = document.getElementById(`opn-sys-mob-${m.SKU}`);
-            let sys = parseInt(sysDesk ? sysDesk.innerText : (sysMob ? sysMob.innerText : 0)) || 0;
-
-            // 🚀 LOGIKA BARU: Jika fisikStr kosong, pakai nilai sys. 
-            // Jadi semua barang akan terkirim, entah berubah atau tidak.
-            let fisik = fisikStr !== '' ? this.getNumericValue(fisikStr) : sys;
-
             let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
             let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
-            let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
 
-            // 3. Simpan data untuk WA (tetap kirim semua item)
+            // 3. Baca isian angka kasir (Jika kosong, anggap sama dengan nilai sistem)
+            let valDesk = inputDesk && inputDesk.value !== '' ? this.getNumericValue(inputDesk.value) : sys;
+            let valMob = inputMob && inputMob.value !== '' ? this.getNumericValue(inputMob.value) : sys;
+
+            // 4. 🚀 DETEKSI OTOMATIS: Kasir ngetik di HP atau di Laptop?
+            let fisik = sys;
+            let note = '';
+
+            if (valMob !== sys) {
+                // Berarti angka di HP berubah!
+                fisik = valMob;
+                note = noteMob ? noteMob.value : '';
+            } else if (valDesk !== sys) {
+                // Berarti angka di Laptop berubah!
+                fisik = valDesk;
+                note = noteDesk ? noteDesk.value : '';
+            } else {
+                // Angka tidak berubah, tapi siapa tahu kasir kasih catatan tambahan
+                note = (noteMob && noteMob.value !== '') ? noteMob.value : (noteDesk && noteDesk.value !== '' ? noteDesk.value : '');
+            }
+
+            // 5. Masukkan ke list untuk dilaporkan ke Owner via WA (semua barang dikirim)
             itemsForWa.push({ sku: m.SKU, nama: m.Nama_Produk, kategori: m.Kategori, sys: sys, fisik: fisik, selisih: fisik - sys, note: note });
             
-            // 4. Kirim ke Sheet hanya jika ada perubahan (agar database tidak membengkak)
-            // ATAU jika Anda ingin Owner melihat semua log meskipun tidak ada perubahan, 
-            // hapus baris 'if (fisik !== sys)' ini.
-            if (fisik !== sys) {
+            // 6. Masukkan ke list Database JIKA ADA PERUBAHAN (baik fisik maupun catatan)
+            if (fisik !== sys || note !== '') {
                 itemsToSubmit.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
             }
         }
@@ -1387,7 +1444,7 @@ const superApp = {
     
     if (itemsToSubmit.length === 0) { 
         this.setLoading(false); 
-        return this.showToast("Tidak ada perubahan stok untuk dilaporkan!", "warning"); 
+        return this.showToast("Tidak ada perubahan stok atau catatan untuk dilaporkan!", "warning"); 
     }
 
     let waText = this.buildOpnameWaText(this.outlet, this.currentUser.Username, new Date().toLocaleString('id-ID'), itemsForWa);
@@ -1409,6 +1466,7 @@ const superApp = {
     }
     this.setLoading(false);
 },
+    
     // AUDIT & BULK APPROVAL
     toggleAuditTab: function(tab) {
         const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
@@ -1418,72 +1476,79 @@ const superApp = {
         const vContent = document.getElementById(`audit-content-${tab}`); if(vContent) vContent.classList.remove('hidden'); 
         const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
     },
+
+    toggleAllAuditCb: function(type, isChecked) {
+        let cbs = document.querySelectorAll(`.cb-audit-${type}`); 
+        cbs.forEach(cb => cb.checked = isChecked); 
+        this.checkBulkAudit();
+    },
+
     renderAudit: function() {
-    const tbodyOp = document.getElementById('audit-opname-tbody');
-    if (tbodyOp) {
-        let html = '';
-        (this.db.opname || []).forEach(op => {
-            if (op.Status_Approval === 'Pending') {
-                let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
-                let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
-                let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
+        const tbodyOp = document.getElementById('audit-opname-tbody');
+        if (tbodyOp) {
+            let html = '';
+            (this.db.opname || []).forEach(op => {
+                if (op.Status_Approval === 'Pending') {
+                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
+                    let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
+                    let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
-                html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                    <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
-                    <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                    <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td>
-                    <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
-                    <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
-                    <td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
-                    <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td>
-                </tr>`;
-            }
-        });
-        tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
-    }
-
-    const tbodyTr = document.getElementById('audit-terima-tbody');
-    if (tbodyTr) {
-        let html = '';
-        let mutasiHistoryHariIni = {};
-
-        (this.db.mutasi || []).forEach(mt => {
-            if (mt.Status_Approval === 'Disetujui' && mt.Waktu) {
-                let tgl = this.cleanDateOnly(mt.Waktu);
-                // Pastikan key valid
-                if (tgl) {
-                    let key = `${mt.Outlet_Tujuan}_${tgl}`;
-                    mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
+                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td>
+                        <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
+                        <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
+                        <td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
+                        <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td>
+                    </tr>`;
                 }
-            }
-        });
+            });
+            tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
+        }
 
-        (this.db.mutasi || []).forEach(mt => {
-            if (mt.Status_Approval === 'Pending') {
-                let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
-                let tgl = this.cleanDateOnly(mt.Waktu);
-                let key = `${mt.Outlet_Tujuan}_${tgl}`;
-                let sudahAda = mutasiHistoryHariIni[key] || 0;
-                
-                let warningBadge = sudahAda > 0 ? 
-                    `<span class="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded shadow-sm animate-pulse block mt-1">⚠️ Sudah ${sudahAda}x kirim hari ini!</span>` : '';
+        const tbodyTr = document.getElementById('audit-terima-tbody');
+        if (tbodyTr) {
+            let html = '';
+            // Kita hitung dulu berapa kali tiap outlet sudah melakukan mutasi hari ini
+            let mutasiHistoryHariIni = {};
+            (this.db.mutasi || []).forEach(mt => {
+                if (mt.Status_Approval === 'Disetujui' && mt.Waktu) {
+                    let tgl = this.cleanDateOnly(mt.Waktu);
+                    // Pastikan key valid
+                    if (tgl) {
+                        let key = `${mt.Outlet_Tujuan}_${tgl}`;
+                        mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
+                    }
+                }
+            });
 
-                let wStr = mt.Waktu ? (this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu)) : '-';
+            (this.db.mutasi || []).forEach(mt => {
+                if (mt.Status_Approval === 'Pending') {
+                    let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
+                    let tgl = this.cleanDateOnly(mt.Waktu);
+                    let key = `${mt.Outlet_Tujuan}_${tgl}`;
+                    let sudahAda = mutasiHistoryHariIni[key] || 0;
+                    
+                    let warningBadge = sudahAda > 0 ? 
+                        `<span class="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded shadow-sm animate-pulse block mt-1">⚠️ Sudah ${sudahAda}x kirim hari ini!</span>` : '';
 
-                html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                    <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td>
-                    <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                    <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span>${warningBadge}</td>
-                    <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
-                    <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
-                    <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td>
-                </tr>`;
-            }
-        });
-        tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
-    }
-    this.checkBulkAudit();
-},
+                    let wStr = mt.Waktu ? (this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu)) : '-';
+
+                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span>${warningBadge}</td>
+                        <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
+                        <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
+                        <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td>
+                    </tr>`;
+                }
+            });
+            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
+        }
+        this.checkBulkAudit();
+    },
     
     checkBulkAudit: function() {
         let opChecked = document.querySelectorAll('.cb-audit-opname:checked').length;
@@ -1491,6 +1556,7 @@ const superApp = {
         let bar = document.getElementById('bulk-action-bar');
         if (bar) { if (opChecked > 0 || trChecked > 0) bar.classList.remove('hidden'); else bar.classList.add('hidden'); }
     },
+
     processBulkApproval: async function(status) {
         if (this.isProcessing) return;
         let opCbs = document.querySelectorAll('.cb-audit-opname:checked'); let trCbs = document.querySelectorAll('.cb-audit-terima:checked');
@@ -2256,14 +2322,16 @@ const superApp = {
         const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
-    connectBluetooth: async function() {
+    connectBluetooth: async function(isAuto = false) {
         // 1. Kunci pengaman dari kasir yang menekan tombol berkali-kali
         if (this.isBluetoothSearching) return;
         this.isBluetoothSearching = true; 
         
         const btnPrinter = document.getElementById('btn-printer');
         const statusPrinter = document.getElementById('printer-status');
-        this.setLoading(true, "Mengecek Printer...");
+        
+        // JANGAN tampilkan loading jika ini hanya pancingan otomatis
+        if (!isAuto) this.setLoading(true, "Mengecek Printer...");
 
         try {
             // 2. HARD RESET: Bersihkan memori hantu dari sisa koneksi sebelumnya
@@ -2285,7 +2353,6 @@ const superApp = {
                         server = await device.gatt.connect(); // Bangunkan printer!
                     } catch (e) {
                         console.log("Printer lama mati/error, melupakan device...", e);
-                        // Hapus memori printer jika ternyata printernya sudah mati/rusak
                         if (device.forget) await device.forget(); 
                         device = null; 
                         server = null;
@@ -2293,8 +2360,14 @@ const superApp = {
                 }
             }
 
-            // 4. JIKA INGATAN KOSONG/GAGAL: Baru munculkan pop-up pencarian Chrome
+            // 4. JIKA INGATAN KOSONG/GAGAL
             if (!server) {
+                // 🚀 JIKA AUTO-CONNECT GAGAL, BATALKAN DIAM-DIAM. Jangan paksa muncul pop-up!
+                if (isAuto) {
+                    this.isBluetoothSearching = false;
+                    return; 
+                }
+
                 this.setLoading(true, "Mencari Perangkat Baru...");
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true, 
@@ -2347,8 +2420,8 @@ const superApp = {
             }
             if (statusPrinter) statusPrinter.innerText = "Printer Ready";
 
-            this.showToast("Printer Terhubung & Siap Cetak!", "success");
-            this.setLoading(false);
+            if (!isAuto) this.showToast("Printer Terhubung & Siap Cetak!", "success");
+            if (!isAuto) this.setLoading(false);
 
             // Mencegah double-listener error
             device.ongattserverdisconnected = null; 
@@ -2363,20 +2436,40 @@ const superApp = {
             });
             
         } catch (error) {
-            this.setLoading(false);
+            if (!isAuto) this.setLoading(false);
             
             // PENYELAMATAN ERROR: Bersihkan memori agar tombol bisa ditekan ulang!
             this.printerDevice = null;
             this.printerCharacteristic = null;
             
-            if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
-                this.showToast("Pencarian dibatalkan.", "warning");
-            } else {
-                this.showToast("Gagal menyambung ke Printer.", "error");
+            if (!isAuto) {
+                if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
+                    this.showToast("Pencarian dibatalkan.", "warning");
+                } else {
+                    this.showToast("Gagal menyambung ke Printer.", "error");
+                }
             }
         } finally {
             // Beri jeda sistem 2 detik sebelum tombol boleh ditekan ulang
             setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
+        }
+    },
+    
+    autoConnectPrinter: async function() {
+        // Jangan lakukan apa-apa jika sudah terhubung atau sedang mencari
+        if (this.printerCharacteristic || this.isBluetoothSearching) return;
+        
+        if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+            try {
+                const devices = await navigator.bluetooth.getDevices();
+                if (devices.length > 0) {
+                    console.log("Mencoba Auto-Connect ke printer tersimpan...");
+                    // Panggil connectBluetooth dengan mode senyap (true)
+                    this.connectBluetooth(true); 
+                }
+            } catch (e) {
+                console.log("Auto-connect gagal atau tidak diizinkan browser.");
+            }
         }
     },
     
@@ -2436,3 +2529,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
