@@ -1649,10 +1649,15 @@ submitOpname: async function() {
         const rct = document.getElementById(`report-content-${tab}`); if(rct) rct.classList.remove('hidden'); 
         const tbtn = document.getElementById(`tab-${tab}`); if(tbtn) tbtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
     },
+    
     renderReport: function() {
         const rof = document.getElementById('report-outlet-filter');
         let filterVal = rof ? rof.value : this.outlet;
-        if(this.currentUser && String(this.currentUser.Role).toLowerCase().includes('admin') && rof) { filterVal = rof.value; } else { filterVal = this.outlet; }
+        
+        // Cek apakah user adalah admin
+        let isAdmin = this.currentUser && String(this.currentUser.Role).toLowerCase().includes('admin');
+        
+        if(isAdmin && rof) { filterVal = rof.value; } else { filterVal = this.outlet; }
         
         let dStartEl = document.getElementById('filter-start'); let dEndEl = document.getElementById('filter-end');
         let dStart = dStartEl ? dStartEl.value : ''; let dEnd = dEndEl ? dEndEl.value : '';
@@ -1678,6 +1683,7 @@ submitOpname: async function() {
                     totalRev += Number(t.Total_Bayar) || 0; countTrx++;
                     if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += Number(t.Total_Bayar) || 0; else totalTunai += Number(t.Total_Bayar) || 0;
                 }
+                
                 let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-bold">Batal</span>`;
                 let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
                 let rowBg = t.Status === 'Sukses' ? 'border-b border-slate-50 hover:bg-slate-50' : 'row-void';
@@ -1685,12 +1691,31 @@ submitOpname: async function() {
                 let cleanDate = this.cleanDateOnly(t.Tanggal);
                 let cleanTime = this.cleanTimeOnly(t.Waktu);
 
-                // TAMBAHAN ANTRIAN PADA HISTORI
-                let antrianTeks = t.Antrian ? `<span class="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded ml-2">Antrian: ${t.Antrian}</span>` : '';
+                let antrianTeks = t.Antrian ? `<span class="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded">Antrian: ${t.Antrian}</span>` : '';
+
+                // 🚀 FITUR DETEKSI STRUK: Memunculkan badge merah jika belum dicetak
+                let statusCetak = t.Status_Cetak || 'Belum';
+                let warningStruk = (isAdmin && t.Status === 'Sukses' && statusCetak !== 'Sudah') 
+                    ? `<span class="text-[9px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded shadow-sm animate-pulse border border-red-200" title="Struk Belum Dicetak!">🚨 NO PRINT</span>` 
+                    : '';
 
                 if(i < 500) {
-                    trxHtml += `<tr class="${rowBg} transition"><td class="py-4 px-5 whitespace-nowrap text-xs"><div class="font-black text-slate-700">${safeID || 'N/A'} ${antrianTeks}</div><div class="text-[10px] text-slate-400 mt-0.5">${cleanDate} ${cleanTime}</div></td><td class="py-4 px-5 whitespace-nowrap text-xs text-slate-700 font-bold">${t.Kasir || t.Outlet}</td><td class="py-4 px-5 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td><td class="py-4 px-5 whitespace-nowrap">${statBadge}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td><td class="py-4 px-5 whitespace-nowrap text-center" data-html2canvas-ignore="true"><button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-[10px] font-bold px-4 py-2 rounded-lg shadow-sm transition"><i class="fas fa-eye mr-1"></i> Detail</button></td></tr>`;
+                    // Penyesuaian HTML dengan flex-wrap dan gap-1 agar lencana/badge tersusun rapi
+                    trxHtml += `<tr class="${rowBg} transition">
+                        <td class="py-4 px-5 whitespace-nowrap text-xs">
+                            <div class="font-black text-slate-700 flex flex-wrap items-center gap-1">${safeID || 'N/A'} ${antrianTeks} ${warningStruk}</div>
+                            <div class="text-[10px] text-slate-400 mt-0.5">${cleanDate} ${cleanTime}</div>
+                        </td>
+                        <td class="py-4 px-5 whitespace-nowrap text-xs text-slate-700 font-bold">${t.Kasir || t.Outlet}</td>
+                        <td class="py-4 px-5 whitespace-nowrap text-xs font-black uppercase text-blue-500">${t.Metode_Bayar||'Tunai'}</td>
+                        <td class="py-4 px-5 whitespace-nowrap">${statBadge}</td>
+                        <td class="py-4 px-5 whitespace-nowrap text-right font-black ${isCoret}">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td>
+                        <td class="py-4 px-5 whitespace-nowrap text-center" data-html2canvas-ignore="true">
+                            <button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-[10px] font-bold px-4 py-2 rounded-lg shadow-sm transition"><i class="fas fa-eye mr-1"></i> Detail</button>
+                        </td>
+                    </tr>`;
                 }
+                
                 if (t.Status === 'Sukses') {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                     items.forEach(item => {
@@ -1702,6 +1727,7 @@ submitOpname: async function() {
                 }
             }
         });
+        
         const rtt = document.getElementById('rep-total-trx'); if(rtt) rtt.innerText = countTrx; 
         const rtrT = document.getElementById('rep-total-tunai'); if(rtrT) rtrT.innerText = `Rp ${totalTunai.toLocaleString('id-ID')}`;
         const rtrQ = document.getElementById('rep-total-qris'); if(rtrQ) rtrQ.innerText = `Rp ${totalQris.toLocaleString('id-ID')}`;
@@ -1756,6 +1782,7 @@ submitOpname: async function() {
         });
         const rsTbody = document.getElementById('report-selisih-tbody'); if(rsTbody) rsTbody.innerHTML = selisihHtml || `<tr><td colspan="6" class="text-center py-12 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Selisih Kosong', 'Tidak ada histori opname disini')}</td></tr>`;
     },
+    
     exportPDF: function() {
         this.showToast("Mempersiapkan PDF Laporan...");
         const element = document.getElementById('pdf-export-area'); if(!element) return;
@@ -2322,6 +2349,23 @@ submitOpname: async function() {
         const modal = document.getElementById('modal-form'); const modalContent = document.getElementById('modal-form-content');
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
+
+    laporStrukDicetak: async function(idTrx) {
+        try {
+            // 1. Kirim laporan ke Google Sheets di latar belakang tanpa mengganggu kasir
+            this.apiPost({ action: 'update_status_cetak', id_transaksi: idTrx });
+            
+            // 2. Update database lokal secara langsung agar tanda merah hilang
+            let trx = (this.db.transaksi || []).find(t => t.ID_TRX === idTrx);
+            if (trx) {
+                trx.Status_Cetak = 'Sudah';
+            }
+        } catch (e) {
+            console.log("Gagal mengirim laporan status cetak ke server", e);
+        }
+    },
+
+    
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
         this.isBluetoothSearching = true; 
@@ -2464,7 +2508,7 @@ submitOpname: async function() {
         }
     },
     
-    printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
+printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
         // PERBAIKAN 1: Sesuaikan dengan nama variabel di connectBluetooth
         if (!this.printerCharacteristic) {
             this.showToast("Printer belum terhubung!", "error");
@@ -2497,6 +2541,12 @@ submitOpname: async function() {
                 // PERBAIKAN 3: Kirim ke printerCharacteristic
                 await this.printerCharacteristic.writeValue(data.slice(i, i + chunkSize));
             }
+
+            // 🚀 FITUR DETEKSI STRUK: Lapor ke server hanya jika pengiriman data sukses 100%
+            if (id && status === 'Sukses') {
+                this.laporStrukDicetak(id);
+            }
+
         } catch(e) { 
             console.error("Gagal Cetak:", e);
             this.showToast("Gagal mencetak struk", "error");
@@ -2520,5 +2570,8 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
 
 
