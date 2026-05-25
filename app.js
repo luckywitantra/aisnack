@@ -944,7 +944,21 @@ const superApp = {
         this.renderCart();
         setTimeout(() => { const cont = document.getElementById('cart-container'); if (cont) cont.scrollTop = cont.scrollHeight; }, 50);
     },
-    changeQty: function(idx, val) { this.cart[idx].qty += val; if (this.cart[idx].qty <= 0) this.cart.splice(idx, 1); this.renderCart(); },
+    
+    changeQty: function(idx, val) { 
+        // 🚀 PERBAIKAN: Cegah kasir menambah pesanan melampaui stok dari dalam keranjang
+        if (val > 0) {
+            let item = this.cart[idx];
+            let currentStokBahan = 0; let refBahan = item.sku_bahan || item.sku;
+            this.cart.forEach(i => { if ((i.sku_bahan || i.sku) === refBahan) currentStokBahan += i.qty; });
+            if (currentStokBahan >= item.maxStok) return this.showToast(`Stok Habis!`, 'error');
+        }
+        
+        this.cart[idx].qty += val; 
+        if (this.cart[idx].qty <= 0) this.cart.splice(idx, 1); 
+        this.renderCart(); 
+    },
+    
     renderCart: function() {
         const cont = document.getElementById('cart-container'); let total = 0, items = 0, html = ''; if (!cont) return;
         this.cart.forEach((i, idx) => {
@@ -953,12 +967,20 @@ const superApp = {
             this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) sisaBahanDiKeranjang += c.qty; });
             let stokTersisaVisual = i.maxStok - sisaBahanDiKeranjang;
 
-            html += `<div class="flex bg-white border border-slate-100 p-3 rounded-[1rem] shadow-sm items-center gap-2 text-slate-800 transition transform hover:-translate-x-1"><div class="flex-1 min-w-0"><h4 class="font-bold text-xs truncate text-slate-700">${i.nama}</h4><p class="text-[10px] text-slate-400 mb-1">Sisa Stok: <span class="font-bold ${stokTersisaVisual <= 0 ? 'text-red-500' : 'text-brand-500'}">${stokTersisaVisual}</span></p><p class="text-brand-500 font-black text-sm">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div><div class="flex bg-slate-50 rounded-lg border border-slate-200 shadow-inner"><button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 font-bold hover:text-brand-500 hover:bg-slate-100 rounded-l-lg transition">-</button><span class="w-8 text-center text-xs font-black flex items-center justify-center">${i.qty}</span><button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 font-bold hover:text-brand-500 hover:bg-slate-100 rounded-r-lg transition">+</button></div></div>`;
+            html += `<div class="flex bg-white border border-slate-100 p-3 rounded-[1rem] shadow-sm items-center gap-2 text-slate-800 transition transform hover:-translate-x-1"><div class="flex-1 min-w-0"><h4 class="font-bold text-xs truncate text-slate-700">${i.nama}</h4><p class="text-[10px] text-slate-400 mb-1">Sisa Stok: <span class="font-bold ${stokTersisaVisual <= 0 ? 'text-red-500' : 'text-brand-500'}">${stokTersisaVisual}</span></p><p class="text-brand-500 font-black text-sm">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div><div class="flex bg-slate-50 rounded-lg border border-slate-200 shadow-inner"><button onclick="superApp.changeQty(${idx}, -1)" class="w-10 h-10 font-black hover:text-brand-500 hover:bg-slate-100 rounded-l-lg transition text-lg">-</button><span class="w-8 text-center text-xs font-black flex items-center justify-center">${i.qty}</span><button onclick="superApp.changeQty(${idx}, 1)" class="w-10 h-10 font-black hover:text-brand-500 hover:bg-slate-100 rounded-r-lg transition text-lg">+</button></div></div>`;
         });
         cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-basket-shopping', 'Keranjang Kosong', 'Yuk, tambahkan pesanan!');
         
         const totalEl = document.getElementById('total-price'); if (totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
         const badge = document.getElementById('cart-badge'); if (badge) badge.innerText = `${items} Item`;
+        
+        // 🚀 PERBAIKAN UTAMA: Tembakkan update angka ke Floating Button di HP
+        const mobQty = document.getElementById('mobile-cart-qty'); 
+        if (mobQty) mobQty.innerText = `${items} Item`;
+        
+        const mobTotal = document.getElementById('mobile-cart-total'); 
+        if (mobTotal) mobTotal.innerText = `Rp ${total.toLocaleString('id-ID')}`;
+
         this.payTotal = total; 
         
         this.syncStorage(); // KEMBALIKAN KE NORMAL
@@ -2365,6 +2387,25 @@ submitOpname: async function() {
         }
     },
 
+
+    toggleMobileCart: function() {
+        const aside = document.getElementById('cart-aside');
+        const overlay = document.getElementById('mobile-cart-overlay');
+        const floatingBtn = document.getElementById('floating-cart-btn');
+        
+        if (aside.classList.contains('translate-y-full')) {
+            // Membuka Keranjang
+            aside.classList.remove('translate-y-full');
+            overlay.classList.remove('hidden');
+            if(floatingBtn) floatingBtn.classList.add('translate-y-full'); // Sembunyikan tombol mengambang
+        } else {
+            // Menutup Keranjang
+            aside.classList.add('translate-y-full');
+            overlay.classList.add('hidden');
+            if(floatingBtn) floatingBtn.classList.remove('translate-y-full');
+        }
+    },
+
     
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
@@ -2570,8 +2611,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
-
-
 
 
