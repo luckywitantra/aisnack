@@ -1,5 +1,6 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
+
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (IN-APP OSK)     */
 /* ========================================== */
@@ -889,16 +890,65 @@ const superApp = {
     changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
     switchMenu: function(menu) {
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('nav-active'); b.classList.add('text-slate-500'); });
+        
+        // 🚀 PEMETAAN WARNA KHUSUS UNTUK SETIAP MENU
+        const colors = {
+            'pos': 'text-brand-500',      // Oranye
+            'terima': 'text-green-600',   // Hijau
+            'opname': 'text-purple-600',  // Ungu
+            'report': 'text-blue-600',    // Biru
+            'audit': 'text-indigo-600',   // Nila
+            'ai': 'text-pink-600',        // Merah Muda
+            'gudang': 'text-emerald-600', // Hijau Tua
+            'outlet': 'text-teal-600',    // Teal (Biru Kehijauan)
+            'staf': 'text-amber-600'      // Kuning
+        };
+        const allColors = Object.values(colors);
 
-        const activeNav = document.getElementById(`nav-${menu}`); if (activeNav) { activeNav.classList.add('nav-active'); activeNav.classList.remove('text-slate-500'); }
-        const activeView = document.getElementById(`view-${menu}`); if (activeView) activeView.classList.remove('hidden');
+        // 1. Reset Warna Sidebar (PC)
+        document.querySelectorAll('.nav-btn').forEach(b => { 
+            b.classList.remove('nav-active', 'bg-slate-50', ...allColors); 
+            b.classList.add('text-slate-500'); 
+            let icon = b.querySelector('i');
+            if(icon) { icon.classList.remove(...allColors); icon.classList.add('text-slate-400'); }
+        });
+
+        // 2. Aktifkan Warna Sidebar Terpilih
+        const activeNav = document.getElementById(`nav-${menu}`); 
+        if (activeNav) { 
+            let targetColor = colors[menu] || 'text-brand-500';
+            activeNav.classList.add('nav-active', 'bg-slate-50', targetColor); 
+            activeNav.classList.remove('text-slate-500'); 
+            let icon = activeNav.querySelector('i');
+            if(icon) { icon.classList.remove('text-slate-400'); icon.classList.add(targetColor); }
+        }
+
+        const activeView = document.getElementById(`view-${menu}`); 
+        if (activeView) activeView.classList.remove('hidden');
 
         const titles = { 'pos': 'Point of Sale', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'Asisten AI', 'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan' };
-        const pageTitle = document.getElementById('page-title'); if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
+        const pageTitle = document.getElementById('page-title'); 
+        if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
 
-        if (window.innerWidth < 1024) this.toggleSidebar();
+        // 3. Tutup Sidebar otomatis jika dibuka di HP
+        const sidebar = document.getElementById('sidebar');
+        if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+            this.toggleSidebar();
+        }
 
+        // 4. Reset & Aktifkan Warna Menu Bawah (HP)
+        document.querySelectorAll('.nav-mobile-btn').forEach(btn => {
+            let target = btn.dataset.target;
+            btn.classList.remove(...allColors);
+            if(target === menu) {
+                btn.classList.add(colors[target] || 'text-brand-500');
+                btn.classList.remove('text-slate-400');
+            } else {
+                btn.classList.add('text-slate-400');
+            }
+        });
+
+        // Render Data Berdasarkan Halaman
         if (menu === 'pos' && !this.activeShiftId) this.checkShiftStatus();
         if (menu === 'report' && typeof this.renderReport === 'function') this.renderReport();
         if (menu === 'opname' && typeof this.renderOpname === 'function') this.renderOpname();
@@ -907,6 +957,7 @@ const superApp = {
         if (menu === 'ai' && typeof this.generateAIReport === 'function') this.generateAIReport();
         if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
     },
+    
     filterProducts: function(key) {
         let pList = document.getElementById('product-list');
         if (pList) {
@@ -2443,6 +2494,67 @@ submitOpname: async function() {
             overlay.classList.add('hidden');
             if(floatingBtn) floatingBtn.classList.remove('translate-y-full');
         }
+    },
+
+    gnTarget: null,
+    
+    toggleReportFilter: function() {
+        const modal = document.getElementById('mobile-filter-modal');
+        if(modal.classList.contains('translate-y-full')) {
+            modal.classList.remove('translate-y-full');
+        } else {
+            modal.classList.add('translate-y-full');
+        }
+    },
+
+    openGiantNumpad: function(targetId, title, subtitle) {
+        this.gnTarget = document.getElementById(targetId);
+        document.getElementById('gn-title').innerText = title;
+        document.getElementById('gn-subtitle').innerText = subtitle;
+        
+        // Ambil nilai awal, jika 0 jadikan kosong agar siap diketik
+        let initialVal = this.gnTarget ? (this.gnTarget.value || '0') : '0';
+        document.getElementById('gn-display').innerText = initialVal;
+        
+        const modal = document.getElementById('modal-giant-numpad');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => modal.classList.remove('translate-y-full'), 10);
+    },
+    
+    closeGiantNumpad: function() {
+        const modal = document.getElementById('modal-giant-numpad');
+        modal.classList.add('translate-y-full');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            this.gnTarget = null;
+        }, 300);
+    },
+    
+    typeGiantNumpad: function(char) {
+        let disp = document.getElementById('gn-display');
+        if (disp.innerText === '0') disp.innerText = '';
+        disp.innerText += char;
+    },
+    
+    delGiantNumpad: function() {
+        let disp = document.getElementById('gn-display');
+        disp.innerText = disp.innerText.slice(0, -1);
+        if (disp.innerText === '') disp.innerText = '0';
+    },
+
+    clearGiantNumpad: function() {
+        document.getElementById('gn-display').innerText = '0';
+    },
+    
+    saveGiantNumpad: function() {
+        if (this.gnTarget) {
+            this.gnTarget.value = document.getElementById('gn-display').innerText;
+            // Paksa sistem untuk memicu perhitungan otomatis (seperti calcOpname)
+            this.gnTarget.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        this.closeGiantNumpad();
     },
 
     
