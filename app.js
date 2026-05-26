@@ -1597,9 +1597,9 @@ submitOpname: async function() {
                     let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
                     html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${this.getOutletBadge(op.Outlet)}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
+                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
                         <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(op.Outlet)}<br><span class="text-brand-500">${op.Kasir}</span></td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(op.Outlet)}<br><span class="text-brand-500 inline-block mt-1">${op.Kasir}</span></td>
                         <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                         <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
                         <td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
@@ -1613,14 +1613,15 @@ submitOpname: async function() {
         const tbodyTr = document.getElementById('audit-terima-tbody');
         if (tbodyTr) {
             let html = '';
+            
             // Kita hitung dulu berapa kali tiap outlet sudah melakukan mutasi hari ini
             let mutasiHistoryHariIni = {};
             (this.db.mutasi || []).forEach(mt => {
                 if (mt.Status_Approval === 'Disetujui' && mt.Waktu) {
                     let tgl = this.cleanDateOnly(mt.Waktu);
-                    // Pastikan key valid
                     if (tgl) {
-                        let key = `${this.getOutletBadge(mt.Outlet_Tujuan)}_${tgl}`;
+                        // 🚀 PERBAIKAN: Gunakan data mentah untuk membuat Key Kamus Memori
+                        let key = `${mt.Outlet_Tujuan}_${tgl}`;
                         mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
                     }
                 }
@@ -1630,7 +1631,9 @@ submitOpname: async function() {
                 if (mt.Status_Approval === 'Pending') {
                     let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
                     let tgl = this.cleanDateOnly(mt.Waktu);
-                    let key = `${this.getOutletBadge(mt.Outlet_Tujuan)}_${tgl}`;
+                    
+                    // 🚀 PERBAIKAN: Gunakan data mentah yang sama untuk mengecek Key
+                    let key = `${mt.Outlet_Tujuan}_${tgl}`;
                     let sudahAda = mutasiHistoryHariIni[key] || 0;
                     
                     let warningBadge = sudahAda > 0 ? 
@@ -1641,7 +1644,9 @@ submitOpname: async function() {
                     html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
                         <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td>
                         <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(mt.Outlet_Tujuan)}<br><span class="text-brand-500">${mt.Kasir || '-'}</span>${warningBadge}</td>
+                        
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(mt.Outlet_Tujuan)}<br><span class="text-brand-500 inline-block mt-1">${mt.Kasir || '-'}</span>${warningBadge}</td>
+                        
                         <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                         <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
                         <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td>
