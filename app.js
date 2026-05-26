@@ -2377,10 +2377,15 @@ submitOpname: async function() {
             // 1. Kirim laporan ke Google Sheets di latar belakang tanpa mengganggu kasir
             this.apiPost({ action: 'update_status_cetak', id_transaksi: idTrx });
             
-            // 2. Update database lokal secara langsung agar tanda merah hilang
-            let trx = (this.db.transaksi || []).find(t => t.ID_TRX === idTrx);
+            // 2. 🚀 PERBAIKAN TYPO: Menggunakan "transactions" bukan "transaksi"
+            let trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(idTrx));
             if (trx) {
                 trx.Status_Cetak = 'Sudah';
+                
+                // 3. Simpan perubahan ke memori HP agar saat pindah menu tidak me-reset status
+                if (typeof this.syncStorage === 'function') {
+                    this.syncStorage(); 
+                }
             }
         } catch (e) {
             console.log("Gagal mengirim laporan status cetak ke server", e);
