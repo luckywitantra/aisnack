@@ -1,6 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
-
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (IN-APP OSK)     */
 /* ========================================== */
@@ -858,10 +857,18 @@ const superApp = {
     },
 
     // POS CORE
-    refreshData: function() {
-        const hSub = document.getElementById('header-subtitle'); if (hSub) hSub.innerText = `${this.outlet}`;
-        const lOutManage = document.getElementById('label-outlet-manage'); if (lOutManage) lOutManage.innerText = this.outlet;
+ refreshData: function() {
+        // 🚀 1. PASTIKAN TEMA WARNA TERAPLIKASI SESUAI CABANG AKTIF
+        this.applyOutletTheme();
 
+        // 2. Terapkan Lencana Warna di Header POS dan Label Manajemen Outlet
+        const hSub = document.getElementById('header-subtitle'); 
+        if (hSub) hSub.innerHTML = this.getOutletBadge(this.outlet);
+        
+        const lOutManage = document.getElementById('label-outlet-manage'); 
+        if (lOutManage) lOutManage.innerHTML = this.getOutletBadge(this.outlet);
+
+        // 3. Proses Produk
         this.filteredProducts = [];
         if (this.db && this.db.masterProduk) {
             this.db.masterProduk.forEach(master => {
@@ -878,6 +885,7 @@ const superApp = {
         }
         this.filteredProducts.sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
 
+        // 4. Render Semua Menu
         if (document.getElementById('product-list')) this.renderProducts();
         if (typeof this.renderReport === 'function') this.renderReport();
         if (typeof this.renderGudang === 'function') this.renderGudang();
@@ -887,6 +895,7 @@ const superApp = {
         if (typeof this.renderTerimaBarang === 'function') this.renderTerimaBarang();
         if (typeof this.generateAIReport === 'function') this.generateAIReport();
     },
+    
     changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
     switchMenu: function(menu) {
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
@@ -1107,8 +1116,10 @@ const superApp = {
         
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian };
 
+        // 1. PRINT STRUK (Prioritas Utama)
         try { await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); } catch (e) { console.log("Printer belum siap"); }
         
+        // 2. UPDATE MEMORI LOKAL SECARA INSTAN
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
             ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
@@ -1120,27 +1131,46 @@ const superApp = {
         this.refreshData(); 
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
 
-        // --- 🚀 KUNCI PERBAIKAN ALUR CFD ---
-        // 1. Simpan angka total & kembalian ke kapsul
+        // 3. KUNCI PERBAIKAN ALUR CFD
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
-
-        // 2. Bersihkan keranjang kasir SEKARANG JUGA (CFD akan mendapat sinyal keranjang kosong)
         this.cart = []; 
         this.renderCart(); 
-
-        // 3. Tembakkan sinyal 'PAID' sebagai kata terakhir ke CFD
         this.syncStorage('paid', noAntrian); 
-        
         this.closeModal('modal-payment'); 
+        
+        // 🚀 4. LEPASKAN KUNCI KASIR SEKARANG JUGA (Non-Blocking)
         this.isProcessing = false;
-        // ------------------------------------
 
+        // 🚀 5. SINKRONISASI SERVER DI LATAR BELAKANG (Fire & Forget)
         this.apiPost(payload).then(res => {
-            if (res && res.status !== 'sukses' && !res.is_offline) {
-               this.offlineQueue.push(payload);
-               localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
-               this.updateNetworkUI();
+            // A. Jika sukses terkirim ke Google Sheets
+            if (res && res.status === 'sukses' && !res.is_offline) {
+                // Tarik data terbaru secara diam-diam
+                fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.status === 'sukses') {
+                            this.db = data;
+                            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                            
+                            // 💡 PENTING: Hanya update UI HP Kasir JIKA keranjang sedang kosong
+                            // Ini memastikan aplikasi tidak "berkedip" saat kasir sedang sibuk menginput pelanggan berikutnya
+                            if (this.cart.length === 0) {
+                                this.refreshData();
+                            }
+                        }
+                    }).catch(e => console.log("Gagal tarik background, aman karena memori lokal sudah tercatat."));
+            } 
+            // B. Jika Gagal dari sisi Server (bukan jaringan putus)
+            else if (res && res.status !== 'sukses' && !res.is_offline) {
+               // Pastikan tidak terjadi double push (karena apiPost kadang sudah mem-push)
+               let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
+               if (!isAlreadyQueued) {
+                   this.offlineQueue.push(payload);
+                   localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
+                   this.updateNetworkUI();
+               }
             }
         }).catch(err => { console.log("Masuk ke antrean offline."); });
     },
@@ -1567,9 +1597,9 @@ submitOpname: async function() {
                     let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
 
                     html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
+                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${this.getOutletBadge(op.Outlet)}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
                         <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${op.Outlet}<br><span class="text-brand-500">${op.Kasir}</span></td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(op.Outlet)}<br><span class="text-brand-500">${op.Kasir}</span></td>
                         <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                         <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
                         <td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
@@ -1590,7 +1620,7 @@ submitOpname: async function() {
                     let tgl = this.cleanDateOnly(mt.Waktu);
                     // Pastikan key valid
                     if (tgl) {
-                        let key = `${mt.Outlet_Tujuan}_${tgl}`;
+                        let key = `${this.getOutletBadge(mt.Outlet_Tujuan)}_${tgl}`;
                         mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
                     }
                 }
@@ -1600,7 +1630,7 @@ submitOpname: async function() {
                 if (mt.Status_Approval === 'Pending') {
                     let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
                     let tgl = this.cleanDateOnly(mt.Waktu);
-                    let key = `${mt.Outlet_Tujuan}_${tgl}`;
+                    let key = `${this.getOutletBadge(mt.Outlet_Tujuan)}_${tgl}`;
                     let sudahAda = mutasiHistoryHariIni[key] || 0;
                     
                     let warningBadge = sudahAda > 0 ? 
@@ -1611,7 +1641,7 @@ submitOpname: async function() {
                     html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
                         <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td>
                         <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${mt.Outlet_Tujuan}<br><span class="text-brand-500">${mt.Kasir || '-'}</span>${warningBadge}</td>
+                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(mt.Outlet_Tujuan)}<br><span class="text-brand-500">${mt.Kasir || '-'}</span>${warningBadge}</td>
                         <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
                         <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
                         <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td>
@@ -1848,7 +1878,7 @@ submitOpname: async function() {
                 if(renderedRowsKas < 500) {
                     kasHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-500">${kDateStr} ${kTimeStr}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-slate-700">${k.Outlet} <span class="text-[10px] text-slate-400 font-normal">(${k.Kasir})</span></td>
+                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-slate-700">${this.getOutletBadge(k.Outlet)} <span class="text-[10px] text-slate-400 font-normal">(${k.Kasir})</span></td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap font-medium text-slate-600 max-w-[150px] md:max-w-[250px] truncate" title="${k.Keterangan}">${k.Keterangan}</td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black text-red-500 bg-red-50/30 rounded">- Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td>
                     </tr>`;
@@ -1878,7 +1908,7 @@ submitOpname: async function() {
                     selisihHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-500">${opWaktuStr}</td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-slate-700 max-w-[150px] truncate" title="${itemName}">${itemName}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-bold">${op.Outlet} <span class="text-[10px] text-slate-400 font-normal">(${op.Kasir})</span></td>
+                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-bold">${this.getOutletBadge(op.Outlet)} <span class="text-[10px] text-slate-400 font-normal">(${op.Kasir})</span></td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-medium text-slate-500 bg-slate-50/50 rounded-lg">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fis: ${op.Stok_Fisik}</td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black ${selColor} text-sm">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
                         <td class="py-3 px-3 md:px-5 whitespace-nowrap text-center">${badge}</td>
@@ -2402,46 +2432,144 @@ submitOpname: async function() {
     },
 
     // STAF & KINERJA
-    renderStaf: function() {
+   renderStaf: function() {
+        // 🚀 1. PENGAMAN UTAMA: Mencegah error diam-diam jika database belum siap
+        if (!this.db) return; 
+
+        // --- 2. SETUP FILTER OUTLET ---
         const filterEl = document.getElementById('staf-filter-outlet');
         if(filterEl && filterEl.options.length <= 1) {
             let opts = '<option value="Semua">Semua Cabang</option>';
             (this.db.outlets || []).forEach(o => opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`);
             filterEl.innerHTML = opts;
+            
+            // 🚀 PERBAIKAN: Deteksi Admin ATAU Owner agar dropdown tidak terkunci
+            let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
+            let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+            
+            if(!isAdmin) { 
+                filterEl.value = this.outlet; 
+                filterEl.disabled = true; 
+            } else {
+                filterEl.value = this.outlet; // Secara default arahkan ke cabang yang sedang login
+            }
         }
         let selOut = filterEl ? filterEl.value : 'Semua';
 
-        let outletSales = {}; let staffSales = {}; let maxOutletSales = 0; let maxStaffSales = 0;
+        // --- 3. SETUP FILTER TANGGAL ---
+        const dStartEl = document.getElementById('filter-start-staf');
+        const dEndEl = document.getElementById('filter-end-staf');
+        
+        let today = new Date();
+        let yyyy = today.getFullYear(); 
+        let mm = String(today.getMonth() + 1).padStart(2, '0'); 
+        let dd = String(today.getDate()).padStart(2, '0');
 
-        (this.db.transactions || []).forEach(t => {
-            if (t.Status === 'Sukses') {
-                let out = t.Outlet; let kasir = t.Kasir; let bayar = Number(t.Total_Bayar) || 0;
-                if(!outletSales[out]) outletSales[out] = 0; outletSales[out] += bayar;
-                if(!staffSales[kasir]) staffSales[kasir] = { outlet: out, sales: 0 }; staffSales[kasir].sales += bayar;
+        // Default: Tanggal 1 bulan ini sampai hari ini
+        if (dStartEl && !dStartEl.value) dStartEl.value = `${yyyy}-${mm}-01`;
+        if (dEndEl && !dEndEl.value) dEndEl.value = `${yyyy}-${mm}-${dd}`;
+
+        let dStart = dStartEl ? dStartEl.value : ''; 
+        let dEnd = dEndEl ? dEndEl.value : '';
+        let dateStart = dStart ? new Date(dStart + "T00:00:00") : new Date(0);
+        let dateEnd = dEnd ? new Date(dEnd + "T23:59:59") : new Date(8640000000000000);
+
+        let outletSales = {}; 
+        let staffData = {};
+
+        // --- 4. DAFTARKAN SEMUA STAF OPERASIONAL ---
+        (this.db.users || []).forEach(u => {
+            if(!String(u.Role).toLowerCase().includes('owner')) {
+                 staffData[u.Username] = { name: u.Username, role: u.Role, outlet: u.Outlet, sales: 0, trxCount: 0, batalCount: 0 };
             }
         });
 
-        Object.values(outletSales).forEach(v => { if(v > maxOutletSales) maxOutletSales = v; });
-        Object.values(staffSales).forEach(v => { if(v.sales > maxStaffSales) maxStaffSales = v.sales; });
+        // --- 5. KALKULASI DATA TRANSAKSI ---
+        (this.db.transactions || []).forEach(t => {
+            let trxDate = this.parseDateId(t.Tanggal);
+            
+            // 🚀 PERBAIKAN: Hanya hitung transaksi yang sesuai dengan Filter Tanggal & Cabang yang Dipilih!
+            if(trxDate >= dateStart && trxDate <= dateEnd && (selOut === 'Semua' || t.Outlet === selOut)) {
+                let out = t.Outlet; 
+                let kasir = t.Kasir; 
+                let bayar = Number(t.Total_Bayar) || 0;
 
+                // Daftarkan otomatis jika ada kasir siluman (belum masuk db users tapi ada di transaksi)
+                if(!staffData[kasir]) {
+                    staffData[kasir] = { name: kasir, role: 'Staf', outlet: out, sales: 0, trxCount: 0, batalCount: 0 };
+                }
+
+                if (t.Status === 'Sukses') {
+                    if(!outletSales[out]) outletSales[out] = 0; 
+                    outletSales[out] += bayar;
+                    
+                    staffData[kasir].sales += bayar;
+                    staffData[kasir].trxCount += 1;
+                } else {
+                    staffData[kasir].batalCount += 1;
+                }
+            }
+        });
+
+        let maxOutletSales = 0;
+        Object.values(outletSales).forEach(v => { if(v > maxOutletSales) maxOutletSales = v; });
+
+        // --- 6. RENDER LEADERBOARD CABANG ---
         let outHtml = '';
         let outArr = Object.keys(outletSales).map(k => ({name: k, sales: outletSales[k]})).sort((a,b) => b.sales - a.sales);
         outArr.forEach((o, i) => {
             let pct = maxOutletSales > 0 ? (o.sales / maxOutletSales) * 100 : 0;
             let medal = i===0 ? 'text-yellow-500' : (i===1 ? 'text-gray-400' : 'text-amber-700');
-            outHtml += `<div class="flex flex-col gap-1.5 mb-5"><div class="flex justify-between text-sm font-bold text-slate-700"><span><i class="fas fa-medal ${medal} mr-2 text-lg"></i> ${o.name}</span><span>Rp ${o.sales.toLocaleString('id-ID')}</span></div><div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-gradient-to-r from-brand-500 to-orange-400 h-3 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
+            outHtml += `<div class="flex flex-col gap-1.5 mb-5"><div class="flex justify-between items-center text-sm font-bold text-slate-700"><div><i class="fas fa-medal ${medal} mr-2 text-lg"></i> ${this.getOutletBadge(o.name)}</div><span>Rp ${o.sales.toLocaleString('id-ID')}</span></div><div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-gradient-to-r from-brand-500 to-orange-400 h-3 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
         });
         const outListEl = document.getElementById('staf-outlet-leaderboard');
-        if(outListEl) outListEl.innerHTML = outHtml || this.getEmptyState('fa-store', 'Belum Ada Data', 'Belum ada transaksi terekam.');
+        if(outListEl) outListEl.innerHTML = outHtml || this.getEmptyState('fa-store', 'Belum Ada Transaksi', 'Di rentang tanggal ini.');
 
-        let stafHtml = '';
-        let stafArr = Object.keys(staffSales).map(k => ({name: k, ...staffSales[k]})).filter(s => selOut === 'Semua' || s.outlet === selOut).sort((a,b) => b.sales - a.sales);
-        stafArr.forEach((s, i) => {
+        // --- 7. RENDER KARTU TOP 3 KARYAWAN ---
+        // 🚀 PERBAIKAN: Tetap tampilkan staf jika ia terdaftar di Pusat ATAU dia punya transaksi di cabang tersebut!
+        let stafArr = Object.values(staffData).filter(s => 
+            selOut === 'Semua' || 
+            s.outlet === selOut || 
+            s.outlet === 'Pusat' || 
+            s.trxCount > 0 || 
+            s.batalCount > 0
+        ).sort((a,b) => b.sales - a.sales);
+
+        let top3Html = '';
+        let maxStaffSales = stafArr.length > 0 ? stafArr[0].sales : 0;
+        
+        // Filter lagi: Hanya yang omsetnya LEBIH DARI 0 yang bisa masuk daftar TOP 3
+        stafArr.filter(s => s.sales > 0).slice(0, 3).forEach((s, i) => {
             let pct = maxStaffSales > 0 ? (s.sales / maxStaffSales) * 100 : 0;
-            stafHtml += `<div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:-translate-y-1 transition duration-300"><div class="flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-100">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5"><i class="fas fa-location-dot text-brand-500 mr-1"></i>${s.outlet}</p></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-lg">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner"><div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
+            let roleColor = String(s.role).toLowerCase().includes('senior') ? 'text-orange-600 bg-orange-50 border-orange-200' : 'text-slate-500 bg-slate-50 border-slate-200';
+            
+            top3Html += `<div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:-translate-y-1 transition duration-300"><div class="flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-100">${i+1}</div><div><h4 class="font-bold text-sm text-slate-800">${s.name}</h4><div class="mt-1 flex items-center gap-1">${this.getOutletBadge(s.outlet)} <span class="px-2 py-0.5 border rounded text-[9px] font-black uppercase ${roleColor}">${s.role}</span></div></div></div><div class="text-right"><h4 class="font-black text-brand-600 text-lg">Rp ${s.sales.toLocaleString('id-ID')}</h4></div></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner"><div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>`;
         });
-        const stafListEl = document.getElementById('staf-employee-list');
-        if(stafListEl) stafListEl.innerHTML = stafHtml || this.getEmptyState('fa-users', 'Belum Ada Data', 'Kasir belum mencatat penjualan.');
+        const stafTopEl = document.getElementById('staf-top-employee');
+        if(stafTopEl) stafTopEl.innerHTML = top3Html || this.getEmptyState('fa-users', 'Belum Ada Peringkat', 'Belum ada omset terekam.');
+
+        // --- 8. RENDER TABEL DETAIL (SELURUH STAF) ---
+        let detailHtml = '';
+        stafArr.forEach(s => {
+            let atv = s.trxCount > 0 ? Math.round(s.sales / s.trxCount) : 0; // Average Transaction Value
+            let badBatal = s.batalCount > 0 ? 'text-red-500 bg-red-50 border border-red-100' : 'text-slate-400 bg-slate-50 border border-slate-100';
+            let roleColor = String(s.role).toLowerCase().includes('senior') ? 'text-orange-500 bg-orange-50 border-orange-200' : 'text-slate-400 bg-white border-slate-200';
+            
+            detailHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                <td class="py-4 px-5 whitespace-nowrap">
+                    <div class="font-bold text-slate-800 text-sm mb-1">${s.name} <span class="text-[9px] ml-2 px-1.5 py-0.5 rounded border uppercase font-black ${roleColor}">${s.role}</span></div>
+                    <div class="mt-0.5">${this.getOutletBadge(s.outlet)}</div>
+                </td>
+                <td class="py-4 px-5 text-right font-black text-brand-600">Rp ${s.sales.toLocaleString('id-ID')}</td>
+                <td class="py-4 px-5 text-center font-bold text-slate-600">${s.trxCount} <span class="text-[10px] text-slate-400 font-normal">Struk</span></td>
+                <td class="py-4 px-5 text-right font-black text-blue-600 bg-blue-50/30">Rp ${atv.toLocaleString('id-ID')}</td>
+                <td class="py-4 px-5 text-center">
+                    <span class="px-3 py-1 rounded-lg font-bold text-xs ${badBatal}">${s.batalCount}x</span>
+                </td>
+            </tr>`;
+        });
+        const detailTbody = document.getElementById('staf-detail-tbody');
+        if (detailTbody) detailTbody.innerHTML = detailHtml || `<tr><td colspan="5" class="text-center py-8">Tidak ada data staf.</td></tr>`;
     },
 
     // UI & BLUETOOTH
@@ -2557,6 +2685,56 @@ submitOpname: async function() {
         this.closeGiantNumpad();
     },
 
+    getOutletBadge: function(outletName) {
+        let safeName = String(outletName || '-').trim();
+        let colorClass = 'bg-slate-100 text-slate-600 border-slate-200'; // Warna Default (Abu-abu)
+
+        // Pemetakan warna khusus untuk setiap cabang
+        let lowerName = safeName.toLowerCase();
+        if (lowerName.includes('penajam')) {
+            colorClass = 'bg-blue-50 text-blue-600 border-blue-200';
+        } else if (lowerName.includes('babulu')) {
+            colorClass = 'bg-green-50 text-green-600 border-green-200';
+        } else if (lowerName.includes('batu kajang')) {
+            colorClass = 'bg-purple-50 text-purple-600 border-purple-200';
+        } else if (lowerName.includes('sepaku')) {
+            colorClass = 'bg-orange-50 text-orange-600 border-orange-200';
+        }
+
+        // Cetak elemen HTML Lencana
+        return `<span class="px-2 py-0.5 rounded md:rounded-md text-[10px] md:text-xs font-black border shadow-sm whitespace-nowrap ${colorClass}">${safeName}</span>`;
+    },
+
+    applyOutletTheme: function() {
+        let safeName = String(this.outlet || '').toLowerCase();
+        let root = document.documentElement;
+
+        if (safeName.includes('penajam')) { 
+            // Tema Penajam: BIRU
+            root.style.setProperty('--brand-50', '#eff6ff');
+            root.style.setProperty('--brand-100', '#dbeafe');
+            root.style.setProperty('--brand-500', '#3b82f6');
+            root.style.setProperty('--brand-600', '#2563eb');
+        } else if (safeName.includes('babulu')) { 
+            // Tema Babulu: HIJAU
+            root.style.setProperty('--brand-50', '#f0fdf4');
+            root.style.setProperty('--brand-100', '#dcfce7');
+            root.style.setProperty('--brand-500', '#22c55e');
+            root.style.setProperty('--brand-600', '#16a34a');
+        } else if (safeName.includes('batu kajang')) { 
+            // Tema Batu Kajang: UNGU
+            root.style.setProperty('--brand-50', '#faf5ff');
+            root.style.setProperty('--brand-100', '#f3e8ff');
+            root.style.setProperty('--brand-500', '#a855f7');
+            root.style.setProperty('--brand-600', '#9333ea');
+        } else { 
+            // Tema Sepaku / Default: ORANYE
+            root.style.setProperty('--brand-50', '#fff7ed');
+            root.style.setProperty('--brand-100', '#ffedd5');
+            root.style.setProperty('--brand-500', '#f97316');
+            root.style.setProperty('--brand-600', '#ea580c');
+        }
+    },
     
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
