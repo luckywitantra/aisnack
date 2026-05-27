@@ -980,9 +980,20 @@ const superApp = {
         list.innerHTML = this.filteredProducts.map(p => this.createProductCard(p)).join('');
     },
     createProductCard: function(p) {
-        let img = p.img ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition duration-300 group-hover:scale-105">` : `<div class="w-full h-full flex items-center justify-center text-2xl text-slate-300 opacity-50"><img src="https://cdn-icons-png.flaticon.com/512/3081/3081308.png" class="w-12 h-12 grayscale opacity-50"></div>`;
-        let isHabis = p.maxStok <= 0 ? 'item-empty' : '';
-        return `<div onclick="${p.maxStok > 0 ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" class="bg-white border border-slate-100 rounded-[1.5rem] p-3 cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col relative group ${isHabis}"><span class="absolute top-3 right-3 ${p.maxStok <= 0 ? 'bg-red-500' : 'bg-slate-900/80 backdrop-blur'} text-white text-[10px] font-bold px-2 py-1 rounded-lg z-10 shadow-sm">${p.maxStok <= 0 ? 'Habis' : `Sisa: ${p.maxStok}`}</span><div class="aspect-square mb-3 overflow-hidden rounded-xl bg-slate-50 relative">${img}</div><h3 class="font-extrabold text-xs text-slate-800 leading-tight mb-1 flex-1">${p.nama}</h3><p class="text-brand-500 font-black text-sm">Rp ${p.harga.toLocaleString('id-ID')}</p></div>`;
+        let img = p.img ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 opacity-50 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
+        let isHabis = p.maxStok <= 0 ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:-translate-y-1.5 hover:shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:border-brand-200';
+        
+        return `<div onclick="${p.maxStok > 0 ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" class="bg-white border-2 border-transparent rounded-[1.5rem] p-3 cursor-pointer shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col relative group ${isHabis}">
+            <span class="absolute top-4 right-4 ${p.maxStok <= 0 ? 'bg-red-500' : 'bg-slate-900/80 backdrop-blur-md'} text-white text-[10px] font-black px-2.5 py-1 rounded-lg z-10 shadow-md tracking-wider">${p.maxStok <= 0 ? 'HABIS' : `STOK: ${p.maxStok}`}</span>
+            <div class="aspect-[4/3] mb-4 overflow-hidden rounded-[1rem] bg-slate-100 relative shadow-inner">${img}</div>
+            <div class="flex flex-col flex-1 justify-between px-1">
+                <h3 class="font-bold text-xs md:text-sm text-slate-800 leading-snug mb-2 line-clamp-2">${p.nama}</h3>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-brand-500 font-black text-sm md:text-base tracking-tight">Rp ${p.harga.toLocaleString('id-ID')}</p>
+                    <div class="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-sm"><i class="fas fa-plus text-[10px]"></i></div>
+                </div>
+            </div>
+        </div>`;
     },
     addToCart: function(sku, nama, price, maxStok, skuBahan, event) {
         let currentStokBahanDiKeranjang = 0; let refBahan = skuBahan || sku;
@@ -1021,22 +1032,43 @@ const superApp = {
     
     renderCart: function() {
         const cont = document.getElementById('cart-container'); let total = 0, items = 0, html = ''; if (!cont) return;
+        
         this.cart.forEach((i, idx) => {
             total += (i.price * i.qty); items += i.qty;
+            
+            // Logika hitung sisa stok aktual di keranjang
             let sisaBahanDiKeranjang = 0; let refBahan = i.sku_bahan || i.sku;
             this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) sisaBahanDiKeranjang += c.qty; });
             let stokTersisaVisual = i.maxStok - sisaBahanDiKeranjang;
 
-            html += `<div class="flex bg-white border border-slate-100 p-3 rounded-[1rem] shadow-sm items-center gap-2 text-slate-800 transition transform hover:-translate-x-1"><div class="flex-1 min-w-0"><h4 class="font-bold text-xs truncate text-slate-700">${i.nama}</h4><p class="text-[10px] text-slate-400 mb-1">Sisa Stok: <span class="font-bold ${stokTersisaVisual <= 0 ? 'text-red-500' : 'text-brand-500'}">${stokTersisaVisual}</span></p><p class="text-brand-500 font-black text-sm">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p></div><div class="flex bg-slate-50 rounded-lg border border-slate-200 shadow-inner"><button onclick="superApp.changeQty(${idx}, -1)" class="w-10 h-10 font-black hover:text-brand-500 hover:bg-slate-100 rounded-l-lg transition text-lg">-</button><span class="w-8 text-center text-xs font-black flex items-center justify-center">${i.qty}</span><button onclick="superApp.changeQty(${idx}, 1)" class="w-10 h-10 font-black hover:text-brand-500 hover:bg-slate-100 rounded-r-lg transition text-lg">+</button></div></div>`;
+            // 🚀 PERBAIKAN UI: Desain Card Item Premium & Elegan
+            html += `<div class="flex bg-white border border-slate-100 p-3.5 rounded-[1.25rem] shadow-[0_4px_12px_rgba(0,0,0,0.03)] items-center gap-3 text-slate-800 transition transform hover:-translate-y-0.5">
+                
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-extrabold text-sm truncate text-slate-800 mb-0.5">${i.nama}</h4>
+                    <div class="flex items-center gap-2">
+                        <p class="text-brand-500 font-black text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
+                        <span class="text-[10px] text-slate-400 font-bold border border-slate-100 px-1.5 py-0.5 rounded-md ${stokTersisaVisual <= 0 ? 'bg-red-50 text-red-500 border-red-100' : ''}">Sisa: ${stokTersisaVisual}</span>
+                    </div>
+                </div>
+
+                <div class="flex bg-slate-50 rounded-xl border border-slate-200 shadow-inner p-1 overflow-hidden shrink-0 items-center">
+                    <button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm"><i class="fas fa-minus text-xs"></i></button>
+                    <span class="w-8 flex items-center justify-center text-sm font-black text-slate-800">${i.qty}</span>
+                    <button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm"><i class="fas fa-plus text-xs"></i></button>
+                </div>
+
+            </div>`;
         });
-        cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-basket-shopping', 'Keranjang Kosong', 'Yuk, tambahkan pesanan!');
+        
+        cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-shopping-basket', 'Keranjang Kosong', 'Yuk, tambahkan pesanan!');
         
         const totalEl = document.getElementById('total-price'); if (totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
         const badge = document.getElementById('cart-badge'); if (badge) badge.innerText = `${items} Item`;
         
-        // 🚀 PERBAIKAN UTAMA: Tembakkan update angka ke Floating Button di HP
+        // 🚀 Tembakkan update angka ke Floating Button di HP
         const mobQty = document.getElementById('mobile-cart-qty'); 
-        if (mobQty) mobQty.innerText = `${items} Item`;
+        if (mobQty) mobQty.innerText = `${items} ITEM`;
         
         const mobTotal = document.getElementById('mobile-cart-total'); 
         if (mobTotal) mobTotal.innerText = `Rp ${total.toLocaleString('id-ID')}`;
@@ -1100,7 +1132,7 @@ const superApp = {
     },
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN
-    executeCheckout: async function() {
+   executeCheckout: async function() {
         if (this.isProcessing) return; 
         this.isProcessing = true;
         
@@ -1116,22 +1148,29 @@ const superApp = {
         
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian };
 
-        // 1. PRINT STRUK (Prioritas Utama)
-        try { await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); } catch (e) { console.log("Printer belum siap"); }
+        // 🚀 PERBAIKAN 1: Tangkap status keberhasilan printer
+        let isPrintSuccess = false;
+        try { 
+            await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); 
+            isPrintSuccess = true; // Jika sukses lewat baris atas, tandai TRUE
+        } catch (e) { 
+            console.log("Printer belum siap atau gagal cetak"); 
+        }
         
-        // 2. UPDATE MEMORI LOKAL SECARA INSTAN
+        // 🚀 PERBAIKAN 2: Sisipkan "Status_Cetak" saat memasukkan data ke memori
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
             ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
             Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, 
             Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, 
-            Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian 
+            Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian,
+            Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'  // <--- KUNCI PENYELESAIANNYA DI SINI
         });
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
         this.refreshData(); 
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
 
-        // 3. KUNCI PERBAIKAN ALUR CFD
+        // KUNCI PERBAIKAN ALUR CFD
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
         this.cart = []; 
@@ -1139,32 +1178,27 @@ const superApp = {
         this.syncStorage('paid', noAntrian); 
         this.closeModal('modal-payment'); 
         
-        // 🚀 4. LEPASKAN KUNCI KASIR SEKARANG JUGA (Non-Blocking)
+        // LEPASKAN KUNCI KASIR
         this.isProcessing = false;
 
-        // 🚀 5. SINKRONISASI SERVER DI LATAR BELAKANG (Fire & Forget)
+        // Tambahkan info status cetak ke payload agar Google Sheets juga tahu
+        payload.status_cetak = isPrintSuccess ? 'Sudah' : 'Belum';
+
+        // SINKRONISASI SERVER DI LATAR BELAKANG
         this.apiPost(payload).then(res => {
-            // A. Jika sukses terkirim ke Google Sheets
             if (res && res.status === 'sukses' && !res.is_offline) {
-                // Tarik data terbaru secara diam-diam
                 fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
                     .then(r => r.json())
                     .then(data => {
                         if (data && data.status === 'sukses') {
                             this.db = data;
                             localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                            
-                            // 💡 PENTING: Hanya update UI HP Kasir JIKA keranjang sedang kosong
-                            // Ini memastikan aplikasi tidak "berkedip" saat kasir sedang sibuk menginput pelanggan berikutnya
                             if (this.cart.length === 0) {
                                 this.refreshData();
                             }
                         }
-                    }).catch(e => console.log("Gagal tarik background, aman karena memori lokal sudah tercatat."));
-            } 
-            // B. Jika Gagal dari sisi Server (bukan jaringan putus)
-            else if (res && res.status !== 'sukses' && !res.is_offline) {
-               // Pastikan tidak terjadi double push (karena apiPost kadang sudah mem-push)
+                    }).catch(e => console.log("Gagal tarik background, aman."));
+            } else if (res && res.status !== 'sukses' && !res.is_offline) {
                let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
                if (!isAlreadyQueued) {
                    this.offlineQueue.push(payload);
@@ -2592,17 +2626,20 @@ submitOpname: async function() {
 
     laporStrukDicetak: async function(idTrx) {
         try {
-            // 1. Kirim laporan ke Google Sheets di latar belakang tanpa mengganggu kasir
+            // 1. Kirim laporan ke Google Sheets di latar belakang
             this.apiPost({ action: 'update_status_cetak', id_transaksi: idTrx });
             
-            // 2. 🚀 PERBAIKAN TYPO: Menggunakan "transactions" bukan "transaksi"
+            // 2. Cari transaksinya
             let trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(idTrx));
             if (trx) {
                 trx.Status_Cetak = 'Sudah';
                 
-                // 3. Simpan perubahan ke memori HP agar saat pindah menu tidak me-reset status
-                if (typeof this.syncStorage === 'function') {
-                    this.syncStorage(); 
+                // 🚀 PERBAIKAN 3: Simpan ke Database Lokal yang benar
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+                
+                // Segarkan Layar Histori Transaksi secara paksa (agar lencana NO PRINT langsung menghilang di depan mata kasir)
+                if (document.getElementById('view-report') && !document.getElementById('view-report').classList.contains('hidden')) {
+                    if (typeof this.renderReport === 'function') this.renderReport();
                 }
             }
         } catch (e) {
