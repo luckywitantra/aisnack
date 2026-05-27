@@ -1145,32 +1145,31 @@ const superApp = {
         });
         let noAntrian = countToday + 1;
         let trxID = 'TRX' + d.getTime();
-        
-        const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian };
 
-        // 🚀 PERBAIKAN 1: Tangkap status keberhasilan printer
-        let isPrintSuccess = false;
-        try { 
-            await this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian); 
-            isPrintSuccess = true; // Jika sukses lewat baris atas, tandai TRUE
-        } catch (e) { 
-            console.log("Printer belum siap atau gagal cetak"); 
-        }
+        // 🚀 LOGIKA PINTAR ANDA: Jika mesin mendeteksi ada printer terhubung, anggap Pasti Sukses Cetak
+        let isPrintSuccess = this.printerCharacteristic ? true : false;
         
-        // 🚀 PERBAIKAN 2: Sisipkan "Status_Cetak" saat memasukkan data ke memori
+        const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintSuccess ? 'Sudah' : 'Belum' };
+
+        // 1. UPDATE MEMORI LOKAL DULUAN
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
             ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
             Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, 
             Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, 
             Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian,
-            Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'  // <--- KUNCI PENYELESAIANNYA DI SINI
+            Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'
         });
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
         this.refreshData(); 
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
 
-        // KUNCI PERBAIKAN ALUR CFD
+        // 2. JALANKAN PRINTER DI BACKGROUND (Tanpa memblokir layar kasir)
+        if (isPrintSuccess) {
+            this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian, false).catch(e => console.log("Gagal print background"));
+        }
+
+        // 3. RESET KASIR & CFD SECARA INSTAN
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
         this.cart = []; 
@@ -1178,15 +1177,18 @@ const superApp = {
         this.syncStorage('paid', noAntrian); 
         this.closeModal('modal-payment'); 
         
-        // LEPASKAN KUNCI KASIR
         this.isProcessing = false;
 
-        // Tambahkan info status cetak ke payload agar Google Sheets juga tahu
-        payload.status_cetak = isPrintSuccess ? 'Sudah' : 'Belum';
-
-        // SINKRONISASI SERVER DI LATAR BELAKANG
+        // 4. SINKRONISASI SERVER DI LATAR BELAKANG
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
+                
+                // 🚀 ANTI BALAPAN WAKTU: Lapor status cetak SETELAH transaksi sukses dibuat di server Google Sheets!
+                if (isPrintSuccess) {
+                    this.laporStrukDicetak(trxID);
+                }
+
+                // Segarkan data dari server
                 fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
                     .then(r => r.json())
                     .then(data => {
@@ -1197,7 +1199,7 @@ const superApp = {
                                 this.refreshData();
                             }
                         }
-                    }).catch(e => console.log("Gagal tarik background, aman."));
+                    }).catch(e => console.log("Aman, memori lokal sudah tercatat."));
             } else if (res && res.status !== 'sukses' && !res.is_offline) {
                let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
                if (!isAlreadyQueued) {
@@ -1208,7 +1210,6 @@ const superApp = {
             }
         }).catch(err => { console.log("Masuk ke antrean offline."); });
     },
-
     // TERIMA BARANG, OPNAME & WA MODAL
     showWaModal: function(waText) {
         try { navigator.clipboard.writeText(waText); } catch (err) { 
@@ -2109,11 +2110,14 @@ submitOpname: async function() {
         if(md && mdc) { md.classList.remove('hidden'); setTimeout(() => mdc.classList.add('modal-enter-active'), 10); }
     },
     executeReprint: async function() {
-        if(!this.activeReprintTrx) return; let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+        if(!this.activeReprintTrx) return; 
+        let t = this.activeReprintTrx; let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
         let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
         let cleanDate = this.cleanDateOnly(t.Tanggal);
         let cleanTime = this.cleanTimeOnly(t.Waktu);
-        try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + cleanTime, t.Antrian); } catch(e) {}
+        
+        // 🚀 PERBAIKAN: Tambahkan parameter 'true' di bagian akhir
+        try { await this.printReceipt(t.ID_TRX, t.Outlet, t.Total_Bayar, tunaiVal, t.Kembalian, items, t.Status, cleanDate + ' ' + cleanTime, t.Antrian, true); } catch(e) {}
     },
     promptVoidTrx: function() {
         let pin = prompt("Masukkan PIN Super Admin (Owner) untuk Membatalkan & Mengembalikan Stok:");
@@ -2920,11 +2924,10 @@ submitOpname: async function() {
         }
     },
     
-printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian) {
-        // PERBAIKAN 1: Sesuaikan dengan nama variabel di connectBluetooth
+printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian, isReprint = false) {
         if (!this.printerCharacteristic) {
             this.showToast("Printer belum terhubung!", "error");
-            return;
+            throw new Error("Printer tidak siap");
         } 
         
         try {
@@ -2932,10 +2935,6 @@ printReceipt: async function(id, outlet, total, tunai, kembali, items, status, e
             let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID');
             let antrianStr = antrian ? `\nANTRIAN : ${antrian}` : '';
             
-            // ESC/POS Commands:
-            // \x1B\x61\x01 = Align Center
-            // \x1B\x45\x01 = Bold ON
-            // \x1B\x45\x00 = Bold OFF
             let str = "\x1B\x61\x01\x1B\x45\x01=== Ai-Snack ===\n\x1B\x45\x00";
             str += `Cabang: ${outlet}\nNo. Resi: ${id}${antrianStr}${statStr}\nKasir: ${this.currentUser.Username}\nMetode: ${this.payMethod || 'Tunai'}\nWaktu: ${printTime}\n--------------------------------\n\x1B\x61\x00\n`;
             
@@ -2943,19 +2942,16 @@ printReceipt: async function(id, outlet, total, tunai, kembali, items, status, e
                 str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
             });
             
-            str += `--------------------------------\n\x1B\x61\x02\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\x1B\x61\x01\nTerima Kasih!\n\n\n\n`; // Tambah extra \n untuk feed kertas
+            str += `--------------------------------\n\x1B\x61\x02\x1B\x45\x01TOTAL  : Rp ${Number(total).toLocaleString('id-ID')}\nTUNAI  : Rp ${Number(tunai).toLocaleString('id-ID')}\nKEMBALI: Rp ${Number(kembali).toLocaleString('id-ID')}\n\x1B\x45\x00\x1B\x61\x01\nTerima Kasih!\n\n\n\n`;
             
             const data = new TextEncoder().encode(str);
-            
-            // PERBAIKAN 2: Gunakan chunkSize 20 jika 100 masih gagal (beberapa printer lawas hanya kuat 20)
             const chunkSize = 20; 
             for (let i = 0; i < data.length; i += chunkSize) {
-                // PERBAIKAN 3: Kirim ke printerCharacteristic
                 await this.printerCharacteristic.writeValue(data.slice(i, i + chunkSize));
             }
 
-            // 🚀 FITUR DETEKSI STRUK: Lapor ke server hanya jika pengiriman data sukses 100%
-            if (id && status === 'Sukses') {
+            // 🚀 PERBAIKAN: Hanya kirim laporan cetak dari sini JIKA ini adalah fitur Cetak Ulang
+            if (isReprint && id && status === 'Sukses') {
                 this.laporStrukDicetak(id);
             }
 
