@@ -584,38 +584,38 @@
     </div>
   </div>
 
-  <div id="modal-payment" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[150] hidden flex items-end md:items-center justify-center md:p-4 transition-opacity">
-    <div class="bg-white md:rounded-[2.5rem] rounded-t-[2rem] w-full max-w-md h-[95dvh] md:h-auto p-6 lg:p-8 shadow-2xl modal-enter text-slate-800 flex flex-col overflow-hidden border border-slate-100" id="modal-payment-content">
+  <div id="modal-payment" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[150] hidden flex items-center justify-center p-4 transition-opacity">
+    <div class="bg-white rounded-[2rem] w-full max-w-md max-h-[90dvh] p-5 md:p-6 shadow-2xl modal-enter text-slate-800 flex flex-col overflow-hidden border border-slate-100" id="modal-payment-content">
       
-        <div class="flex justify-between items-center mb-6 shrink-0">
+        <div class="flex justify-between items-center mb-5 shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-brand-50 text-brand-500 rounded-full flex items-center justify-center text-lg shadow-inner">
                     <i class="fas fa-cash-register"></i>
                 </div>
                 <h3 class="font-extrabold text-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500">Pembayaran</h3>
             </div>
-            <button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors w-9 h-9 flex items-center justify-center bg-slate-100 rounded-full">
+            <button onclick="superApp.closeModal('modal-payment')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full">
                 <i class="fas fa-times"></i>
             </button>
         </div>
       
-        <div class="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar custom-scroll min-h-0 pb-4 pr-1">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar custom-scroll min-h-0 pb-2 pr-1">
           
-            <div class="bg-gradient-to-br from-brand-500 to-orange-400 p-6 rounded-3xl mb-6 text-center shadow-[0_10px_25px_rgba(249,115,22,0.3)] relative overflow-hidden">
-                <div class="absolute top-0 right-0 opacity-10 text-7xl transform translate-x-4 -translate-y-2">
+            <div class="bg-gradient-to-br from-brand-500 to-orange-400 p-5 rounded-[1.5rem] mb-5 text-center shadow-[0_8px_20px_rgba(249,115,22,0.25)] relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 text-6xl transform translate-x-3 -translate-y-2">
                     <i class="fas fa-wallet"></i>
                 </div>
-                <p class="text-brand-100 font-bold text-xs uppercase tracking-widest mb-1 relative z-10">Total Tagihan</p>
-                <h2 class="text-4xl md:text-5xl font-black text-white drop-shadow-md relative z-10 tracking-tight" id="pay-total">Rp 0</h2>
+                <p class="text-brand-100 font-bold text-[10px] uppercase tracking-widest mb-1 relative z-10">Total Tagihan</p>
+                <h2 class="text-3xl md:text-4xl font-black text-white drop-shadow-md relative z-10 tracking-tight" id="pay-total">Rp 0</h2>
             </div>
 
-            <div class="mb-6">
+            <div class="mb-5">
                 <label class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest ml-1">Metode Pembayaran</label>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="superApp.setPaymentMethod('Tunai')" id="btn-pay-tunai" class="py-3.5 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition shadow-sm flex items-center justify-center">
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button onclick="superApp.setPaymentMethod('Tunai')" id="btn-pay-tunai" class="py-2.5 border-2 border-brand-500 bg-brand-50 text-brand-600 rounded-xl font-bold transition shadow-sm flex items-center justify-center">
                         <i class="fas fa-money-bill-wave mr-2 text-lg"></i>TUNAI
                     </button>
-                    <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-3.5 border-2 border-slate-200 bg-white text-slate-500 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 shadow-sm flex items-center justify-center">
+                    <button onclick="superApp.setPaymentMethod('QRIS')" id="btn-pay-qris" class="py-2.5 border-2 border-slate-200 bg-white text-slate-500 rounded-xl font-bold transition hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 shadow-sm flex items-center justify-center">
                         <i class="fas fa-qrcode mr-2 text-lg"></i>QRIS
                     </button>
                 </div>
@@ -623,38 +623,38 @@
 
             <div id="tunai-section" class="animate-fade-in">
                 <label class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest ml-1">Pecahan Cepat</label>
-                <div class="grid grid-cols-4 gap-2.5 mb-4">
-                    <button onclick="superApp.addPayNumpad(10000)" class="py-3 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-sm">10k</button>
-                    <button onclick="superApp.addPayNumpad(20000)" class="py-3 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-sm">20k</button>
-                    <button onclick="superApp.addPayNumpad(50000)" class="py-3 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-sm">50k</button>
-                    <button onclick="superApp.addPayNumpad(100000)" class="py-3 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-sm">100k</button>
-                    <button onclick="superApp.setCash('pas')" class="col-span-4 py-3 border border-slate-200 rounded-xl font-extrabold bg-slate-800 text-white shadow-md hover:bg-slate-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                <div class="grid grid-cols-4 gap-2 mb-3">
+                    <button onclick="superApp.addPayNumpad(10000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-xs">10k</button>
+                    <button onclick="superApp.addPayNumpad(20000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-xs">20k</button>
+                    <button onclick="superApp.addPayNumpad(50000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-xs">50k</button>
+                    <button onclick="superApp.addPayNumpad(100000)" class="py-2.5 border border-slate-200 rounded-xl font-bold bg-white text-slate-600 shadow-sm hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50 hover:-translate-y-0.5 transition-all text-xs">100k</button>
+                    <button onclick="superApp.setCash('pas')" class="col-span-4 py-2.5 border border-slate-200 rounded-xl font-extrabold bg-slate-800 text-white shadow-md hover:bg-slate-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 text-sm">
                         <i class="fas fa-hand-holding-dollar"></i> UANG PAS
                     </button>
                 </div>
               
-                <div class="flex items-center gap-2.5 mb-6 w-full">
+                <div class="flex items-center gap-2.5 mb-5 w-full">
                     <div class="relative flex-1 min-w-0">
-                        <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 font-bold">Rp</span>
-                        <input type="text" id="pay-cash-input" readonly onclick="osKeyboard.open('pay-cash-input', 'numeric')" class="w-full border-2 border-slate-200 bg-slate-50 rounded-xl pl-10 pr-4 py-3.5 font-black text-2xl text-slate-800 outline-none focus:border-brand-500 focus:bg-white transition cursor-pointer text-right osk-trigger shadow-inner" data-type="numeric" placeholder="0" oninput="superApp.formatRupiahInput(this); superApp.calcChange()">
+                        <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 font-bold text-sm">Rp</span>
+                        <input type="text" id="pay-cash-input" readonly onclick="osKeyboard.open('pay-cash-input', 'numeric')" class="w-full border-2 border-slate-200 bg-slate-50 rounded-xl pl-10 pr-4 py-3 font-black text-xl text-slate-800 outline-none focus:border-brand-500 focus:bg-white transition cursor-pointer text-right osk-trigger shadow-inner" data-type="numeric" placeholder="0" oninput="superApp.formatRupiahInput(this); superApp.calcChange()">
                     </div>
-                    <button onclick="superApp.setCash(0)" class="px-5 py-3.5 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl font-bold hover:bg-rose-100 transition shadow-sm whitespace-nowrap shrink-0 flex items-center gap-2">
+                    <button onclick="superApp.setCash(0)" class="px-4 py-3 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl font-bold hover:bg-rose-100 transition shadow-sm whitespace-nowrap shrink-0 flex items-center gap-2 text-sm">
                         <i class="fas fa-eraser"></i> Reset
                     </button>
                 </div>
               
-                <div class="flex justify-between items-center bg-white p-5 rounded-2xl mb-2 border-2 border-dashed border-slate-200 text-slate-800 relative">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl mb-1 border-2 border-dashed border-slate-200 text-slate-800 relative">
                     <div class="absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white border-r-2 border-slate-200 rounded-full"></div>
                     <div class="absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white border-l-2 border-slate-200 rounded-full"></div>
-                    <span class="font-bold text-slate-500 uppercase tracking-widest text-xs">Kembalian</span>
-                    <span class="text-3xl font-black text-slate-800 tracking-tight" id="pay-change">Rp 0</span>
+                    <span class="font-bold text-slate-500 uppercase tracking-widest text-[10px]">Kembalian</span>
+                    <span class="text-2xl font-black text-slate-800 tracking-tight" id="pay-change">Rp 0</span>
                 </div>
             </div>
         </div>
       
-        <div class="shrink-0 pt-5 border-t border-slate-100 pb-2 mt-2">
-            <button onclick="superApp.executeCheckout()" class="w-full bg-gradient-to-r from-brand-500 to-orange-500 text-white py-4 md:py-4 rounded-xl font-extrabold shadow-[0_10px_25px_rgba(249,115,22,0.4)] hover:from-brand-600 hover:to-orange-600 active:scale-95 transition-all text-lg tracking-wide flex items-center justify-center gap-2" id="btn-execute-pay">
-                <i class="fas fa-print text-xl"></i> Selesaikan & Cetak
+        <div class="shrink-0 pt-4 border-t border-slate-100 mt-2">
+            <button onclick="superApp.executeCheckout()" class="w-full bg-gradient-to-r from-brand-500 to-orange-500 text-white py-3.5 rounded-xl font-extrabold shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:from-brand-600 hover:to-orange-600 active:scale-95 transition-all text-base tracking-wide flex items-center justify-center gap-2" id="btn-execute-pay">
+                <i class="fas fa-print text-lg"></i> Selesaikan & Cetak
             </button>
         </div>
     </div>
