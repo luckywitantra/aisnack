@@ -1572,22 +1572,20 @@ const superApp = {
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
         if (selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if (selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
     },
-    buildOpnameWaText: function(outlet, kasir, waktu, items) {
-        // 1. Hitung Kecepatan Jualan (Velocity) dari Riwayat Transaksi
+   buildOpnameWaText: function(outlet, kasir, waktu, items) {
+        // 1. Hitung Kecepatan Jualan (Velocity) untuk Bahan Utama dari Riwayat Transaksi
         let productSales = {};
         let oldestDate = new Date();
         
         (this.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && t.Outlet === outlet) {
                 let d = this.parseDateId(t.Tanggal); 
-                // Cari tanggal transaksi paling tua untuk pembagi rata-rata harian
                 if(d < oldestDate && d.getTime() > 0) oldestDate = d;
                 
                 let parsedItems = []; 
                 try { parsedItems = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 
                 parsedItems.forEach(item => {
-                    // 🚀 PERBAIKAN 1: Gunakan SKU Bahan (Bukan sekadar Nama)
                     let refSku = item.sku_bahan || item.sku;
                     if(!productSales[refSku]) productSales[refSku] = 0;
                     productSales[refSku] += Number(item.qty) || 0;
@@ -1595,61 +1593,79 @@ const superApp = {
             }
         });
         
+        // 1.5 🚀 Hitung Total Barang Masuk (Mutasi) untuk Barang Pendukung
+        let mutasiIn = {};
+        (this.db.mutasi || []).forEach(m => {
+            if(m.Outlet_Tujuan === outlet && m.Status_Approval === 'Disetujui') {
+                if(!mutasiIn[m.SKU]) mutasiIn[m.SKU] = 0;
+                mutasiIn[m.SKU] += Number(m.Qty) || 0;
+            }
+        });
+
         let todayObj = new Date();
         let daysActive = Math.ceil((todayObj - oldestDate) / (1000 * 60 * 60 * 24));
         if (daysActive < 1) daysActive = 1;
 
         // 2. Pisahkan Kategori & Urutkan A-Z
-        let bahanUtama = [];
-        let bahanPendukung = [];
+        let bermasalah = [];
+        let aman = [];
 
         items.forEach(item => {
-            // 🚀 PERBAIKAN 2: Kalkulasi berdasarkan SKU
-            let soldQty = productSales[item.sku] || 0;
-            let vel = soldQty / daysActive;
             
-            if (vel > 0) {
-                let estHari = item.fisik / vel; 
-                item.estHari = Math.floor(estHari);
+            // 🚀 KALKULASI PINTAR BERDASARKAN KATEGORI BARANG
+            if (String(item.kategori).toLowerCase() === 'bahan') {
+                // A. Barang Utama (Dihitung dari kasir/POS)
+                let soldQty = productSales[item.sku] || 0;
+                let vel = soldQty / daysActive;
+                if (vel > 0) item.estHari = Math.floor(item.fisik / vel);
+                else item.estHari = -1; 
             } else {
-                // 🚀 PERBAIKAN 3: Jika barang tidak pernah di-input di kasir (seperti Plastik/Kotak)
-                item.estHari = -1; 
+                // B. Barang Pendukung (Dihitung dari Arus Masuk vs Fisik)
+                // Total Terpakai = Total Pernah Dikirim Pusat - Sisa Fisik Saat Ini
+                let totalReceived = mutasiIn[item.sku] || item.sys; // Fallback ke stok sistem jika blm ada mutasi
+                let totalUsed = totalReceived - item.fisik;
+                
+                if (totalUsed > 0 && daysActive > 0) {
+                    let vel = totalUsed / daysActive; // Rata-rata pemakaian pcs per hari
+                    item.estHari = Math.floor(item.fisik / vel);
+                } else {
+                    item.estHari = -1; // Jika barang belum pernah dipakai sama sekali
+                }
             }
 
-            if(String(item.kategori).toLowerCase() === 'bahan') bahanUtama.push(item);
-            else bahanPendukung.push(item);
+            // FILTER: Jika ada selisih ATAU kasir memberikan catatan khusus
+            if (item.selisih !== 0 || (item.note && item.note.trim() !== '')) {
+                bermasalah.push(item);
+            } else {
+                aman.push(item);
+            }
         });
 
-        bahanUtama.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
-        bahanPendukung.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        bermasalah.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        aman.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
 
-        // 3. Susun Teks WhatsApp
-        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+        // 3. SUSUN TEKS WHATSAPP EKSEKUTIF
+        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek menu Audit Opname di aplikasi untuk menyetujui_*\n\n`;
 
-        const renderItems = (arr, title, icon) => {
-            if(arr.length === 0) return '';
-            let txt = `${icon} *${title}*\n`;
-            arr.forEach(i => {
-                let alertStr = '';
+        // --- A. Render Barang Bermasalah / Selisih ---
+        if (bermasalah.length > 0) {
+            waText += `🚨 *ITEM SELISIH / CATATAN (${bermasalah.length})*\n`;
+            bermasalah.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '⚠️');
                 
-                // Logika Teks Peringatan Pintar
-                if (i.fisik <= 0) {
-                    alertStr = 'HABIS 🛑';
-                } else if (i.estHari === -1) {
-                    alertStr = 'Data tidak cukup 📉'; // Untuk barang pendukung (Saus, Kotak, dll)
-                } else if (i.estHari < 4) {
-                    alertStr = `${i.estHari} Hari (Kritis ⚠️)`;
-                } else {
-                    alertStr = `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`;
-                }
-                
-                txt += `🔹 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih}*\n⏳ Estimasi Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
+                waText += `${icon} *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih > 0 ? '+'+i.selisih : i.selisih}*\n⏳ Est Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
             });
-            return txt;
-        };
+        } else {
+            waText += `🚨 *ITEM SELISIH / CATATAN*\n_Nihil. Kinerja staf sangat teliti, tidak ada selisih stok!_ 🎉\n\n`;
+        }
 
-        waText += renderItems(bahanUtama, 'A. BAHAN BAKU UTAMA', '📦');
-        waText += renderItems(bahanPendukung, 'B. BARANG PENDUKUNG', '🧴');
+        // --- B. Render Barang Aman ---
+        if (aman.length > 0) {
+            waText += `✅ *ITEM AMAN FISIK SESUAI SISTEM (${aman.length})*\n`;
+            let amanNames = aman.map(i => i.nama).join(', ');
+            waText += `_${amanNames}_\n`;
+        }
 
         return waText;
     },
