@@ -1,5 +1,4 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
-
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
 /* ========================================== */
@@ -700,29 +699,39 @@ const superApp = {
             const sbRole = document.getElementById('sb-role'); if (sbRole) sbRole.innerText = user.Role;
             const hInit = document.getElementById('header-initial'); if (hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
 
-            let isAdmin = String(user.Role).toLowerCase().includes('admin');
+            // Deteksi Role Admin / Owner
+            let roleStr = String(user.Role).toLowerCase();
+            let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+            
             const adminMenus = document.getElementById('admin-menus'); const selOut = document.getElementById('select-outlet'); const repOut = document.getElementById('report-outlet-filter');
 
             if (isAdmin) {
+                // AKSES ADMIN/OWNER
                 if (adminMenus) adminMenus.classList.remove('hidden'); if (selOut) selOut.classList.remove('hidden'); if (repOut) repOut.classList.remove('hidden');
                 let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                 (this.db.outlets || []).forEach(o => { outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; });
                 if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
                 if (repOut) repOut.innerHTML = outFilters;
                 
-                // TAMPILKAN 3 TOMBOL KHUSUS ADMIN (Owner)
-                const btnStandby = document.getElementById('btn-promo-standby'); if (btnStandby) btnStandby.style.display = 'flex';
-                const btnTransaksi = document.getElementById('btn-promo-transaksi'); if (btnTransaksi) btnTransaksi.style.display = 'flex';
-                const btnLogo = document.getElementById('btn-ubah-logo'); if (btnLogo) btnLogo.style.display = 'flex';
+                // 🚀 BUKA KUNCI MENU PROMO UNTUK ADMIN/OWNER
+                const cardStandby = document.getElementById('setting-card-standby'); 
+                if (cardStandby) cardStandby.classList.remove('hidden');
+                
+                const cardTransaksi = document.getElementById('setting-card-transaksi'); 
+                if (cardTransaksi) cardTransaksi.classList.remove('hidden');
+
             } else {
+                // AKSES KASIR BIASA
                 if (adminMenus) adminMenus.classList.add('hidden');
                 if (selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`; selOut.disabled = true; }
                 if (repOut) repOut.classList.add('hidden');
                 
-                // SEMBUNYIKAN 3 TOMBOL DARI KASIR BIASA
-                const btnStandby = document.getElementById('btn-promo-standby'); if (btnStandby) btnStandby.style.display = 'none';
-                const btnTransaksi = document.getElementById('btn-promo-transaksi'); if (btnTransaksi) btnTransaksi.style.display = 'none';
-                const btnLogo = document.getElementById('btn-ubah-logo'); if (btnLogo) btnLogo.style.display = 'none';
+                // 🔒 KUNCI MENU PROMO DARI KASIR BIASA
+                const cardStandby = document.getElementById('setting-card-standby'); 
+                if (cardStandby) cardStandby.classList.add('hidden');
+                
+                const cardTransaksi = document.getElementById('setting-card-transaksi'); 
+                if (cardTransaksi) cardTransaksi.classList.add('hidden');
             }
 
             const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
