@@ -293,10 +293,10 @@
             <i class="fas fa-print"></i> <span id="printer-status" class="hidden sm:inline">Printer</span>
         </button>
         
-        <div class="relative hidden md:block shrink-0">
-            <select id="select-outlet" class="h-10 appearance-none bg-slate-900 border border-slate-800 text-white rounded-xl pl-4 pr-10 font-bold text-sm outline-none shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-slate-800 cursor-pointer transition-all" onchange="superApp.changeOutlet(this.value)"></select>
-            <i class="fas fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]"></i>
-        </div>
+        <button onclick="superApp.openOutletSelector()" class="w-10 h-10 md:w-auto md:px-4 flex items-center justify-center gap-2 bg-slate-900 text-white rounded-full md:rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-slate-800 transition-all active:scale-95 shrink-0 group" title="Pilih Cabang">
+            <i class="fas fa-map-marker-alt text-brand-400 group-hover:animate-bounce"></i>
+            <span id="header-outlet-name" class="font-bold text-sm hidden md:block tracking-wide">Pilih Cabang</span>
+        </button>
         
         <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-500 to-orange-400 flex items-center justify-center font-black text-white shadow-[0_4px_10px_rgba(249,115,22,0.3)] border-2 border-white shrink-0 cursor-pointer hover:scale-105 transition-transform" id="header-initial">A</div>
         
@@ -1072,6 +1072,28 @@
 
   <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none"></div>
 
+
+  <div id="modal-outlet-selector" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4 lg:p-6 transition-opacity">
+        <div class="bg-white rounded-[2rem] w-full max-w-md flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-100 modal-enter" id="modal-outlet-selector-content">
+            
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 relative overflow-hidden">
+                <i class="fas fa-map-marked-alt absolute -right-4 -bottom-4 text-7xl text-slate-200 opacity-40 pointer-events-none"></i>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="w-12 h-12 bg-gradient-to-br from-slate-800 to-black text-white rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-slate-300/50"><i class="fas fa-store"></i></div>
+                    <div>
+                        <h3 class="font-black text-xl text-slate-800 tracking-tight">Lokasi Toko</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pilih Cabang Operasional</p>
+                    </div>
+                </div>
+                <button onclick="superApp.closeModal('modal-outlet-selector')" class="w-9 h-9 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-colors shadow-sm active:scale-90 relative z-10"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[60vh] custom-scroll bg-slate-50" id="outlet-selector-list">
+                </div>
+            
+        </div>
+    </div>
+  
   <div id="modal-shift" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex-col items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl modal-enter text-center" id="modal-shift-content">
       <div class="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-clock"></i></div>
@@ -1323,7 +1345,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=97"></script>
+  <script src="app.js?v=98"></script>
   
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
