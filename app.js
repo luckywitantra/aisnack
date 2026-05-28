@@ -2609,35 +2609,94 @@ submitOpname: async function() {
 
         let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
         
+        // 1. RENDER GUDANG PUSAT (STOK FISIK)
         sortedMaster.forEach(g => {
             if(String(g.Kategori||'').toLowerCase() === 'bahan' || String(g.Kategori||'').toLowerCase() === 'pendukung') {
                 let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
-                let row = `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-5 whitespace-normal min-w-[150px] font-bold text-slate-700">${g.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-medium">SKU: ${g.SKU}</span></td><td class="py-3 px-5 whitespace-nowrap text-right font-black text-brand-500 bg-brand-50/30 text-lg">${stok}</td><td class="py-3 px-5 whitespace-nowrap text-center"><button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold ml-1 hover:bg-red-100 transition"><i class="fas fa-trash"></i></button></td></tr>`;
+                let isKritis = stok <= 5;
+                let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-[0_0_10px_rgba(225,29,72,0.15)] animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm';
+                
+                let row = `
+                <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                    <td class="py-4 px-5 whitespace-normal min-w-[150px]">
+                        <div class="font-extrabold text-slate-800 text-sm mb-1">${g.Nama_Produk}</div>
+                        <div class="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[9px] font-black text-slate-500 uppercase tracking-widest">SKU: ${g.SKU}</div>
+                    </td>
+                    <td class="py-4 px-5 whitespace-nowrap text-right">
+                        <span class="inline-flex w-14 h-9 items-center justify-center rounded-xl border font-black text-lg ${stokBadge}">${stok}</span>
+                    </td>
+                    <td class="py-4 px-5 whitespace-nowrap text-center">
+                        <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-90" title="Edit Bahan"><i class="fas fa-edit"></i></button> 
+                            <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-200 transition-all active:scale-90" title="Hapus Bahan"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+                
                 if(String(g.Kategori||'').toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
             }
         });
-        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku')}</td></tr>`;
-        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-box', 'Barang Kosong', 'Belum ada barang pendukung')}</td></tr>`;
         
+        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-10 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku utama.')}</td></tr>`;
+        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-10 h-32">${this.getEmptyState('fa-pump-soap', 'Pendukung Kosong', 'Belum ada barang kemasan/saus.')}</td></tr>`;
+        
+        // 2. RENDER MASTER PRODUK (MENU POS)
         const masterBody = document.getElementById('master-tbody');
         if(masterBody) {
             let html = '';
             sortedMaster.forEach(m => {
                 if(String(m.Kategori||'').toLowerCase() !== 'bahan' && String(m.Kategori||'').toLowerCase() !== 'pendukung') {
                     let bahanName = '-';
-                    if(m.SKU_Bahan) { let b = (this.db.masterProduk || []).find(x=>x.SKU===m.SKU_Bahan); if(b) bahanName = b.Nama_Produk; }
-                    let imgT = m.Gambar_URL ? `<img src="${m.Gambar_URL}" class="w-10 h-10 rounded-xl object-cover inline-block mr-3 shadow-sm" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';">` : `<div class="w-10 h-10 rounded-xl bg-slate-100 inline-flex items-center justify-center mr-3 text-slate-300 shadow-inner"><i class="fas fa-image"></i></div>`;
-                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-3 px-5 whitespace-normal min-w-[150px] font-bold text-sm flex items-center text-slate-700">${imgT} ${m.Nama_Produk}</td><td class="py-3 px-5 whitespace-normal min-w-[120px] text-xs font-bold text-orange-600 bg-orange-50/30">${bahanName}</td><td class="py-3 px-5 whitespace-nowrap text-center"><button onclick="superApp.openCrudMasterMenu('edit', '${m.SKU}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button> <button onclick="superApp.deleteCrud('Master_Produk', '${m.SKU}')" class="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold ml-1 hover:bg-red-100 transition"><i class="fas fa-trash"></i></button></td></tr>`;
+                    if(m.SKU_Bahan) { 
+                        let b = (this.db.masterProduk || []).find(x=>x.SKU===m.SKU_Bahan); 
+                        if(b) bahanName = b.Nama_Produk; 
+                    }
+                    
+                    let bahanBadge = bahanName !== '-' 
+                        ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center w-max"><i class="fas fa-link mr-1.5 opacity-70"></i> ${bahanName}</span>` 
+                        : `<span class="bg-slate-50 text-slate-400 border border-slate-200 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center w-max"><i class="fas fa-unlink mr-1.5 opacity-70"></i> Mandiri</span>`;
+
+                    let imgT = m.Gambar_URL 
+                        ? `<img src="${m.Gambar_URL}" class="w-12 h-12 rounded-[1rem] object-cover shadow-sm border border-slate-100 shrink-0" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';">` 
+                        : `<div class="w-12 h-12 rounded-[1rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 shadow-inner shrink-0"><i class="fas fa-image text-xl"></i></div>`;
+                    
+                    html += `
+                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                        <td class="py-4 px-5 whitespace-normal min-w-[200px]">
+                            <div class="flex items-center gap-3">
+                                ${imgT}
+                                <span class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</span>
+                            </div>
+                        </td>
+                        <td class="py-4 px-5 whitespace-normal min-w-[150px]">
+                            ${bahanBadge}
+                        </td>
+                        <td class="py-4 px-5 whitespace-nowrap text-center">
+                            <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <button onclick="superApp.openCrudMasterMenu('edit', '${m.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-500 hover:bg-indigo-500 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-90" title="Edit Menu"><i class="fas fa-edit"></i></button> 
+                                <button onclick="superApp.deleteCrud('Master_Produk', '${m.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-200 transition-all active:scale-90" title="Hapus Menu"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>`;
                 }
             });
-            masterBody.innerHTML = html || `<tr><td colspan="3" class="text-center py-8 h-32">${this.getEmptyState('fa-utensils', 'Belum Ada Master', 'Tambahkan menu jualan di sini')}</td></tr>`;
+            masterBody.innerHTML = html || `<tr><td colspan="3" class="text-center py-10 h-32">${this.getEmptyState('fa-utensils', 'Belum Ada Master', 'Tambahkan menu jualan di sini')}</td></tr>`;
         }
         
+        // 3. RENDER DAFTAR OUTLET (CRUD)
         const outBody = document.getElementById('crud-outlet-tbody');
         if(outBody) {
-            outBody.innerHTML = (this.db.outlets || []).map(o => `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 font-bold text-sm text-slate-700">${o.ID_Outlet}</td><td class="py-4 px-5 font-medium text-slate-600">${o.Nama_Outlet}</td><td class="py-4 px-5 text-center"><button onclick="superApp.openCrudOutlet('edit', '${o.ID_Outlet}')" class="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition"><i class="fas fa-edit"></i></button></td></tr>`).join('');
+            outBody.innerHTML = (this.db.outlets || []).map(o => `
+            <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                <td class="py-4 px-5 font-black text-sm text-slate-800">${o.ID_Outlet}</td>
+                <td class="py-4 px-5 font-bold text-slate-500">${o.Nama_Outlet}</td>
+                <td class="py-4 px-5 text-center">
+                    <button onclick="superApp.openCrudOutlet('edit', '${o.ID_Outlet}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-90 opacity-60 group-hover:opacity-100 mx-auto"><i class="fas fa-edit"></i></button>
+                </td>
+            </tr>`).join('');
         }
 
+        // 4. RENDER HARGA & STOK CABANG (MANAGE OUTLET)
         const mOutBody = document.getElementById('outlet-manage-tbody');
         if(mOutBody) {
             let html = '';
@@ -2649,11 +2708,35 @@ submitOpname: async function() {
                         let refBahan = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                         let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
                         let stk = sData ? sData.Stok_Toko : 0;
-                        html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="py-4 px-5 whitespace-normal min-w-[150px] font-bold text-sm text-slate-700">${master.Nama_Produk}</td><td class="py-4 px-5 whitespace-nowrap text-right text-brand-600 font-bold bg-brand-50/30 text-lg">Rp ${Number(hrg).toLocaleString('id-ID')}</td><td class="py-4 px-5 whitespace-nowrap text-right font-black text-slate-700 text-lg">${stk}</td><td class="py-4 px-5 whitespace-nowrap text-center"><button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="text-blue-500 bg-blue-50 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-100 transition shadow-sm"><i class="fas fa-tag mr-1"></i> Set Harga</button> <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="text-red-500 bg-red-50 px-3 py-2 rounded-xl text-xs font-bold ml-1 hover:bg-red-100 transition shadow-sm"><i class="fas fa-trash"></i></button></td></tr>`;
+                        
+                        let isKritis = stk <= 5;
+                        let stokUI = isKritis 
+                            ? `<span class="inline-flex w-12 h-8 items-center justify-center rounded-lg border bg-rose-50 border-rose-100 text-rose-600 font-black text-sm shadow-sm animate-pulse">${stk}</span>`
+                            : `<span class="inline-flex w-12 h-8 items-center justify-center rounded-lg border bg-slate-50 border-slate-200 text-slate-700 font-black text-sm shadow-sm">${stk}</span>`;
+
+                        html += `
+                        <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                            <td class="py-4 px-5 whitespace-normal min-w-[150px] font-extrabold text-sm text-slate-800">${master.Nama_Produk}</td>
+                            <td class="py-4 px-5 whitespace-nowrap text-right">
+                                <span class="text-brand-600 font-black text-lg tracking-tight drop-shadow-sm">Rp ${Number(hrg).toLocaleString('id-ID')}</span>
+                            </td>
+                            <td class="py-4 px-5 whitespace-nowrap text-right">${stokUI}</td>
+                            <td class="py-4 px-5 whitespace-nowrap text-center">
+                                <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="superApp.openEditHargaOutlet('${master.SKU}', '${master.Nama_Produk}', ${hrg})" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white px-3 py-2 rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-95 flex items-center gap-1.5"><i class="fas fa-tag"></i> Set Harga</button> 
+                                    <button onclick="superApp.deleteOutletProduct('${master.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-200 transition-all active:scale-90" title="Hapus dari Cabang"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>`;
                     }
                 }
             });
-            mOutBody.innerHTML = html || `<tr><td colspan="4" class="text-center py-10 h-32">${this.getEmptyState('fa-store-slash', 'Cabang Kosong', 'Belum ada menu yang dikirim/dijual di cabang ini')}</td></tr>`;
+            mOutBody.innerHTML = html || `<tr><td colspan="4" class="text-center py-12 h-32">${this.getEmptyState('fa-store-slash', 'Cabang Kosong', 'Belum ada menu yang dikirim/dijual di cabang ini')}</td></tr>`;
+        }
+
+        // 5. RENDER GLOBAL INVENTORY HEATMAP (Jika fitur ini aktif)
+        if (typeof this.renderGlobalStockMatrix === 'function') {
+            this.renderGlobalStockMatrix();
         }
     },
     openCrudBahan: function(action = 'add', sku = '') {
@@ -3265,6 +3348,71 @@ submitOpname: async function() {
         this.updateHeaderOutletName(); // Update nama di header
         this.closeModal('modal-outlet-selector');
     },
+
+    renderGlobalStockMatrix: function() {
+        if (!this.db || !this.db.masterProduk || !this.db.outlets) return;
+
+        let outlets = this.db.outlets || [];
+        
+        // 1. BUAT HEADER TABEL SECARA DINAMIS
+        let thHtml = `<tr>
+            <th class="py-4 px-4 sticky left-0 bg-white z-20 shadow-[2px_0_10px_rgba(0,0,0,0.05)] font-black uppercase tracking-widest text-[10px] text-slate-400">Nama Bahan Baku</th>
+            <th class="py-4 px-4 text-center font-black uppercase tracking-widest text-[10px] bg-blue-50/50 text-blue-600 border-l border-r border-blue-100/50">Gudang Pusat</th>`;
+        
+        // Looping nama outlet ke samping
+        outlets.forEach(o => {
+            thHtml += `<th class="py-4 px-4 text-center font-black uppercase tracking-widest text-[10px]">${o.Nama_Outlet}</th>`;
+        });
+        thHtml += `</tr>`;
+        
+        const thead = document.getElementById('heatmap-thead');
+        if (thead) {
+            // Karena ini efek sticky ke kiri, kita atur z-index manual pada kolom pertama
+            thead.innerHTML = thHtml;
+        }
+
+        // 2. BUAT BARIS DATA (PRODUK & STOK)
+        let trHtml = '';
+        
+        // Filter hanya kategori Bahan dan Pendukung, lalu urutkan abjad
+        let sortedBahan = [...this.db.masterProduk]
+            .filter(m => String(m.Kategori).toLowerCase() === 'bahan' || String(m.Kategori).toLowerCase() === 'pendukung')
+            .sort((a,b) => String(a.Nama_Produk).localeCompare(String(b.Nama_Produk)));
+
+        sortedBahan.forEach(m => {
+            let rowHtml = `
+                <td class="py-3 px-4 font-bold text-slate-800 text-sm sticky left-0 bg-white z-10 shadow-[2px_0_10px_rgba(0,0,0,0.03)] border-r border-slate-50">
+                    ${m.Nama_Produk} <br>
+                    <span class="text-[9px] font-black uppercase text-slate-400 tracking-widest">${m.Kategori}</span>
+                </td>`;
+
+            // Data Stok Gudang Pusat
+            let stokPusat = (this.db.stokGudang || []).find(x => x.SKU === m.SKU)?.Stok_Pusat || 0;
+            rowHtml += `<td class="py-3 px-4 text-center font-black text-blue-600 bg-blue-50/30 text-base border-l border-r border-blue-50">${stokPusat}</td>`;
+
+            // Data Stok Tiap Outlet
+            outlets.forEach(o => {
+                let stokToko = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === o.ID_Outlet)?.Stok_Toko || 0;
+                
+                // Indikator Warna Heatmap
+                let badgeClass = '';
+                if (stokToko <= 5) badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.2)]';
+                else if (stokToko <= 15) badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+                else badgeClass = 'bg-emerald-50 text-emerald-600 border-emerald-100';
+
+                rowHtml += `<td class="py-3 px-4 text-center">
+                    <span class="inline-flex w-12 h-8 items-center justify-center rounded-lg border font-black text-sm ${badgeClass} transition-transform hover:scale-110 cursor-default">
+                        ${stokToko}
+                    </span>
+                </td>`;
+            });
+
+            trHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">${rowHtml}</tr>`;
+        });
+
+        const tbody = document.getElementById('heatmap-tbody');
+        if (tbody) tbody.innerHTML = trHtml || `<tr><td colspan="${outlets.length + 2}" class="text-center py-8 text-slate-400">Belum ada data bahan baku</td></tr>`;
+    },
     
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
@@ -3462,5 +3610,7 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
 
 
