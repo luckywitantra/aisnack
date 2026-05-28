@@ -524,7 +524,7 @@ const superApp = {
                 cfdStandby.classList.remove('opacity-0', 'pointer-events-none');
             }, 7000); 
             
-            return; // 🚀 HENTIKAN KODE DI SINI! Agar keranjang tidak digambar ulang.
+            return; 
         } 
         
         // --- JIKA TRANSAKSI NORMAL / NORMAL BARU ---
@@ -537,7 +537,27 @@ const superApp = {
         else if (data.items) {
             cfdStandby.classList.add('opacity-0', 'pointer-events-none'); 
             let html = '';
-            data.items.forEach(i => { html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center"><div><h4 class="font-black text-slate-800 text-lg">${i.nama}</h4><p class="text-slate-500 font-bold">${i.qty} x Rp ${Number(i.price || 0).toLocaleString('id-ID')}</p></div><p class="font-black text-brand-500 text-xl">Rp ${(Number(i.price || 0) * Number(i.qty || 0)).toLocaleString('id-ID')}</p></div>`; });
+            
+            // 🚀 PERBAIKAN 2: Kartu Pesanan Berkelas (Badge QTY & Animasi Slide)
+            data.items.forEach((i, idx) => { 
+                // Delay animasi bertingkat berdasarkan urutan item agar munculnya beruntun
+                let delay = idx * 50; 
+                html += `
+                <div class="bg-white p-4 lg:p-5 rounded-2xl border border-slate-100 shadow-[0_4px_12px_rgba(0,0,0,0.02)] flex justify-between items-center transform transition-all" style="animation: slideInRight 0.4s ease-out ${delay}ms both;">
+                    <div class="flex items-center gap-4">
+                        <div class="bg-slate-100/80 border border-slate-200 text-brand-600 font-black w-10 h-10 flex justify-center items-center rounded-xl text-sm shadow-inner shrink-0">
+                            ${i.qty}x
+                        </div>
+                        <div>
+                            <h4 class="font-extrabold text-slate-800 text-sm lg:text-base leading-tight">${i.nama}</h4>
+                            <p class="text-[10px] lg:text-xs font-bold text-slate-400 mt-1">@ Rp ${Number(i.price || 0).toLocaleString('id-ID')}</p>
+                        </div>
+                    </div>
+                    <div class="font-black text-brand-500 text-lg lg:text-xl shrink-0">
+                        Rp ${(Number(i.price || 0) * Number(i.qty || 0)).toLocaleString('id-ID')}
+                    </div>
+                </div>`; 
+            });
             const listEl = document.getElementById('cfd-cart-list'); if (listEl) listEl.innerHTML = html;
             const totEl = document.getElementById('cfd-total'); if (totEl) totEl.innerText = `Rp ${Number(data.total || 0).toLocaleString('id-ID')}`;
         }
@@ -3442,8 +3462,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
-
-
 
 
