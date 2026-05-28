@@ -1,4 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
+
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
 /* ========================================== */
@@ -3187,6 +3188,63 @@ submitOpname: async function() {
             root.style.setProperty('--brand-600', '#ea580c');
         }
     },
+
+    updateHeaderOutletName: function() {
+        const hName = document.getElementById('header-outlet-name');
+        if (hName) hName.innerText = this.outlet || 'Pusat';
+    },
+
+    openOutletSelector: function() {
+        const listEl = document.getElementById('outlet-selector-list');
+        if (!listEl) return;
+        
+        // Cek Keamanan: Apakah yang klik Admin atau Kasir biasa?
+        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
+        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+        
+        let html = '';
+        (this.db.outlets || []).forEach(o => {
+            let isActive = (o.ID_Outlet === this.outlet);
+            
+            // UI Berbeda untuk cabang yang sedang aktif
+            let activeClass = isActive 
+                ? 'border-brand-500 bg-brand-50 ring-4 ring-brand-500/10 scale-[1.02]' 
+                : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md';
+            
+            let checkIcon = isActive 
+                ? '<i class="fas fa-check-circle text-brand-500 text-2xl drop-shadow-sm"></i>' 
+                : '<i class="far fa-circle text-slate-300 text-2xl"></i>';
+            
+            // Kunci klik jika Kasir Biasa mencoba pindah ke cabang lain
+            let disableClick = (!isAdmin && !isActive) ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer';
+            let clickEvent = (!isAdmin && !isActive) 
+                ? `onclick="superApp.showToast('Kasir tidak diizinkan pindah ke cabang lain', 'error')"` 
+                : `onclick="superApp.selectOutlet('${o.ID_Outlet}')"`;
+
+            html += `
+            <div ${clickEvent} class="${activeClass} ${disableClick} p-4 rounded-[1.5rem] mb-4 transition-all duration-300 flex items-center justify-between group">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${isActive ? 'bg-gradient-to-br from-brand-400 to-orange-500 text-white shadow-md' : 'bg-slate-100 text-slate-400'}">
+                        <i class="fas fa-map-marked-alt text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-slate-800 text-base tracking-tight">${o.Nama_Outlet}</h4>
+                        <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">ID: ${o.ID_Outlet}</p>
+                    </div>
+                </div>
+                <div>${checkIcon}</div>
+            </div>`;
+        });
+        
+        listEl.innerHTML = html;
+        this.openModal('modal-outlet-selector');
+    },
+    
+    selectOutlet: function(id) {
+        this.changeOutlet(id);
+        this.updateHeaderOutletName(); // Update nama di header
+        this.closeModal('modal-outlet-selector');
+    },
     
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
@@ -3384,5 +3442,8 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
 
 
