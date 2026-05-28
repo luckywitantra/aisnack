@@ -1576,28 +1576,45 @@ const superApp = {
         // 1. Hitung Kecepatan Jualan (Velocity) dari Riwayat Transaksi
         let productSales = {};
         let oldestDate = new Date();
+        
         (this.db.transactions || []).forEach(t => {
-            let d = this.parseDateId(t.Tanggal); if(d < oldestDate) oldestDate = d;
             if(t.Status === 'Sukses' && t.Outlet === outlet) {
-                let parsedItems = []; try { parsedItems = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                let d = this.parseDateId(t.Tanggal); 
+                // Cari tanggal transaksi paling tua untuk pembagi rata-rata harian
+                if(d < oldestDate && d.getTime() > 0) oldestDate = d;
+                
+                let parsedItems = []; 
+                try { parsedItems = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                
                 parsedItems.forEach(item => {
-                    let nama = item.nama || 'Unknown';
-                    if(!productSales[nama]) productSales[nama] = 0;
-                    productSales[nama] += Number(item.qty) || 0;
+                    // 🚀 PERBAIKAN 1: Gunakan SKU Bahan (Bukan sekadar Nama)
+                    let refSku = item.sku_bahan || item.sku;
+                    if(!productSales[refSku]) productSales[refSku] = 0;
+                    productSales[refSku] += Number(item.qty) || 0;
                 });
             }
         });
-        let daysActive = Math.ceil((new Date() - oldestDate) / (1000 * 60 * 60 * 24)) || 1;
+        
+        let todayObj = new Date();
+        let daysActive = Math.ceil((todayObj - oldestDate) / (1000 * 60 * 60 * 24));
+        if (daysActive < 1) daysActive = 1;
 
         // 2. Pisahkan Kategori & Urutkan A-Z
         let bahanUtama = [];
         let bahanPendukung = [];
 
         items.forEach(item => {
-            // Kalkulasi sisa umur stok (Stok Fisik / Rata-rata terjual per hari)
-            let vel = (productSales[item.nama] || 0) / daysActive;
-            let estHari = vel > 0 ? (item.fisik / vel) : 999; 
-            item.estHari = Math.floor(estHari);
+            // 🚀 PERBAIKAN 2: Kalkulasi berdasarkan SKU
+            let soldQty = productSales[item.sku] || 0;
+            let vel = soldQty / daysActive;
+            
+            if (vel > 0) {
+                let estHari = item.fisik / vel; 
+                item.estHari = Math.floor(estHari);
+            } else {
+                // 🚀 PERBAIKAN 3: Jika barang tidak pernah di-input di kasir (seperti Plastik/Kotak)
+                item.estHari = -1; 
+            }
 
             if(String(item.kategori).toLowerCase() === 'bahan') bahanUtama.push(item);
             else bahanPendukung.push(item);
@@ -1613,7 +1630,19 @@ const superApp = {
             if(arr.length === 0) return '';
             let txt = `${icon} *${title}*\n`;
             arr.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`);
+                let alertStr = '';
+                
+                // Logika Teks Peringatan Pintar
+                if (i.fisik <= 0) {
+                    alertStr = 'HABIS 🛑';
+                } else if (i.estHari === -1) {
+                    alertStr = 'Data tidak cukup 📉'; // Untuk barang pendukung (Saus, Kotak, dll)
+                } else if (i.estHari < 4) {
+                    alertStr = `${i.estHari} Hari (Kritis ⚠️)`;
+                } else {
+                    alertStr = `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`;
+                }
+                
                 txt += `🔹 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih}*\n⏳ Estimasi Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
             });
             return txt;
@@ -1624,6 +1653,7 @@ const superApp = {
 
         return waText;
     },
+    
 submitOpname: async function() {
     if (this.isProcessing) return;
     if (!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
