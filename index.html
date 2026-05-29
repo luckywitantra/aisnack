@@ -200,11 +200,13 @@
         <button onclick="superApp.switchMenu('terima')" id="nav-terima" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 hover:bg-slate-50 transition-all duration-300 group shrink-0">
             <i class="fas fa-truck-ramp-box w-6 text-slate-400 group-hover:text-green-500 group-hover:scale-110 transition-transform duration-300 text-lg text-center"></i>
             <span class="font-extrabold text-sm ml-4 group-hover:translate-x-1 transition-transform duration-300">Terima Barang</span>
+            <span id="badge-terima" class="hidden ml-auto bg-amber-100 text-amber-600 px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm border border-amber-200">0</span>
         </button>
         
         <button onclick="superApp.switchMenu('opname')" id="nav-opname" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 hover:bg-slate-50 transition-all duration-300 group shrink-0">
             <i class="fas fa-clipboard-check w-6 text-slate-400 group-hover:text-purple-500 group-hover:scale-110 transition-transform duration-300 text-lg text-center"></i>
             <span class="font-extrabold text-sm ml-4 group-hover:translate-x-1 transition-transform duration-300">Opname Fisik</span>
+            <span id="badge-opname" class="hidden ml-auto bg-amber-100 text-amber-600 px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm border border-amber-200">0</span>
         </button>
         
         <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 hover:bg-slate-50 transition-all duration-300 group shrink-0">
@@ -222,6 +224,7 @@
             <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 hover:bg-slate-50 transition-all duration-300 group">
                 <i class="fas fa-user-check w-6 text-slate-400 group-hover:text-indigo-600 group-hover:scale-110 transition-transform duration-300 text-lg text-center"></i>
                 <span class="font-extrabold text-sm ml-4 group-hover:translate-x-1 transition-transform duration-300">Audit & Approval</span>
+                <span id="badge-audit" class="hidden ml-auto bg-rose-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black shadow-[0_0_10px_rgba(225,29,72,0.5)] animate-pulse border border-rose-400">0</span>
             </button>
             
             <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 hover:bg-slate-50 transition-all duration-300 group">
@@ -274,7 +277,7 @@
                 <span class="hidden md:inline">Tarik Data</span>
             </button>
             <div class="w-px h-4 bg-slate-200 mx-1"></div>
-            <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 cursor-pointer transition-colors" onclick="superApp.syncOfflineQueue()">
+            <div id="network-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 cursor-pointer transition-colors shadow-sm hover:bg-emerald-100" onclick="superApp.openSyncCenter()">
                 <span id="net-dot" class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
                 <span id="net-text" class="text-[10px] font-extrabold text-emerald-600 hidden md:inline tracking-wide">Online</span>
             </div>
@@ -352,7 +355,7 @@
         </div>
       </div>
       
-      <div id="view-terima" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4 pb-20 md:pb-0">
+      <div id="view-terima" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4 pb-6">
         <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0 relative overflow-hidden">
             
             <div class="absolute top-0 right-0 -mt-10 -mr-6 text-9xl text-slate-50 opacity-50 pointer-events-none">
@@ -361,7 +364,7 @@
 
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b border-slate-100 pb-5 gap-5 shrink-0 relative z-10">
                 <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-green-200/50">
+                    <div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-green-200/50 shrink-0">
                         <i class="fas fa-dolly"></i>
                     </div>
                     <div>
@@ -382,7 +385,18 @@
                 </div>
             </div>
 
-            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll pr-2">
+            <div id="banner-pending-terima" class="hidden mb-5 bg-amber-50/80 backdrop-blur-sm border border-amber-200/60 rounded-[1.25rem] p-4 flex items-start gap-4 shadow-sm relative overflow-hidden group z-10 transition-all">
+                <div class="absolute inset-y-0 left-0 w-1.5 bg-amber-400 rounded-l-[1.25rem]"></div>
+                <div class="w-10 h-10 bg-amber-100 text-amber-500 rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                    <i class="fas fa-clock animate-[spin_4s_linear_infinite] text-lg"></i>
+                </div>
+                <div class="flex-1 pt-0.5">
+                    <h4 class="font-extrabold text-amber-800 text-sm tracking-tight">Menunggu Otorisasi Owner</h4>
+                    <p class="text-xs text-amber-700 font-medium mt-1 leading-relaxed" id="text-pending-terima">-</p>
+                </div>
+            </div>
+
+            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll pr-2 pb-28 md:pb-2">
                 
                 <div class="sticky top-0 z-20 bg-white/95 backdrop-blur-sm pt-2 pb-3 border-b border-slate-100 mb-2">
                     <h4 class="font-black text-slate-800 text-sm flex items-center gap-2 border-l-4 border-brand-500 pl-3 uppercase tracking-widest">
@@ -397,7 +411,7 @@
                             <th class="pb-3 px-4 w-1/2 font-bold uppercase tracking-widest text-[10px]">Catatan Kurir / Kondisi</th>
                         </tr>
                     </thead>
-                    <tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-50"></tbody>
+                    <tbody id="terima-tbody-utama" class="font-bold divide-y divide-slate-50 text-slate-700"></tbody>
                 </table>
 
                 <div class="sticky top-0 z-20 bg-white/95 backdrop-blur-sm pt-2 pb-3 border-b border-slate-100 mb-2">
@@ -413,23 +427,26 @@
                             <th class="pb-3 px-4 w-1/2 font-bold uppercase tracking-widest text-[10px]">Catatan Kurir / Kondisi</th>
                         </tr>
                     </thead>
-                    <tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-50"></tbody>
+                    <tbody id="terima-tbody-pendukung" class="font-bold divide-y divide-slate-50 text-slate-700"></tbody>
                 </table>
             </div>
 
-            <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 custom-scroll content-start pb-4" id="terima-mobile-cards"></div>
+            <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 custom-scroll content-start pb-28" id="terima-mobile-cards"></div>
             
         </div>
       </div>
       
-      <div id="view-opname" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4 pb-20 md:pb-0">
+
+      <div id="view-opname" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4 pb-6">
         <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0 relative overflow-hidden">
             
-            <div class="absolute top-0 right-0 -mt-10 -mr-10 text-9xl text-slate-50 opacity-50 pointer-events-none"><i class="fas fa-boxes-packing"></i></div>
+            <div class="absolute top-0 right-0 -mt-10 -mr-10 text-9xl text-slate-50 opacity-50 pointer-events-none">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
 
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b border-slate-100 pb-5 gap-5 shrink-0 relative z-10">
                 <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-purple-200/50">
+                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-purple-200/50 shrink-0">
                         <i class="fas fa-clipboard-list"></i>
                     </div>
                     <div>
@@ -450,7 +467,18 @@
                 </div>
             </div>
 
-            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll pr-2">
+            <div id="banner-pending-opname" class="hidden mb-5 bg-amber-50/80 backdrop-blur-sm border border-amber-200/60 rounded-[1.25rem] p-4 flex items-start gap-4 shadow-sm relative overflow-hidden group z-10 transition-all">
+                <div class="absolute inset-y-0 left-0 w-1.5 bg-amber-400 rounded-l-[1.25rem]"></div>
+                <div class="w-10 h-10 bg-amber-100 text-amber-500 rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+                    <i class="fas fa-clock animate-[spin_4s_linear_infinite] text-lg"></i>
+                </div>
+                <div class="flex-1 pt-0.5">
+                    <h4 class="font-extrabold text-amber-800 text-sm tracking-tight">Menunggu Otorisasi Owner</h4>
+                    <p class="text-xs text-amber-700 font-medium mt-1 leading-relaxed" id="text-pending-opname">-</p>
+                </div>
+            </div>
+
+            <div class="hidden md:flex flex-col flex-1 min-h-0 overflow-y-auto relative custom-scroll pr-2 pb-28 md:pb-2">
                 
                 <div class="sticky top-0 z-20 bg-white/95 backdrop-blur-sm pt-2 pb-3 border-b border-slate-100 mb-2">
                     <h4 class="font-black text-slate-800 text-sm flex items-center gap-2 border-l-4 border-brand-500 pl-3 uppercase tracking-widest">
@@ -467,7 +495,7 @@
                             <th class="pb-3 px-4 w-1/3 font-bold uppercase tracking-widest text-[10px]">Keterangan</th>
                         </tr>
                     </thead>
-                    <tbody id="opname-tbody-utama" class="font-bold divide-y divide-slate-50"></tbody>
+                    <tbody id="opname-tbody-utama" class="font-bold divide-y divide-slate-50 text-slate-700"></tbody>
                 </table>
 
                 <div class="sticky top-0 z-20 bg-white/95 backdrop-blur-sm pt-2 pb-3 border-b border-slate-100 mb-2">
@@ -485,11 +513,11 @@
                             <th class="pb-3 px-4 w-1/3 font-bold uppercase tracking-widest text-[10px]">Keterangan</th>
                         </tr>
                     </thead>
-                    <tbody id="opname-tbody-pendukung" class="font-bold divide-y divide-slate-50"></tbody>
+                    <tbody id="opname-tbody-pendukung" class="font-bold divide-y divide-slate-50 text-slate-700"></tbody>
                 </table>
             </div>
 
-            <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 custom-scroll content-start pb-4" id="opname-mobile-cards"></div>
+            <div class="md:hidden space-y-4 flex-1 overflow-y-auto min-h-0 custom-scroll content-start pb-28" id="opname-mobile-cards"></div>
             
         </div>
       </div>
@@ -898,26 +926,90 @@
         
       </div>
       
-      <div id="view-outlet" class="app-view hidden flex-col lg:flex-row lg:min-h-[80vh] min-h-max gap-6">
-        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[40vh] lg:min-h-0">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-4 shrink-0"><h3 class="font-extrabold text-xl">Daftar Cabang</h3><button onclick="superApp.openCrudOutlet('add')" class="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md transition hover:-translate-y-1"><i class="fas fa-plus mr-1"></i>Outlet Baru</button></div>
-            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white z-10 shadow-sm"><tr><th class="pb-3 px-4">ID</th><th class="pb-3 px-4">Nama Outlet</th><th class="pb-3 px-4 text-center">Aksi</th></tr></thead><tbody id="crud-outlet-tbody" class="divide-y divide-slate-50 font-bold"></tbody></table></div>
+      <div id="view-outlet" class="app-view hidden flex-col lg:flex-row lg:items-start lg:min-h-[80vh] min-h-max gap-6 pb-6">
+        
+        <div class="flex-1 bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col min-h-[40vh] lg:min-h-0 relative overflow-hidden group">
+            
+            <i class="fas fa-store-alt absolute top-0 right-0 -mt-6 -mr-8 text-9xl text-slate-50 opacity-70 pointer-events-none transition-transform duration-700 group-hover:scale-110 z-0"></i>
+
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-5 mb-5 gap-5 shrink-0 relative z-10">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-200/50 shrink-0">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-xl text-slate-800 tracking-tight">Daftar Cabang</h3>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Manajemen Lokasi Toko</p>
+                    </div>
+                </div>
+                
+                <button onclick="superApp.openCrudOutlet('add')" class="w-full lg:w-auto bg-slate-900 text-white px-5 py-3 rounded-xl text-xs md:text-sm font-extrabold hover:bg-slate-800 shadow-[0_8px_15px_rgba(0,0,0,0.15)] transition-all hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-2">
+                    <i class="fas fa-plus"></i> Outlet Baru
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative z-10 pr-2 pb-28 md:pb-2">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white/95 backdrop-blur-sm z-20 shadow-sm">
+                        <tr>
+                            <th class="py-3 px-4 font-bold uppercase tracking-widest text-[10px]">ID Cabang</th>
+                            <th class="py-3 px-4 font-bold uppercase tracking-widest text-[10px]">Nama Outlet</th>
+                            <th class="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="crud-outlet-tbody" class="divide-y divide-slate-50 font-bold text-slate-700"></tbody>
+                </table>
+            </div>
         </div>
-        <div class="flex-1 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col min-h-[50vh] lg:min-h-0">
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-4 mb-4 shrink-0 gap-4">
-                <div><h3 class="font-extrabold text-xl">Distribusi & Harga</h3><p class="text-sm font-bold text-brand-500 mt-1"><i class="fas fa-location-dot"></i> Cabang Aktif: <span id="label-outlet-manage" class="text-slate-700"></span></p></div>
-                <div class="flex gap-2 w-full lg:w-auto">
-                    <button onclick="superApp.openAddOutletProduct()" class="flex-1 lg:flex-none bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md transition hover:-translate-y-1" title="Tambah Jualan"><i class="fas fa-plus mr-1"></i>Jual</button>
-                    <button onclick="superApp.openDistribusiModal()" class="flex-1 lg:flex-none bg-brand-100 text-brand-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-200 shadow-md transition hover:-translate-y-1" title="Kirim Stok Pusat"><i class="fas fa-truck-fast mr-1"></i>Pusat</button>
-                    <button onclick="superApp.openTransferModalOwner()" class="flex-1 lg:flex-none bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 shadow-md transition hover:-translate-y-1" title="Transfer Antar Cabang"><i class="fas fa-exchange-alt mr-1"></i>Transfer</button>
+        
+        <div class="flex-1 lg:flex-[1.5] bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col min-h-[50vh] lg:min-h-0 relative overflow-hidden group">
+            
+            <i class="fas fa-network-wired absolute top-0 right-0 -mt-6 -mr-6 text-9xl text-slate-50 opacity-70 pointer-events-none transition-transform duration-700 group-hover:scale-110 z-0"></i>
+
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-5 mb-5 gap-5 shrink-0 relative z-10">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-orange-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-orange-200/50 shrink-0">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-xl text-slate-800 tracking-tight">Distribusi & Harga</h3>
+                        <p class="text-[11px] font-bold text-brand-500 mt-1 flex items-center gap-1.5 uppercase tracking-widest">
+                            <i class="fas fa-location-dot"></i> Cabang Aktif: <span id="label-outlet-manage" class="bg-brand-50 text-brand-700 px-2 py-0.5 rounded-md border border-brand-200 font-black normal-case tracking-normal"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 w-full lg:w-auto">
+                    <button onclick="superApp.openAddOutletProduct()" class="flex-1 lg:flex-none bg-slate-900 text-white px-4 py-3 rounded-xl text-xs md:text-sm font-extrabold hover:bg-slate-800 shadow-[0_8px_15px_rgba(0,0,0,0.15)] transition-all hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-2" title="Tambah Menu untuk Dijual">
+                        <i class="fas fa-plus text-slate-400"></i> Jual Menu
+                    </button>
+                    <button onclick="superApp.openDistribusiModal()" class="flex-1 lg:flex-none bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-3 rounded-xl text-xs md:text-sm font-extrabold hover:from-emerald-600 hover:to-teal-600 shadow-[0_8px_15px_rgba(16,185,129,0.25)] transition-all hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-2" title="Kirim Stok dari Pusat">
+                        <i class="fas fa-truck-fast text-emerald-100"></i> Suplai Pusat
+                    </button>
+                    <button onclick="superApp.openTransferModalOwner()" class="flex-1 lg:flex-none bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-xs md:text-sm font-extrabold hover:from-blue-600 hover:to-indigo-600 shadow-[0_8px_15px_rgba(59,130,246,0.25)] transition-all hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-2" title="Transfer Antar Cabang">
+                        <i class="fas fa-exchange-alt text-blue-100"></i> Transfer
+                    </button>
                 </div>
             </div>
-            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative">
-                <table class="w-full text-left text-sm whitespace-nowrap"><thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white z-10 shadow-sm"><tr><th class="pb-3 px-4">Menu Jualan</th><th class="pb-3 px-4 text-right">Harga Cabang</th><th class="pb-3 px-4 text-right">Stok Fisik Toko</th><th class="pb-3 px-4 text-center">Aksi</th></tr></thead><tbody id="outlet-manage-tbody" class="divide-y divide-slate-50 font-bold"></tbody></table>
+
+            <div class="flex-1 overflow-x-auto overflow-y-auto min-h-0 custom-scroll relative z-10 pr-2 pb-28 md:pb-2">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="text-slate-400 border-b border-slate-200 sticky top-0 bg-white/95 backdrop-blur-sm z-20 shadow-sm">
+                        <tr>
+                            <th class="py-3 px-4 font-bold uppercase tracking-widest text-[10px]">Menu Jualan</th>
+                            <th class="py-3 px-4 text-right font-bold uppercase tracking-widest text-[10px]">Harga Cabang</th>
+                            <th class="py-3 px-4 text-right font-bold uppercase tracking-widest text-[10px]">Stok Fisik Toko</th>
+                            <th class="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outlet-manage-tbody" class="divide-y divide-slate-50 font-bold text-slate-700"></tbody>
+                </table>
             </div>
         </div>
+        
       </div>
 
+      
       <div id="view-staf" class="app-view hidden flex-col lg:min-h-[80vh] min-h-max gap-4 pb-20 md:pb-0">
         <div class="bg-white p-4 lg:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-slate-800 flex flex-col h-full min-h-0">
             
@@ -1380,6 +1472,37 @@
       </button>
   </div>
 
+  <div id="modal-sync-center" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] hidden flex items-center justify-center p-4 lg:p-6 transition-opacity">
+        <div class="bg-white rounded-[2rem] w-full max-w-lg flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-100 modal-enter relative" id="modal-sync-center-content">
+            
+            <i class="fas fa-cloud-arrow-up absolute top-0 right-0 -mt-10 -mr-10 text-9xl text-slate-50 opacity-80 pointer-events-none z-0"></i>
+
+            <div class="px-6 lg:px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0 relative z-10 bg-white/90 backdrop-blur-sm">
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-emerald-200/50">
+                        <i class="fas fa-rotate" id="sync-center-icon"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-800 text-xl tracking-tight">Pusat Sinkronisasi</h3>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Antrean Data Offline</p>
+                    </div>
+                </div>
+                <button onclick="superApp.closeModal('modal-sync-center')" class="w-10 h-10 bg-slate-50 hover:bg-rose-50 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-colors shadow-sm active:scale-90">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 lg:p-8 flex flex-col gap-4 overflow-y-auto custom-scroll relative z-10 bg-slate-50/50 max-h-[50vh]" id="sync-queue-list">
+                </div>
+
+            <div class="p-6 border-t border-slate-100 bg-white shrink-0 relative z-10">
+                <button id="btn-trigger-sync" onclick="superApp.executeVisualSync()" class="w-full bg-slate-900 text-white px-6 py-4 rounded-xl text-sm font-extrabold hover:bg-slate-800 shadow-[0_8px_20px_rgba(0,0,0,0.15)] transition-all hover:-translate-y-1 active:translate-y-0 flex justify-center items-center gap-3">
+                    <i class="fas fa-cloud-arrow-up text-lg text-emerald-400"></i> Mulai Sinkronisasi
+                </button>
+            </div>
+        </div>
+    </div>
+  
   <div id="modal-giant-numpad" class="fixed inset-0 bg-white z-[9999] hidden flex-col transition-transform transform translate-y-full duration-300">
       <div class="p-5 bg-brand-500 text-white flex justify-between items-center shadow-md shrink-0">
           <h3 class="font-extrabold text-xl">Input Hitung Fisik</h3>
@@ -1413,7 +1536,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=100"></script>
+  <script src="app.js?v=102"></script>
   
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
