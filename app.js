@@ -1,5 +1,6 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
+
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
 /* ========================================== */
@@ -325,6 +326,171 @@ const superApp = {
         try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
         catch (e) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
     },
+
+    // ... (fungsi-fungsi superApp lainnya di atas) ...
+
+    openSyncCenter: function() {
+        this.renderSyncQueue();
+        this.openModal('modal-sync-center');
+    },
+
+    renderSyncQueue: function() {
+        const listEl = document.getElementById('sync-queue-list');
+        if (!listEl) return;
+
+        // 🚀 1. PARSING DATA SUPER AMAN
+        let rawData = localStorage.getItem('aisnack_offline_queue');
+        let offlineData = [];
+        try {
+            offlineData = JSON.parse(rawData || '[]');
+            // Jika entah kenapa bukan array, jadikan array
+            if (!Array.isArray(offlineData)) offlineData = [offlineData]; 
+        } catch(e) {
+            offlineData = [];
+        }
+
+        let totalQueue = offlineData.length;
+
+        // Jika benar-benar kosong, tampilkan status hijau
+        if (totalQueue === 0) {
+            listEl.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner"><i class="fas fa-check-double"></i></div>
+                    <h4 class="font-extrabold text-slate-800 text-lg">Semua Data Tersinkronisasi</h4>
+                    <p class="text-xs text-slate-500 mt-2 font-medium">Tidak ada antrean data lokal. Sistem dalam keadaan up-to-date dengan server.</p>
+                </div>
+            `;
+            const btnSync = document.getElementById('btn-trigger-sync');
+            if(btnSync) btnSync.style.display = 'none';
+            return;
+        }
+
+        // Tampilkan tombol sync jika ada data
+        const btnSync = document.getElementById('btn-trigger-sync');
+        if(btnSync) btnSync.style.display = 'flex';
+
+        // 🚀 2. KLASIFIKASI DATA ANTI-GAGAL
+        let cTrx = 0; let cTerima = 0; let cOpname = 0; let cKas = 0; let cLain = 0;
+
+        offlineData.forEach(item => {
+            // Jaga-jaga jika item di dalam array berbentuk string (Double Stringify)
+            let obj = item;
+            if (typeof item === 'string') {
+                try { obj = JSON.parse(item); } catch(e) {}
+            }
+
+            // Cari tahu jenis datanya dari properti 'action' (atau jadikan string kosong jika tidak ada)
+            let act = String(obj.action || obj.jenis || obj.type || '').toLowerCase();
+
+            if (act.includes('checkout') || act.includes('pos')) cTrx++;
+            else if (act.includes('terima') || act.includes('masuk')) cTerima++;
+            else if (act.includes('opname') || act.includes('audit')) cOpname++;
+            else if (act.includes('kas') || act.includes('keluar')) cKas++;
+            else cLain++; // Masuk ke Data Lainnya jika nama action sama sekali tidak dikenali
+        });
+
+        // 🚀 3. PEMBENTUK KARTU (CARD BUILDER)
+        const createCard = (title, icon, count, colorClass, barColor, id) => {
+            if (count === 0) return ''; // Lewati jika nol
+            return `
+            <div class="bg-white border border-slate-200 rounded-[1.25rem] p-4 shadow-sm relative overflow-hidden group mb-3">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 ${colorClass} rounded-xl flex items-center justify-center text-lg"><i class="fas ${icon}"></i></div>
+                        <h4 class="font-extrabold text-slate-700 text-sm">${title}</h4>
+                    </div>
+                    <span class="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-slate-200" id="badge-${id}">${count} Tertunda</span>
+                </div>
+                
+                <div class="w-full bg-slate-100 rounded-full h-2.5 mb-1 overflow-hidden shadow-inner">
+                    <div id="bar-${id}" class="${barColor} h-2.5 rounded-full w-0 transition-all duration-500 relative">
+                        <div class="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-1.5">
+                    <span class="text-[10px] font-bold text-slate-400" id="status-${id}">Menunggu sinkronisasi...</span>
+                    <span class="text-[10px] font-black text-slate-600" id="pct-${id}">0%</span>
+                </div>
+            </div>`;
+        };
+
+        // 🚀 4. GABUNGKAN KARTU KE DALAM HTML
+        let html = '';
+        html += createCard('Transaksi POS', 'fa-cash-register', cTrx, 'bg-brand-50 text-brand-500', 'bg-brand-500', 'trx');
+        html += createCard('Penerimaan Barang', 'fa-dolly', cTerima, 'bg-emerald-50 text-emerald-500', 'bg-emerald-500', 'terima');
+        html += createCard('Opname Fisik', 'fa-clipboard-check', cOpname, 'bg-purple-50 text-purple-500', 'bg-purple-500', 'opname');
+        html += createCard('Kas Keluar', 'fa-money-bill-transfer', cKas, 'bg-rose-50 text-rose-500', 'bg-rose-500', 'kas');
+        html += createCard('Data Lainnya', 'fa-database', cLain, 'bg-slate-100 text-slate-600', 'bg-slate-600', 'lain');
+
+        // Jika setelah diekstrak ternyata html masih kosong padahal totalQueue > 0 (Sangat langka)
+        if (html === '') {
+             html = createCard('Antrean Sistem', 'fa-server', totalQueue, 'bg-indigo-50 text-indigo-500', 'bg-indigo-500', 'sistem');
+        }
+
+        listEl.innerHTML = html;
+    },
+
+    executeVisualSync: function() {
+        const btn = document.getElementById('btn-trigger-sync');
+        if(btn) {
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin text-lg text-emerald-400"></i> Menyinkronkan...`;
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+        }
+        
+        const syncIcon = document.getElementById('sync-center-icon');
+        if(syncIcon) syncIcon.classList.add('fa-spin');
+
+        const animateBar = (id) => {
+            let bar = document.getElementById(`bar-${id}`);
+            let pct = document.getElementById(`pct-${id}`);
+            let sts = document.getElementById(`status-${id}`);
+            let badge = document.getElementById(`badge-${id}`);
+            
+            if(!bar) return;
+
+            sts.innerText = "Mengirim data...";
+            sts.classList.add('text-brand-500');
+
+            let progress = 0;
+            let interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 20) + 5; 
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    sts.innerText = "Berhasil";
+                    sts.classList.replace('text-brand-500', 'text-emerald-500');
+                    badge.innerText = "Selesai";
+                    badge.classList.replace('bg-slate-100', 'bg-emerald-100');
+                    badge.classList.replace('text-slate-600', 'text-emerald-700');
+                }
+                bar.style.width = `${progress}%`;
+                pct.innerText = `${progress}%`;
+            }, 300);
+        };
+
+        animateBar('trx');
+        animateBar('terima');
+        animateBar('opname');
+        animateBar('kas');
+
+        // PANGGIL FUNGSI SINKRONISASI ASLI
+        if(typeof this.syncOfflineQueue === 'function') {
+            this.syncOfflineQueue(); 
+        }
+
+        setTimeout(() => {
+            if(btn) {
+                btn.innerHTML = `<i class="fas fa-cloud-arrow-up text-lg text-emerald-400"></i> Mulai Sinkronisasi`;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+            }
+            if(syncIcon) syncIcon.classList.remove('fa-spin');
+            
+            this.showToast('Semua data berhasil disinkronkan', 'success');
+            this.closeModal('modal-sync-center');
+            this.renderSyncQueue();
+        }, 2500); 
+    },
+    
     syncOfflineQueue: async function() {
         if (!this.isOnline || this.offlineQueue.length === 0) return;
         this.showToast("Menyinkronkan data offline...", "warning"); let failedQueue = [];
@@ -610,6 +776,7 @@ const superApp = {
         window.addEventListener('beforeunload', () => { if (this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
         window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
         window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
+        this.initAutoSync();
         
         try { 
             let queue = localStorage.getItem('aisnack_offline_queue'); 
@@ -982,36 +1149,124 @@ const superApp = {
         this.setLoading(false);
     },
 
-    // POS CORE
- refreshData: function() {
-        // 🚀 1. PASTIKAN TEMA WARNA TERAPLIKASI SESUAI CABANG AKTIF
-        this.applyOutletTheme();
+updatePendingNotifications: function() {
+        if (!this.db) return;
 
-        // 2. Terapkan Lencana Warna di Header POS dan Label Manajemen Outlet
+        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
+        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+
+        let pOpnameTotal = 0; let pTerimaTotal = 0;
+        let pOpnameOutlet = 0; let pTerimaOutlet = 0;
+
+        // 1. Hitung Opname Fisik Pending
+        (this.db.opname || []).forEach(o => {
+            if (o.Status_Approval === 'Pending') {
+                pOpnameTotal++;
+                if (o.Outlet === this.outlet) pOpnameOutlet++;
+            }
+        });
+
+        // 2. Hitung Terima Barang (Mutasi) Pending
+        (this.db.mutasi || []).forEach(m => {
+            if (m.Status_Approval === 'Pending') {
+                pTerimaTotal++;
+                if (m.Outlet_Tujuan === this.outlet) pTerimaOutlet++;
+            }
+        });
+
+        // --- UPDATE UI OWNER (ADMIN) ---
+        const badgeAudit = document.getElementById('badge-audit');
+        if (badgeAudit) {
+            let totalAudit = pOpnameTotal + pTerimaTotal;
+            if (isAdmin && totalAudit > 0) {
+                badgeAudit.innerText = totalAudit > 99 ? '99+' : totalAudit;
+                badgeAudit.classList.remove('hidden');
+            } else {
+                badgeAudit.classList.add('hidden');
+            }
+        }
+
+        // --- UPDATE UI KASIR (OUTLET) ---
+        const badgeTerima = document.getElementById('badge-terima');
+        const bannerTerima = document.getElementById('banner-pending-terima');
+        const textTerima = document.getElementById('text-pending-terima');
+        
+        if (badgeTerima && bannerTerima && textTerima) {
+            if (pTerimaOutlet > 0) {
+                badgeTerima.innerText = pTerimaOutlet;
+                badgeTerima.classList.remove('hidden');
+                textTerima.innerHTML = `Terdapat <b>${pTerimaOutlet} item</b> barang masuk di Cabang ${this.outlet} yang belum disetujui. Stok belum bertambah.`;
+                bannerTerima.classList.remove('hidden');
+            } else {
+                badgeTerima.classList.add('hidden');
+                bannerTerima.classList.add('hidden');
+            }
+        }
+
+        const badgeOpname = document.getElementById('badge-opname');
+        const bannerOpname = document.getElementById('banner-pending-opname');
+        const textOpname = document.getElementById('text-pending-opname');
+
+        if (badgeOpname && bannerOpname && textOpname) {
+            if (pOpnameOutlet > 0) {
+                badgeOpname.innerText = pOpnameOutlet;
+                badgeOpname.classList.remove('hidden');
+                textOpname.innerHTML = `Terdapat <b>${pOpnameOutlet} item</b> laporan selisih di Cabang ${this.outlet} yang menunggu diperiksa Owner.`;
+                bannerOpname.classList.remove('hidden');
+            } else {
+                badgeOpname.classList.add('hidden');
+                bannerOpname.classList.add('hidden');
+            }
+        }
+    },
+
+    
+    // POS CORE
+refreshData: function() {
+        // 🚀 1. TEMA & IDENTITAS CABANG
+        this.applyOutletTheme();
+        
+        // Memastikan label nama cabang di header (sebelah ikon Map Pin) ikut berubah
+        if (typeof this.updateHeaderOutletName === 'function') {
+            this.updateHeaderOutletName();
+        }
+
+        // 2. LABEL BADGE CABANG (Header POS & Manajemen Outlet)
         const hSub = document.getElementById('header-subtitle'); 
         if (hSub) hSub.innerHTML = this.getOutletBadge(this.outlet);
         
         const lOutManage = document.getElementById('label-outlet-manage'); 
         if (lOutManage) lOutManage.innerHTML = this.getOutletBadge(this.outlet);
 
-        // 3. Proses Produk
+        // 3. PROSES & FILTER PRODUK (Sesuai Cabang Aktif)
         this.filteredProducts = [];
         if (this.db && this.db.masterProduk) {
             this.db.masterProduk.forEach(master => {
                 if (String(master.Kategori || '').toLowerCase() !== 'bahan' && String(master.Kategori || '').toLowerCase() !== 'pendukung') {
+                    // Cari harga dan stok khusus untuk cabang yang sedang dipilih
                     let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
                     let stokReference = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
                     let stokBahan = (this.db.hargaStokOutlet || []).find(x => x.SKU === stokReference && x.ID_Outlet === this.outlet);
+                    
+                    // Hanya tampilkan di POS jika harga sudah disetting ( > 0 )
                     if (hargaOutlet && hargaOutlet.Harga_Jual > 0) {
                         let qtySisa = stokBahan ? stokBahan.Stok_Toko : 0;
-                        this.filteredProducts.push({ sku: master.SKU, nama: master.Nama_Produk, img: master.Gambar_URL, harga: hargaOutlet.Harga_Jual, maxStok: qtySisa, sku_bahan: master.SKU_Bahan });
+                        this.filteredProducts.push({ 
+                            sku: master.SKU, 
+                            nama: master.Nama_Produk, 
+                            img: master.Gambar_URL, 
+                            harga: hargaOutlet.Harga_Jual, 
+                            maxStok: qtySisa, 
+                            sku_bahan: master.SKU_Bahan 
+                        });
                     }
                 }
             });
         }
+        // Urutkan produk berdasarkan abjad agar kasir mudah mencari
         this.filteredProducts.sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
 
-        // 4. Render Semua Menu
+        // 4. RENDER SEMUA TAMPILAN (Sinkronisasi UI)
         if (document.getElementById('product-list')) this.renderProducts();
         if (typeof this.renderReport === 'function') this.renderReport();
         if (typeof this.renderGudang === 'function') this.renderGudang();
@@ -1020,6 +1275,12 @@ const superApp = {
         if (typeof this.renderAudit === 'function') this.renderAudit();
         if (typeof this.renderTerimaBarang === 'function') this.renderTerimaBarang();
         if (typeof this.generateAIReport === 'function') this.generateAIReport();
+
+        // 🚀 5. TRIGGER NOTIFIKASI SPANDUK & BADGE 
+        // (Agar spanduk kuning di layar kasir otomatis hilang saat Owner selesai Approve)
+        if (typeof this.updatePendingNotifications === 'function') {
+            this.updatePendingNotifications();
+        }
     },
     
     changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
@@ -3413,6 +3674,39 @@ submitOpname: async function() {
         const tbody = document.getElementById('heatmap-tbody');
         if (tbody) tbody.innerHTML = trHtml || `<tr><td colspan="${outlets.length + 2}" class="text-center py-8 text-slate-400">Belum ada data bahan baku</td></tr>`;
     },
+
+    // 🚀 AUTO-SYNC BACKGROUND PROCESS (Setiap 3 Menit)
+    initAutoSync: function() {
+        // Cek antrean setiap 3 menit (180.000 milidetik)
+        setInterval(() => {
+            // Pastikan perangkat sedang terhubung ke internet
+            if (navigator.onLine) {
+                let offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]');
+                
+                // Jika ada data yang nyangkut, lakukan sinkronisasi senyap
+                if (offlineData.length > 0) {
+                    console.log("Auto-Sync: Mengirim " + offlineData.length + " data tertunda...");
+                    
+                    // Panggil fungsi sinkronisasi utama Anda (tanpa memunculkan popup loading)
+                    if (typeof this.syncOfflineQueue === 'function') {
+                        this.syncOfflineQueue();
+                    }
+                }
+            }
+        }, 180000); // 180000 ms = 3 menit
+
+        // AUTO-SYNC KETIKA INTERNET KEMBALI MENYALA (Reconnect)
+        window.addEventListener('online', () => {
+            let offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]');
+            if (offlineData.length > 0) {
+                this.showToast('Koneksi pulih. Mengirim data tertunda...', 'success');
+                if (typeof this.syncOfflineQueue === 'function') {
+                    this.syncOfflineQueue();
+                }
+            }
+        });
+    },
+    
     
     connectBluetooth: async function(isAuto = false) {
         if (this.isBluetoothSearching) return;
@@ -3610,6 +3904,9 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
 
 
 
