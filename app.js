@@ -1,6 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
-
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
 /* ========================================== */
@@ -945,6 +944,43 @@ const superApp = {
         this.isProcessing = false;
     },
 
+    logout: function() {
+        // Minta konfirmasi agar tidak tidak sengaja terpencet
+        if (!confirm("Yakin ingin keluar dari akun ini? Anda harus memasukkan PIN lagi untuk masuk.")) return;
+        
+        this.setLoading(true, "Keluar dari sistem...");
+
+        setTimeout(() => {
+            // 1. Bersihkan Data Sesi Kasir Saat Ini
+            this.currentUser = null;
+            this.activeShiftId = null; 
+            this.activeStaffTeam = [];
+            this.clearPin(); // Kosongkan bulatan PIN di layar awal
+
+            // 2. Transisi UI Balik ke Layar Login
+            const ls = document.getElementById('login-screen');
+            const sbar = document.getElementById('sidebar');
+            const mainApp = document.getElementById('main-app');
+
+            if (ls) ls.classList.remove('hidden');
+            if (sbar) sbar.classList.add('hidden');
+            if (mainApp) mainApp.classList.add('hidden');
+
+            // 3. Pastikan Menu Sidebar Mobile tertutup rapat
+            const mobileOverlay = document.getElementById('mobile-overlay');
+            if (mobileOverlay) mobileOverlay.classList.add('hidden');
+            if (sbar && !sbar.classList.contains('-translate-x-full')) {
+                sbar.classList.add('-translate-x-full');
+            }
+
+            // 4. Kembali ke halaman utama (POS) agar saat login lagi layarnya rapi
+            this.switchMenu('pos');
+
+            this.setLoading(false);
+            this.showToast("Berhasil keluar dengan aman.", "success");
+        }, 500); // Beri sedikit delay agar terlihat proses loading
+    },
+
     // FUNGSI PENYAPA CFD (Mendukung Multi-Window)
     updateCFDGreeting: function() {
         // 1. Simpan nama cabang ke memori agar jendela CFD tidak lupa saat di-refresh
@@ -1788,64 +1824,83 @@ refreshData: function() {
     this.setLoading(false);
 },
   renderOpname: function() {
-    const lbl = document.getElementById('lbl-opname-outlet'); if (lbl) lbl.innerText = this.outlet;
-    let hu = ''; let hp = ''; let hum = ''; let hpm = '';
-    
-    // Simpan data sys untuk disuntikkan ulang nanti
-    let autoFillData = []; 
+        const lbl = document.getElementById('lbl-opname-outlet'); if (lbl) lbl.innerText = this.outlet;
+        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
+        
+        // Simpan data sys untuk disuntikkan ulang nanti
+        let autoFillData = []; 
 
-    [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
-        if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
-            let sys = sData ? Number(sData.Stok_Toko) : 0;
+        // 🚀 DETEKSI ROLE UNTUK TOMBOL ANALISIS
+        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
+        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
 
-            // Simpan ID elemen dan valuenya ke array
-            autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
+        [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
+            if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
+                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+                let sys = sData ? Number(sData.Stok_Toko) : 0;
 
-            // (Kode HTML Anda tetap sama, value="${sys}" biarkan saja di situ)
-            let desk = `<tr class="border-b border-slate-50">
-                <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
-                <td class="py-3 px-4 text-center text-brand-600" id="opn-sys-${m.SKU}">${sys}</td>
-                <td class="py-3 px-4 text-center">
-                    <input type="text" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
-                </td>
-                <td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">0</td>
-                <td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik..."></td>
-            </tr>`;
-            
-            let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4>
-                        <p class="text-[10px] text-slate-400">Sys: <span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span></p>
+                // Simpan ID elemen dan valuenya ke array
+                autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
+
+                // 🚀 RENDER TOMBOL SISTEM (DESKTOP)
+                let sysHtmlDesk = '';
+                if (isAdmin) {
+                    sysHtmlDesk = `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-500 hover:text-white transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 mx-auto w-full max-w-[80px]" title="Lihat Analisis & Tren"><i class="fas fa-chart-area"></i> <span id="opn-sys-${m.SKU}">${sys}</span></button>`;
+                } else {
+                    sysHtmlDesk = `<span id="opn-sys-${m.SKU}" class="font-black text-brand-600 text-lg">${sys}</span>`;
+                }
+
+                // 🚀 RENDER TOMBOL SISTEM (MOBILE)
+                let sysHtmlMob = '';
+                if (isAdmin) {
+                    sysHtmlMob = `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="inline-flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-200 shadow-sm active:scale-95 ml-1"><i class="fas fa-chart-area text-[10px]"></i> <span id="opn-sys-mob-${m.SKU}" class="font-bold">${sys}</span></button>`;
+                } else {
+                    sysHtmlMob = `<span id="opn-sys-mob-${m.SKU}" class="font-bold text-brand-500">${sys}</span>`;
+                }
+
+                let desk = `<tr class="border-b border-slate-50">
+                    <td class="py-3 px-4 min-w-[150px] whitespace-normal text-slate-800">${m.Nama_Produk}<br><span class="text-[10px] text-slate-400 font-normal">${m.SKU}</span></td>
+                    <td class="py-3 px-4 text-center">${sysHtmlDesk}</td>
+                    <td class="py-3 px-4 text-center">
+                        <input type="text" id="opn-fisik-${m.SKU}" class="w-20 border-2 border-slate-200 rounded-lg px-2 py-1 text-center outline-none focus:border-brand-500 bg-white text-slate-800 cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
+                    </td>
+                    <td class="py-3 px-4 text-right font-black text-slate-300" id="opn-selisih-${m.SKU}">0</td>
+                    <td class="py-3 px-4"><input type="text" id="opn-note-${m.SKU}" class="w-full border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik..."></td>
+                </tr>`;
+                
+                let mob = `<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4>
+                            <div class="text-[10px] text-slate-400 flex items-center mt-0.5">Sys: ${sysHtmlMob}</div>
+                        </div>
+                        <span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">0</span>
                     </div>
-                    <span class="font-black text-slate-300 text-lg" id="opn-selisih-mob-${m.SKU}">0</span>
-                </div>
-                <div class="flex gap-2">
-                    <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
-                    <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Catatan...">
-                </div>
-            </div>`;
+                    <div class="flex gap-2">
+                        <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-1/3 border-2 border-slate-200 rounded-xl px-3 py-2 text-center outline-none focus:border-brand-500 bg-white text-slate-800 font-bold text-sm cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
+                        <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 border-2 border-slate-200 rounded-xl px-3 py-2 outline-none text-xs text-slate-800 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Catatan...">
+                    </div>
+                </div>`;
 
-            if (String(m.Kategori || '').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
-        }
-    });
-
-    const tU = document.getElementById('opname-tbody-utama'); if (tU) tU.innerHTML = hu || this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
-    const tP = document.getElementById('opname-tbody-pendukung'); if (tP) tP.innerHTML = hp || this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
-    const mobCards = document.getElementById('opname-mobile-cards'); if (mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
-
-    // 🚀 KUNCI PERBAIKAN 3: Eksekusi injeksi value manual setelah DOM ter-render
-    // Ini adalah 'obat kuat' untuk masalah browser HP
-    setTimeout(() => {
-        autoFillData.forEach(item => {
-            let elDesk = document.getElementById(item.idDesk);
-            let elMob = document.getElementById(item.idMob);
-            if (elDesk) elDesk.value = item.val;
-            if (elMob) elMob.value = item.val;
+                if (String(m.Kategori || '').toLowerCase() === 'bahan') { hu += desk; hum += mob; } else { hp += desk; hpm += mob; }
+            }
         });
-    }, 50); // Jeda 50ms sangat cukup agar HP sadar ada tabel baru
-},
+
+        const tU = document.getElementById('opname-tbody-utama'); if (tU) tU.innerHTML = hu || this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang');
+        const tP = document.getElementById('opname-tbody-pendukung'); if (tP) tP.innerHTML = hp || this.getEmptyState('fa-box-open', 'Belum Ada Barang', 'Tambahkan pendukung di gudang');
+        const mobCards = document.getElementById('opname-mobile-cards'); if (mobCards) mobCards.innerHTML = `<h4 class="font-extrabold text-brand-600 mt-2 mb-2 bg-brand-50 p-3 rounded-xl border border-brand-100 text-sm">A. Bahan Utama</h4>` + (hum || '<p class="text-xs text-center">Kosong</p>') + `<h4 class="font-extrabold text-slate-600 mt-6 mb-2 bg-slate-100 p-3 rounded-xl border border-slate-200 text-sm">B. Pendukung & Packaging</h4>` + (hpm || '<p class="text-xs text-center">Kosong</p>');
+
+        // 🚀 KUNCI PERBAIKAN 3: Eksekusi injeksi value manual setelah DOM ter-render
+        // Ini adalah 'obat kuat' untuk masalah browser HP
+        setTimeout(() => {
+            autoFillData.forEach(item => {
+                let elDesk = document.getElementById(item.idDesk);
+                let elMob = document.getElementById(item.idMob);
+                if (elDesk) elDesk.value = item.val;
+                if (elMob) elMob.value = item.val;
+            });
+        }, 50); // Jeda 50ms sangat cukup agar HP sadar ada tabel baru
+    },
     
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
@@ -1959,6 +2014,98 @@ refreshData: function() {
         }
 
         return waText;
+    },
+
+openDetailStokOpname: function(sku) {
+        let m = (this.db.masterProduk || []).find(x => x.SKU === sku);
+        if (!m) return;
+
+        let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === sku && x.ID_Outlet === this.outlet);
+        let currentStok = sData ? Number(sData.Stok_Toko) : 0;
+
+        document.getElementById('detail-stok-nama').innerText = m.Nama_Produk;
+        document.getElementById('detail-stok-now').innerText = currentStok;
+
+        let tbody = document.getElementById('detail-stok-tbody');
+        let html = '';
+        let totalSold7Days = 0;
+
+        // Looping Mundur 7 Hari Terakhir
+        for (let i = 0; i < 7; i++) {
+            let d = new Date();
+            d.setDate(d.getDate() - i);
+            let pad = (n) => n < 10 ? '0' + n : n;
+            let dateStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+            
+            // Format Label Teks (Hari Ini, Kemarin, dll)
+            let dateLabel = dateStr;
+            if (i === 0) dateLabel = `<span class="text-brand-500 font-black">Hari Ini</span> <span class="text-[9px] text-slate-400 block">${dateStr}</span>`;
+            else if (i === 1) dateLabel = `<span class="text-slate-700 font-bold">Kemarin</span> <span class="text-[9px] text-slate-400 block">${dateStr}</span>`;
+
+            let terjual = 0; let masuk = 0; let opnameInfo = '-';
+
+            // 1. Cari Penjualan di Tanggal Ini
+            (this.db.transactions || []).forEach(t => {
+                if (t.Outlet === this.outlet && t.Status === 'Sukses' && this.cleanDateOnly(t.Tanggal) === dateStr) {
+                    let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                    items.forEach(it => {
+                        let refBahan = it.sku_bahan || it.sku;
+                        if (refBahan === sku) terjual += Number(it.qty);
+                    });
+                }
+            });
+
+            // 2. Cari Penerimaan Barang di Tanggal Ini
+            (this.db.mutasi || []).forEach(mt => {
+                if (mt.Outlet_Tujuan === this.outlet && mt.SKU === sku && mt.Status_Approval === 'Disetujui' && this.cleanDateOnly(mt.Waktu) === dateStr) {
+                    masuk += Number(mt.Qty);
+                }
+            });
+
+            // 3. Cari Histori Opname di Tanggal Ini
+            (this.db.opname || []).forEach(op => {
+                if (op.Outlet === this.outlet && op.SKU === sku && this.cleanDateOnly(op.Waktu) === dateStr) {
+                    let sColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-400');
+                    let sSign = op.Selisih > 0 ? '+' : '';
+                    let statusBadge = op.Status_Approval === 'Disetujui' ? '<i class="fas fa-check-circle text-green-500" title="Disetujui"></i>' : '<i class="fas fa-clock text-amber-500" title="Pending"></i>';
+                    
+                    opnameInfo = `<span class="${sColor} font-black">${sSign}${op.Selisih}</span> ${statusBadge}`;
+                }
+            });
+
+            totalSold7Days += terjual;
+
+            // Visualisasi Data Table
+            let trjUI = terjual > 0 ? `<span class="bg-orange-50 text-orange-600 px-2 py-1 rounded-md text-xs font-black shadow-sm border border-orange-100">-${terjual}</span>` : `<span class="text-slate-300">-</span>`;
+            let mskUI = masuk > 0 ? `<span class="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-xs font-black shadow-sm border border-emerald-100">+${masuk}</span>` : `<span class="text-slate-300">-</span>`;
+
+            html += `<tr class="hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                <td class="py-3 px-6 whitespace-nowrap text-sm text-slate-600">${dateLabel}</td>
+                <td class="py-3 px-4 whitespace-nowrap text-center">${trjUI}</td>
+                <td class="py-3 px-4 whitespace-nowrap text-center">${mskUI}</td>
+                <td class="py-3 px-6 whitespace-nowrap text-right text-xs">${opnameInfo}</td>
+            </tr>`;
+        }
+        
+        tbody.innerHTML = html;
+
+        // Kalkulasi Rata-rata & Status
+        let avgSold = (totalSold7Days / 7).toFixed(1);
+        document.getElementById('detail-stok-avg').innerText = avgSold;
+
+        let statusEl = document.getElementById('detail-stok-status');
+        if (avgSold > 10) {
+            statusEl.innerText = 'Fast Moving 🔥';
+            statusEl.className = 'text-[10px] md:text-xs font-black px-2 py-1 rounded-md mt-1 bg-rose-100 text-rose-600 border border-rose-200';
+        } else if (avgSold > 3) {
+            statusEl.innerText = 'Normal 📦';
+            statusEl.className = 'text-[10px] md:text-xs font-black px-2 py-1 rounded-md mt-1 bg-blue-100 text-blue-600 border border-blue-200';
+        } else {
+            statusEl.innerText = 'Slow Moving 🐢';
+            statusEl.className = 'text-[10px] md:text-xs font-black px-2 py-1 rounded-md mt-1 bg-slate-100 text-slate-500 border border-slate-200';
+        }
+
+        this.openModal('modal-stok-detail');
     },
     
 submitOpname: async function() {
@@ -3904,10 +4051,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
-
-
-
-
 
 
