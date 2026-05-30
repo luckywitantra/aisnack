@@ -616,11 +616,10 @@
         </div>
 
         <div class="flex gap-2 bg-slate-50 md:bg-white p-1.5 rounded-xl shadow-inner md:shadow-none border border-slate-200 overflow-x-auto w-full custom-scroll shrink-0">
-            <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition">Dashboard & Transaksi</button>
+            <button onclick="superApp.toggleReportTab('trx')" id="tab-trx" class="px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition">Histori Transaksi</button>
             <button onclick="superApp.toggleReportTab('rekap')" id="tab-rekap" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Rekap Jualan</button>
             <button onclick="superApp.toggleReportTab('kas')" id="tab-kas" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Kas Keluar</button>
             <button onclick="superApp.toggleReportTab('selisih')" id="tab-selisih" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition">Audit Selisih</button>
-            <button onclick="superApp.toggleReportTab('bom')" id="tab-bom" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent"><i class="fas fa-boxes-stacked mr-1"></i> Analisis BOM</button>
         </div>
 
         <div id="mobile-filter-modal" class="fixed inset-x-0 bottom-0 bg-white rounded-t-[2rem] shadow-[0_-20px_40px_rgba(0,0,0,0.2)] p-6 z-[80] transform translate-y-full transition-transform duration-300 md:static md:translate-y-0 md:bg-transparent md:shadow-none md:p-0 md:flex md:flex-col lg:flex-row lg:justify-between lg:items-center md:gap-4 shrink-0 w-full max-h-[85dvh] overflow-y-auto custom-scroll">
@@ -649,62 +648,23 @@
             <button onclick="superApp.toggleReportFilter()" class="w-full bg-brand-500 text-white font-extrabold py-3.5 rounded-xl mt-6 md:hidden active:scale-95 transition shrink-0 shadow-[0_8px_20px_rgba(249,115,22,0.3)]">TERAPKAN & TUTUP</button>
         </div>
 
-        
-        <div id="pdf-export-area" class="bg-slate-50/50 md:bg-white rounded-[2rem] shadow-sm md:border border-slate-100 p-0 md:p-8 flex-1 flex flex-col min-h-0 relative">
-            <div class="text-center mb-6 lg:mb-8 border-b border-slate-200/60 pb-4 lg:pb-6 shrink-0 pt-4 md:pt-0">
+       
+        <div id="pdf-export-area" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-4 lg:p-8 flex-1 flex flex-col min-h-0 relative">
+            <div class="text-center mb-6 lg:mb-8 border-b border-slate-100 pb-4 lg:pb-6 shrink-0">
                 <h2 class="text-2xl lg:text-3xl font-black uppercase tracking-widest text-slate-800 mb-1">Laporan Operasional</h2>
                 <p class="text-slate-500 font-bold text-xs lg:text-sm" id="report-title-label"></p>
                 <p class="text-[9px] lg:text-[10px] font-bold text-slate-400 mt-1 uppercase" id="report-date-label"></p>
             </div>
             
-            <div id="report-content-trx" class="flex-1 flex flex-col min-h-0 px-4 md:px-0">
-                
+            <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6 shrink-0">
-                    <div class="bg-gradient-to-br from-brand-500 to-orange-500 p-4 lg:p-5 rounded-[1.25rem] text-white shadow-lg shadow-orange-200/50 relative overflow-hidden group">
-                        <i class="fas fa-wallet absolute -bottom-4 -right-4 text-7xl text-white/20 group-hover:scale-110 transition-transform"></i>
-                        <p class="text-[10px] lg:text-xs font-black uppercase tracking-widest text-white/80 mb-1 relative z-10">Total Omset</p>
-                        <h4 class="text-xl lg:text-2xl font-black relative z-10 drop-shadow-sm truncate" id="rep-total-omset">Rp 0</h4>
-                        <div class="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-white/20 backdrop-blur-sm rounded-md text-[10px] font-bold relative z-10" id="rep-diff-omset">-</div>
-                    </div>
-                    <div class="bg-white p-4 lg:p-5 rounded-[1.25rem] border border-slate-200 shadow-sm relative overflow-hidden">
-                        <p class="text-[10px] lg:text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Kas Tunai</p>
-                        <h4 class="text-xl lg:text-2xl font-black text-emerald-600 truncate" id="rep-total-tunai">Rp 0</h4>
-                        <div class="mt-2 text-[10px] font-bold text-slate-500" id="rep-diff-tunai">-</div>
-                    </div>
-                    <div class="bg-white p-4 lg:p-5 rounded-[1.25rem] border border-slate-200 shadow-sm relative overflow-hidden">
-                        <p class="text-[10px] lg:text-xs font-black uppercase tracking-widest text-slate-400 mb-1">QRIS / Transfer</p>
-                        <h4 class="text-xl lg:text-2xl font-black text-blue-600 truncate" id="rep-total-qris">Rp 0</h4>
-                        <div class="mt-2 text-[10px] font-bold text-slate-500" id="rep-diff-qris">-</div>
-                    </div>
-                    <div class="bg-white p-4 lg:p-5 rounded-[1.25rem] border border-slate-200 shadow-sm relative overflow-hidden">
-                        <p class="text-[10px] lg:text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Jumlah Struk</p>
-                        <h4 class="text-xl lg:text-2xl font-black text-slate-800 truncate" id="rep-total-trx">0</h4>
-                        <div class="mt-2 text-[10px] font-bold text-slate-500" id="rep-diff-trx">-</div>
-                    </div>
+                    <div class="bg-slate-50 p-4 lg:p-5 rounded-2xl border border-slate-100"><p class="text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Transaksi</p><h4 class="text-xl lg:text-2xl font-black text-slate-800" id="rep-total-trx">0</h4></div>
+                    <div class="bg-green-50 p-4 lg:p-5 rounded-2xl border border-green-100"><p class="text-[10px] lg:text-xs font-bold text-green-500 uppercase tracking-widest mb-1">Omset Tunai</p><h4 class="text-xl lg:text-2xl font-black text-green-600 truncate" id="rep-total-tunai">Rp 0</h4></div>
+                    <div class="bg-blue-50 p-4 lg:p-5 rounded-2xl border border-blue-100"><p class="text-[10px] lg:text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Omset QRIS</p><h4 class="text-xl lg:text-2xl font-black text-blue-600 truncate" id="rep-total-qris">Rp 0</h4></div>
+                    <div class="bg-red-50 p-4 lg:p-5 rounded-2xl border border-red-100"><p class="text-[10px] lg:text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Total Kas Keluar</p><h4 class="text-xl lg:text-2xl font-black text-red-600 truncate" id="rep-total-kas">Rp 0</h4></div>
                 </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-8 shrink-0">
-                    <div class="lg:col-span-2 bg-white border border-slate-200 rounded-[1.25rem] p-4 lg:p-5 shadow-sm flex flex-col">
-                        <div class="flex justify-between items-center mb-6">
-                            <h4 class="font-extrabold text-slate-800 text-sm"><i class="fas fa-chart-line text-brand-500 mr-2"></i>Tren Penjualan</h4>
-                            <select id="filter-trend-range" onchange="superApp.renderReport()" class="bg-slate-50 border border-slate-200 text-slate-600 text-[10px] md:text-xs font-bold rounded-lg px-2 py-1 outline-none focus:border-brand-500 cursor-pointer">
-                                <option value="7">7 Hari Terakhir</option>
-                                <option value="30">1 Bulan Terakhir</option>
-                                <option value="365">1 Tahun Terakhir</option>
-                            </select>
-                        </div>
-                        <div id="report-trend-chart" class="flex-1 flex items-end gap-1 h-32 md:h-48 mt-auto border-b border-slate-100 pb-2 relative"></div>
-                        <div class="flex justify-between mt-2 text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest" id="report-trend-labels"></div>
-                    </div>
-
-                    <div class="bg-white border border-slate-200 rounded-[1.25rem] p-4 lg:p-5 shadow-sm flex flex-col">
-                        <h4 class="font-extrabold text-slate-800 text-sm mb-4"><i class="fas fa-trophy text-amber-500 mr-2"></i>5 Produk Terlaris</h4>
-                        <div id="report-top-5-list" class="flex flex-col gap-3 flex-1"></div>
-                    </div>
-                </div>
-
                 <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-list text-brand-500"></i> Detail Histori Transaksi</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 min-h-[300px] relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 min-h-0 relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
                         <thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm">
                             <tr><th class="py-3 px-3 md:px-5">Resi & Waktu</th><th class="py-3 px-3 md:px-5">Kasir / Outlet</th><th class="py-3 px-3 md:px-5">Metode</th><th class="py-3 px-3 md:px-5 text-right">Total Bayar</th><th class="py-3 px-3 md:px-5 text-center" data-html2canvas-ignore="true">Aksi</th></tr>
@@ -714,9 +674,9 @@
                 </div>
             </div>
 
-            <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0 px-4 md:px-0">
+            <div id="report-content-rekap" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-chart-pie text-brand-500"></i> Rekapitulasi Penjualan per Produk</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 mb-6 text-slate-800 min-h-[250px] relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 mb-4 text-slate-800 min-h-0 relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
                         <thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm">
                             <tr><th class="py-3 px-3 md:px-5">Nama Menu / Varian</th><th class="py-3 px-3 md:px-5 text-center">Total Terjual (Pcs)</th><th class="py-3 px-3 md:px-5 text-right">Total Pendapatan (Rp)</th></tr>
@@ -724,9 +684,8 @@
                         <tbody id="report-rekap-tbody" class="font-bold"></tbody>
                     </table>
                 </div>
-
                 <h3 class="font-extrabold text-lg mb-3 text-slate-700 flex items-center gap-2 shrink-0"><i class="fas fa-truck text-brand-500"></i> Log Mutasi & Transfer</h3>
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-[250px] relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
+                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-0 relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
                         <thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm">
                             <tr><th class="py-3 px-3 md:px-5">Waktu</th><th class="py-3 px-3 md:px-5">Barang</th><th class="py-3 px-3 md:px-5">Tujuan</th><th class="py-3 px-3 md:px-5 text-right">Qty Kirim</th><th class="py-3 px-3 md:px-5 text-xs">Keterangan</th></tr>
@@ -736,16 +695,8 @@
                 </div>
             </div>
 
-            <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0 px-4 md:px-0">
-                <div class="bg-red-50 p-5 rounded-2xl border border-red-200 mb-6 shrink-0 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-black text-red-500 uppercase tracking-widest mb-1">Total Pengeluaran Laci</p>
-                        <h4 class="text-2xl font-black text-red-600 truncate" id="rep-total-kas">Rp 0</h4>
-                    </div>
-                    <i class="fas fa-wallet text-4xl text-red-200"></i>
-                </div>
-
-                <h3 class="font-extrabold text-lg mb-3 text-red-500 flex items-center gap-2 shrink-0"><i class="fas fa-money-bill-transfer"></i> Log Kas Keluar Laci</h3>
+            <div id="report-content-kas" class="hidden flex-1 flex flex-col min-h-0">
+                <h3 class="font-extrabold text-lg mb-3 text-red-500 flex items-center gap-2 shrink-0"><i class="fas fa-wallet"></i> Log Kas Keluar Laci</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-0 relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
                         <thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-10 shadow-sm">
@@ -756,7 +707,7 @@
                 </div>
             </div>
 
-            <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0 px-4 md:px-0">
+            <div id="report-content-selisih" class="hidden flex-1 flex flex-col min-h-0">
                 <h3 class="font-extrabold text-lg mb-3 text-purple-600 flex items-center gap-2 shrink-0"><i class="fas fa-clipboard-check"></i> Riwayat Audit Opname</h3>
                 <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-0 relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
                     <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
@@ -767,50 +718,7 @@
                     </table>
                 </div>
             </div>
-
-            <div id="report-content-bom" class="hidden flex-1 flex flex-col min-h-0 px-4 md:px-0">
-                <div class="flex justify-between items-center mb-4 shrink-0">
-                    <h3 class="font-extrabold text-lg text-slate-700 flex items-center gap-2"><i class="fas fa-boxes-stacked text-brand-500"></i> Analisis Pemakaian Bahan</h3>
-                    
-                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1 rounded-xl shadow-sm">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Periode:</span>
-                        <input type="month" id="bom-filter-month" class="bg-white border-none rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer text-slate-700" onchange="superApp.renderBOMReport()">
-                    </div>
-                </div>
-
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-[250px] relative custom-scroll lg:shadow-inner mb-6 -mx-4 lg:mx-0">
-                    <div class="bg-brand-50 border-b border-brand-100 p-3 sticky top-0 z-20"><h4 class="font-black text-brand-700 text-xs uppercase tracking-widest">A. Bahan Baku Utama (Dipotong Otomatis oleh Sistem)</h4></div>
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
-                        <thead class="text-slate-500 border-b border-slate-200 sticky top-10 bg-slate-50 z-10 shadow-sm">
-                            <tr>
-                                <th class="py-3 px-3 md:px-5">Nama Bahan</th>
-                                <th class="py-3 px-3 md:px-5 text-center text-emerald-600 bg-emerald-50/50">Penerimaan Masuk</th>
-                                <th class="py-3 px-3 md:px-5 text-center text-brand-600 bg-brand-50/50">Pemakaian (Terjual)</th>
-                                <th class="py-3 px-3 md:px-5 text-center">Sisa Stok Fisik</th>
-                                <th class="py-3 px-3 md:px-5 text-center">Deviasi (Selisih)</th>
-                                <th class="py-3 px-3 md:px-5 text-right">Tren vs Bln Lalu</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bom-bahan-tbody" class="font-bold"></tbody>
-                    </table>
-                </div>
-
-                <div class="flex-1 overflow-x-auto overflow-y-auto bg-white lg:rounded-2xl border-t border-b lg:border border-slate-200 text-slate-800 min-h-[200px] relative custom-scroll lg:shadow-inner -mx-4 lg:mx-0">
-                    <div class="bg-slate-100 border-b border-slate-200 p-3 sticky top-0 z-20"><h4 class="font-black text-slate-600 text-xs uppercase tracking-widest">B. Bahan Pendukung & Packaging</h4></div>
-                    <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
-                        <thead class="text-slate-500 border-b border-slate-200 sticky top-10 bg-slate-50 z-10 shadow-sm">
-                            <tr>
-                                <th class="py-3 px-3 md:px-5">Nama Barang</th>
-                                <th class="py-3 px-3 md:px-5 text-center text-emerald-600 bg-emerald-50/50">Penerimaan Masuk</th>
-                                <th class="py-3 px-3 md:px-5 text-center text-brand-600 bg-brand-50/50">Pemakaian (Terjual)</th>
-                                <th class="py-3 px-3 md:px-5 text-center">Sisa Stok Fisik</th>
-                                <th class="py-3 px-3 md:px-5 text-right">Tren vs Bln Lalu</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bom-pendukung-tbody" class="font-bold"></tbody>
-                    </table>
-                </div>
-      
+            
         </div>
       </div>
 
@@ -819,22 +727,12 @@
             
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 shrink-0 gap-4 bg-white p-4 rounded-2xl shadow-sm">
                 <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center text-brand-400 text-2xl shadow-[0_8px_20px_rgba(0,0,0,0.2)] shrink-0">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-extrabold text-xl lg:text-2xl text-slate-800 tracking-tight">Dashboard Owner</h3>
-                        <p class="text-[10px] lg:text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Analitik Real-time & Tren Penjualan</p>
-                    </div>
+                    <div class="w-14 h-14 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center text-brand-400 text-2xl shadow-[0_8px_20px_rgba(0,0,0,0.2)]"><i class="fas fa-chart-pie"></i></div>
+                    <div><h3 class="font-extrabold text-xl lg:text-2xl text-slate-800">Dashboard Owner</h3><p class="text-[10px] lg:text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Analitik Real-time & Tren Penjualan</p></div>
                 </div>
-                
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    <div class="flex items-center gap-2 w-full md:w-auto">
-                        <input type="date" id="ai-filter-start" class="flex-1 md:w-auto border-2 border-slate-100 bg-slate-50 rounded-xl px-4 py-3 font-bold text-xs md:text-sm outline-none shadow-inner focus:border-brand-500 focus:bg-white text-slate-700 transition" onchange="superApp.generateAIReport()">
-                        <span class="text-slate-400 font-bold text-xs">s/d</span>
-                        <input type="date" id="ai-filter-end" class="flex-1 md:w-auto border-2 border-slate-100 bg-slate-50 rounded-xl px-4 py-3 font-bold text-xs md:text-sm outline-none shadow-inner focus:border-brand-500 focus:bg-white text-slate-700 transition" onchange="superApp.generateAIReport()">
-                    </div>
-                    <select id="ai-filter-outlet" class="w-full md:flex-1 md:w-auto border-2 border-slate-100 bg-slate-50 rounded-xl px-4 py-3 font-bold text-xs md:text-sm outline-none shadow-inner focus:border-brand-500 focus:bg-white text-slate-800 transition mt-2 md:mt-0" onchange="superApp.generateAIReport()"></select>
+                    <input type="date" id="ai-filter-date" class="flex-1 md:w-auto border-2 border-slate-100 bg-slate-50 rounded-xl px-4 py-3 font-bold text-sm outline-none shadow-inner focus:border-brand-500 focus:bg-white text-slate-700 transition" onchange="superApp.generateAIReport()">
+                    <select id="ai-filter-outlet" class="flex-1 md:w-auto border-2 border-slate-100 bg-slate-50 rounded-xl px-4 py-3 font-bold text-sm outline-none shadow-inner focus:border-brand-500 focus:bg-white text-slate-800 transition" onchange="superApp.generateAIReport()"></select>
                 </div>
             </div>
 
@@ -880,7 +778,7 @@
                                 </tr>
                             </thead>
                             <tbody id="ai-comparison-tbody" class="divide-y divide-slate-100 font-bold text-slate-700">
-                            </tbody>
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -895,9 +793,9 @@
                     </div>
 
                     <div class="flex flex-col gap-4 lg:gap-6">
-                        <div class="bg-gradient-to-br from-brand-500 to-orange-500 rounded-[2rem] p-6 shadow-[0_8px_25px_rgba(249,115,22,0.3)] text-white flex-1 flex flex-col justify-center relative overflow-hidden group">
-                            <div class="absolute right-0 bottom-0 opacity-10 text-9xl translate-x-4 translate-y-4 group-hover:scale-110 transition-transform duration-700"><i class="fas fa-robot"></i></div>
-                            <h4 class="font-black text-sm uppercase tracking-widest text-brand-100 mb-3 flex items-center gap-2 relative z-10"><i class="fas fa-lightbulb text-yellow-300"></i> Kesimpulan AI</h4>
+                        <div class="bg-gradient-to-br from-brand-500 to-orange-500 rounded-[2rem] p-6 shadow-[0_8px_25px_rgba(249,115,22,0.3)] text-white flex-1 flex flex-col justify-center relative overflow-hidden">
+                            <div class="absolute right-0 bottom-0 opacity-10 text-9xl translate-x-4 translate-y-4"><i class="fas fa-robot"></i></div>
+                            <h4 class="font-black text-sm uppercase tracking-widest text-brand-100 mb-3 flex items-center gap-2 relative z-10"><i class="fas fa-lightbulb"></i> Kesimpulan AI</h4>
                             <div id="ai-insight-text" class="text-sm font-bold leading-relaxed opacity-95 relative z-10"></div>
                         </div>
                     </div>
@@ -906,7 +804,7 @@
                 <div class="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
                     <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center relative shrink-0">
+                            <div class="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center relative">
                                 <i class="fas fa-radar relative z-10"></i>
                                 <div class="absolute inset-0 bg-red-400 rounded-full animate-ping opacity-20"></div>
                             </div>
@@ -934,7 +832,7 @@
                                 </tr>
                             </thead>
                             <tbody id="ai-predictive-tbody" class="divide-y divide-slate-100 font-bold text-slate-700">
-                            </tbody>
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -1667,38 +1565,6 @@
         </div>
     </div>
 
-  <div id="modal-bom-detail" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[250] hidden flex items-end md:items-center justify-center p-0 md:p-6 transition-opacity">
-        <div class="bg-white rounded-t-[2rem] md:rounded-[2rem] w-full max-w-2xl max-h-[90dvh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-100 modal-enter relative" id="modal-bom-detail-content">
-            
-            <i class="fas fa-boxes-stacked absolute top-0 right-0 -mt-8 -mr-8 text-9xl text-slate-50 opacity-80 pointer-events-none z-0"></i>
-
-            <div class="px-6 lg:px-8 py-6 border-b border-slate-100 flex justify-between items-start shrink-0 relative z-10 bg-white/90 backdrop-blur-sm">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-orange-500 rounded-xl flex items-center justify-center text-white text-xl shadow-md">
-                        <i class="fas fa-search-plus"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-black text-slate-800 text-lg tracking-tight" id="bom-detail-nama">Nama Barang</h3>
-                        <p class="text-[10px] font-black text-brand-500 uppercase tracking-widest mt-0.5" id="bom-detail-title">Rincian Pemakaian</p>
-                    </div>
-                </div>
-                <button onclick="superApp.closeModal('modal-bom-detail')" class="w-10 h-10 bg-slate-50 hover:bg-rose-50 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-colors shadow-sm active:scale-90">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto custom-scroll relative z-10 bg-white min-h-[300px]">
-                <table class="w-full text-left whitespace-nowrap text-sm text-slate-800">
-                    <thead class="text-slate-500 border-b border-slate-200 sticky top-0 bg-slate-50 z-20 shadow-sm">
-                        <tr id="bom-detail-thead">
-                            </tr>
-                    </thead>
-                    <tbody id="bom-detail-tbody" class="divide-y divide-slate-50 font-bold text-slate-700">
-                        </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
   
   <div id="modal-giant-numpad" class="fixed inset-0 bg-white z-[9999] hidden flex-col transition-transform transform translate-y-full duration-300">
       <div class="p-5 bg-brand-500 text-white flex justify-between items-center shadow-md shrink-0">
@@ -1733,7 +1599,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=104"></script>
+  <script src="app.js?v=103"></script>
   
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
