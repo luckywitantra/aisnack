@@ -1987,11 +1987,11 @@ refreshData: function() {
             }
         });
 
-        // 1. Pengurutan Mutlak A-Z (Mengabaikan huruf besar/kecil)
+       // 1. Pengurutan Mutlak A-Z (Mengabaikan huruf besar/kecil)
         bermasalah.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
         aman.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
 
-        // 3. SUSUN TEKS WHATSAPP EKSEKUTIF
+        // 2. SUSUN TEKS WHATSAPP EKSEKUTIF
         let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek menu Audit Opname di aplikasi untuk menyetujui_*\n\n`;
 
         // --- A. Render Barang Bermasalah / Selisih ---
@@ -2011,14 +2011,18 @@ refreshData: function() {
         if (aman.length > 0) {
             waText += `✅ *ITEM AMAN FISIK SESUAI SISTEM (${aman.length})*\n`;
             
-            // Karena array 'aman' sudah diurutkan di atas, hasil map().join() ini otomatis berurut A-Z
-            let amanNames = aman.map(i => i.nama).join(', ');
-            waText += `_${amanNames}_\n`;
+            // Loop semua barang aman agar rincian stoknya muncul ke bawah
+            aman.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+                
+                // Selisih pasti 0 untuk kategori aman, catatan tidak perlu ditampilkan agar laporan bersih
+                waText += `📦 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *0*\n⏳ Est Habis: ${alertStr}\n\n`;
+            });
         }
 
         return waText;
     },
-
+    
 openDetailStokOpname: function(sku) {
         let m = (this.db.masterProduk || []).find(x => x.SKU === sku);
         if (!m) return;
