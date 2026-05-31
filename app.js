@@ -1562,8 +1562,25 @@ refreshData: function() {
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN
    executeCheckout: async function() {
+        // 1. GEMBOK ANTI DOUBLE-CLICK & KERANJANG KOSONG
         if (this.isProcessing) return; 
+        if (this.cart.length === 0) {
+            this.showToast("Keranjang kosong! Transaksi dicegah.", "error");
+            this.closeModal('modal-payment');
+            return;
+        }
+
         this.isProcessing = true;
+
+        // Kunci tombol secara visual agar tidak bisa ditekan dua kali
+        let btnPay = document.getElementById('btn-execute-pay');
+        let originalBtnHtml = '';
+        if (btnPay) {
+            originalBtnHtml = btnPay.innerHTML;
+            btnPay.disabled = true;
+            btnPay.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Memproses...';
+            btnPay.classList.add('opacity-70', 'cursor-not-allowed');
+        }
         
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
@@ -1575,7 +1592,6 @@ refreshData: function() {
         let noAntrian = countToday + 1;
         let trxID = 'TRX' + d.getTime();
 
-        // 🚀 LOGIKA PINTAR ANDA: Jika mesin mendeteksi ada printer terhubung, anggap Pasti Sukses Cetak
         let isPrintSuccess = this.printerCharacteristic ? true : false;
         
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintSuccess ? 'Sudah' : 'Belum' };
@@ -1602,22 +1618,30 @@ refreshData: function() {
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
         this.cart = []; 
+        this.payCash = 0; // Hapus ingatan uang tunai yang diketik
+        this.payTotal = 0;
         this.renderCart(); 
         this.syncStorage('paid', noAntrian); 
         this.closeModal('modal-payment'); 
         
-        this.isProcessing = false;
+        // JEDA WAKTU UNTUK MENCEGAH DOUBLE CLICK SELAMA ANIMASI
+        setTimeout(() => {
+            this.isProcessing = false;
+            if (btnPay) {
+                btnPay.disabled = false;
+                btnPay.innerHTML = originalBtnHtml;
+                btnPay.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }, 500);
 
         // 4. SINKRONISASI SERVER DI LATAR BELAKANG
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
                 
-                // 🚀 ANTI BALAPAN WAKTU: Lapor status cetak SETELAH transaksi sukses dibuat di server Google Sheets!
                 if (isPrintSuccess) {
                     this.laporStrukDicetak(trxID);
                 }
 
-                // Segarkan data dari server
                 fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
                     .then(r => r.json())
                     .then(data => {
