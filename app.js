@@ -1987,24 +1987,34 @@ refreshData: function() {
             }
         });
 
-        bahanUtama.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
-        bahanPendukung.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        // 1. Pengurutan Mutlak A-Z (Mengabaikan huruf besar/kecil)
+        bermasalah.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
+        aman.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
 
-        // 3. Susun Teks WhatsApp
-        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
+        // 3. SUSUN TEKS WHATSAPP EKSEKUTIF
+        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek menu Audit Opname di aplikasi untuk menyetujui_*\n\n`;
 
-        const renderItems = (arr, title, icon) => {
-            if(arr.length === 0) return '';
-            let txt = `${icon} *${title}*\n`;
-            arr.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`);
-                txt += `🔹 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih}*\n⏳ Estimasi Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
+        // --- A. Render Barang Bermasalah / Selisih ---
+        if (bermasalah.length > 0) {
+            waText += `🚨 *ITEM SELISIH / CATATAN (${bermasalah.length})*\n`;
+            bermasalah.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '⚠️');
+                
+                waText += `${icon} *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih > 0 ? '+'+i.selisih : i.selisih}*\n⏳ Est Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
             });
-            return txt;
-        };
+        } else {
+            waText += `🚨 *ITEM SELISIH / CATATAN*\n_Nihil. Kinerja staf sangat teliti, tidak ada selisih stok!_ 🎉\n\n`;
+        }
 
-        waText += renderItems(bahanUtama, 'A. BAHAN BAKU UTAMA', '📦');
-        waText += renderItems(bahanPendukung, 'B. BARANG PENDUKUNG', '🧴');
+        // --- B. Render Barang Aman ---
+        if (aman.length > 0) {
+            waText += `✅ *ITEM AMAN FISIK SESUAI SISTEM (${aman.length})*\n`;
+            
+            // Karena array 'aman' sudah diurutkan di atas, hasil map().join() ini otomatis berurut A-Z
+            let amanNames = aman.map(i => i.nama).join(', ');
+            waText += `_${amanNames}_\n`;
+        }
 
         return waText;
     },
