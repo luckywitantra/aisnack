@@ -1987,35 +1987,24 @@ refreshData: function() {
             }
         });
 
-        bermasalah.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
-        aman.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        bahanUtama.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
+        bahanPendukung.sort((a,b) => String(a.nama).localeCompare(String(b.nama)));
 
-        // 3. SUSUN TEKS WHATSAPP HARIAN
-        let waText = `*LAPORAN STOK HARIAN & AUDIT*\n📍 Cabang: ${outlet}\n👤 Petugas: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Berikut adalah rincian ketersediaan seluruh stok barang hari ini:_*\n\n`;
+        // 3. Susun Teks WhatsApp
+        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek aplikasi menu Audit Opname untuk menyetujui_*\n\n`;
 
-        // --- A. Render Barang Bermasalah / Selisih ---
-        if (bermasalah.length > 0) {
-            waText += `🚨 *ITEM SELISIH / PERLU PERHATIAN (${bermasalah.length})*\n`;
-            bermasalah.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
-                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '⚠️');
-                
-                waText += `${icon} *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih > 0 ? '+'+i.selisih : i.selisih}*\n⏳ Est Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
+        const renderItems = (arr, title, icon) => {
+            if(arr.length === 0) return '';
+            let txt = `${icon} *${title}*\n`;
+            arr.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`);
+                txt += `🔹 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih}*\n⏳ Estimasi Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
             });
-        } else {
-            waText += `🚨 *ITEM SELISIH / CATATAN*\n_Nihil. Kinerja staf sangat teliti, tidak ada selisih stok!_ 🎉\n\n`;
-        }
+            return txt;
+        };
 
-        // --- B. Render Barang Aman (Menampilkan Seluruh Detail Stok) ---
-        if (aman.length > 0) {
-            waText += `✅ *ITEM AMAN (STOK SESUAI) (${aman.length})*\n`;
-            aman.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
-                
-                // Menampilkan nama barang, jumlah stok terkini, dan estimasi habis
-                waText += `📦 *${i.nama}*\nStok Terkini: *${i.fisik}*\n⏳ Est Habis: ${alertStr}\n\n`;
-            });
-        }
+        waText += renderItems(bahanUtama, 'A. BAHAN BAKU UTAMA', '📦');
+        waText += renderItems(bahanPendukung, 'B. BARANG PENDUKUNG', '🧴');
 
         return waText;
     },
