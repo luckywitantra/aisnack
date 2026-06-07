@@ -4445,7 +4445,7 @@ printReceipt: async function(id, outlet, total, tunai, kembali, items, status, e
             throw e; 
         }
     }
-};
+}
 
 window.onload = () => superApp.init();
 // Tambahkan ini di bawah window.onload = () => superApp.init();
