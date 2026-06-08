@@ -30,6 +30,13 @@ const osKeyboard = {
             this.targetElement = document.getElementById(this.targetElement.id);
         }
 
+        // 🚀 JURUS 1: Auto-scroll agar kotak inputan naik ke tengah layar
+        setTimeout(() => {
+            try { 
+                this.targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+            } catch(e){}
+        }, 300);
+
         this.mode = type; this.isOpen = true; this.render();
         const vk = document.getElementById('virtual-keyboard'); 
         const ov = document.getElementById('virtual-keyboard-overlay');
@@ -47,6 +54,16 @@ const osKeyboard = {
         if (ov) { ov.classList.add('hidden'); }
         this.targetElement = null;
     },
+
+    // 🚀 FUNGSI BARU: Mengirim ketikan ke Layar Monitor Mini
+    updatePreview: function() {
+        const preview = document.getElementById('vk-live-preview');
+        if (preview && this.targetElement) {
+            let val = this.targetElement.value;
+            // Jika kosong, tampilkan efek kursor berkedip
+            preview.innerHTML = val === '' ? '<span class="animate-pulse text-slate-500">_</span>' : val;
+        }
+    },
     
     render: function() {
         const container = document.getElementById('vk-keys'); 
@@ -55,43 +72,55 @@ const osKeyboard = {
         let html = ''; 
         let rows = this.layouts[this.mode];
 
-        // 🚀 KUNCI PROPORSIONAL: Batasi lebar mode numerik, bebaskan mode teks
         let maxWidth = this.mode === 'numeric' ? 'max-w-sm' : 'max-w-3xl';
         html += `<div class="w-full ${maxWidth} mx-auto flex flex-col gap-1.5 sm:gap-2">`;
 
+        // =========================================================
+        // 🚀 JURUS 2: LAYAR MONITOR MINI DI ATAS KEYBOARD (LIVE PREVIEW)
+        // =========================================================
+        let currentVal = this.targetElement ? this.targetElement.value : '';
+        let placeholderTxt = this.targetElement ? (this.targetElement.placeholder || 'Ketik di sini...') : 'Ketik di sini...';
+        
+        // Coba baca teks label di atas inputan agar user tahu sedang mengisi apa
+        let label = placeholderTxt;
+        if (this.targetElement && this.targetElement.previousElementSibling) {
+            label = this.targetElement.previousElementSibling.innerText || placeholderTxt;
+        }
+        
+        html += `
+        <div class="w-full bg-slate-900 border-2 border-slate-700 rounded-xl p-3 sm:p-4 mb-1 shadow-inner relative flex flex-col justify-end min-h-[70px]">
+            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest absolute top-2 left-3 truncate w-5/6">${label}</span>
+            <div id="vk-live-preview" class="text-xl sm:text-2xl font-mono font-black text-emerald-400 text-right w-full overflow-hidden truncate mt-3">
+                ${currentVal || '<span class="animate-pulse text-slate-500">_</span>'}
+            </div>
+        </div>`;
+        // =========================================================
+
         rows.forEach(row => {
-            // Gap lebih kecil untuk QWERTY agar lebih mirip keyboard asli
             let rowGap = this.mode === 'numeric' ? 'gap-2' : 'gap-1 sm:gap-1.5';
             html += `<div class="flex justify-center ${rowGap} w-full">`;
             
             row.forEach(key => {
-                // Styling dasar tombol
                 let baseClass = "flex items-center justify-center font-bold rounded-lg sm:rounded-xl shadow-[0_3px_0_rgba(203,213,225,1)] border border-slate-200 active:shadow-none active:translate-y-[3px] transition-all select-none touch-manipulation";
                 
-                // Ukuran proporsional berdasarkan mode
                 let sizeClass = this.mode === 'numeric' 
                     ? "flex-1 py-4 sm:py-5 text-2xl bg-white text-slate-800" 
                     : "flex-1 py-3 sm:py-4 text-sm sm:text-lg bg-white text-slate-800";
 
-                // 🚀 PERBAIKAN: Pisahkan logika eksekusi khusus untuk tombol "C"
                 if (key === 'C') {
                     sizeClass = this.mode === 'numeric'
                         ? "flex-1 py-4 sm:py-5 text-2xl bg-rose-50 text-rose-500 border-rose-200 shadow-[0_3px_0_rgba(254,205,211,1)]"
                         : "flex-1 py-3 sm:py-4 text-sm sm:text-lg bg-rose-50 text-rose-500 border-rose-200 shadow-[0_3px_0_rgba(254,205,211,1)]";
                     
-                    // Panggil fungsi clear(), BUKAN insert()
                     html += `<button type="button" class="${baseClass} ${sizeClass}" onclick="osKeyboard.clear()">${key}</button>`;
                 } else {
-                    // Tombol angka / teks normal memanggil fungsi insert()
                     html += `<button type="button" class="${baseClass} ${sizeClass}" onclick="osKeyboard.insert('${key}')">${key}</button>`;
                 }
             });
             html += `</div>`;
         });
 
-        // 🚀 ROW BAWAH: Tombol Aksi (Space, Backspace, Enter) disesuaikan per mode
         if (this.mode === 'text') {
-            // Layout Bawah QWERTY
             html += `<div class="flex justify-center gap-1 sm:gap-1.5 w-full mt-0.5">
                 <button type="button" class="flex-[1.5] py-3 bg-slate-200 text-slate-600 font-bold rounded-xl shadow-[0_3px_0_rgba(156,163,175,1)] active:shadow-none active:translate-y-[3px] transition-all flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
                     <i class="fas fa-delete-left text-lg"></i>
@@ -104,7 +133,6 @@ const osKeyboard = {
                 </button>
             </div>`;
         } else {
-            // Layout Bawah NUMERIK
             html += `<div class="flex justify-center gap-2 w-full mt-1">
                 <button type="button" class="flex-1 py-4 sm:py-5 bg-slate-200 text-slate-700 font-bold rounded-xl shadow-[0_3px_0_rgba(156,163,175,1)] active:shadow-none active:translate-y-[3px] transition-all text-xl flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
                     <i class="fas fa-delete-left"></i>
@@ -126,18 +154,22 @@ const osKeyboard = {
         }
         this.targetElement.value += char; 
         this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+        // Delay 10ms agar terbaca setelah fungsi FormatRupiah (jika ada) memodifikasi angka
+        setTimeout(() => this.updatePreview(), 10);
     },
     
     backspace: function() { 
         if (!this.targetElement) return; 
         this.targetElement.value = this.targetElement.value.slice(0, -1); 
         this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+        setTimeout(() => this.updatePreview(), 10);
     },
     
     clear: function() { 
         if (!this.targetElement) return; 
         this.targetElement.value = ''; 
         this.targetElement.dispatchEvent(new Event('input', { bubbles: true })); 
+        setTimeout(() => this.updatePreview(), 10);
     }
 };
 
