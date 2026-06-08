@@ -1831,34 +1831,65 @@ refreshData: function() {
         if ((menu === 'gudang' || menu === 'master' || menu === 'outlet') && typeof this.renderGudang === 'function') this.renderGudang();
     },
     
-    filterProducts: function(key) {
+   filterProducts: function(key) {
+        this._lastSearchKey = key; // 🚀 Simpan memori kata kunci pencarian
         let pList = document.getElementById('product-list');
         if (pList) {
             if (this.isLoadingData) return;
             pList.innerHTML = this.filteredProducts.filter(p => String(p.nama || '').toLowerCase().includes(key.toLowerCase())).map(p => this.createProductCard(p)).join('');
         }
     },
+    
     renderProducts: function() {
         const list = document.getElementById('product-list'); if (!list) return;
         if (this.isLoadingData) { list.innerHTML = Array(8).fill(0).map(() => `<div class="bg-white border border-slate-100 rounded-2xl p-3 shadow-sm flex flex-col h-40"><div class="skeleton h-24 rounded-xl mb-3 w-full"></div><div class="skeleton h-4 w-3/4 rounded mb-2"></div><div class="skeleton h-4 w-1/2 rounded"></div></div>`).join(''); return; }
-        list.innerHTML = this.filteredProducts.map(p => this.createProductCard(p)).join('');
-    },
-    createProductCard: function(p) {
-        let img = p.img ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 opacity-50 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
-        let isHabis = p.maxStok <= 0 ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:-translate-y-1.5 hover:shadow-[0_15px_30px_rgba(0,0,0,0.08)] hover:border-brand-200';
         
-        return `<div onclick="${p.maxStok > 0 ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" class="bg-white border-2 border-transparent rounded-[1.5rem] p-3 cursor-pointer shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col relative group ${isHabis}">
-            <span class="absolute top-4 right-4 ${p.maxStok <= 0 ? 'bg-red-500' : 'bg-slate-900/80 backdrop-blur-md'} text-white text-[10px] font-black px-2.5 py-1 rounded-lg z-10 shadow-md tracking-wider">${p.maxStok <= 0 ? 'HABIS' : `STOK: ${p.maxStok}`}</span>
-            <div class="aspect-[4/3] mb-4 overflow-hidden rounded-[1rem] bg-slate-100 relative shadow-inner">${img}</div>
-            <div class="flex flex-col flex-1 justify-between px-1">
-                <h3 class="font-bold text-xs md:text-sm text-slate-800 leading-snug mb-2 line-clamp-2">${p.nama}</h3>
+        // 🚀 Gunakan memori pencarian jika kasir sedang mencari barang
+        let key = this._lastSearchKey || ''; 
+        let itemsToRender = key ? this.filteredProducts.filter(p => String(p.nama || '').toLowerCase().includes(key.toLowerCase())) : this.filteredProducts;
+        
+        list.innerHTML = itemsToRender.map(p => this.createProductCard(p)).join('');
+    },
+    
+    createProductCard: function(p) {
+        // 1. Cek jumlah item ini di dalam keranjang
+        let qtyInCart = 0;
+        let cartItem = this.cart.find(i => i.sku === p.sku);
+        if (cartItem) qtyInCart = cartItem.qty;
+
+        let img = p.img ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 opacity-50 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
+        
+        let isHabis = p.maxStok <= 0 ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:-translate-y-1 md:hover:-translate-y-1.5 hover:shadow-[0_10px_20px_rgba(0,0,0,0.08)] hover:border-brand-200';
+        
+        // 🚀 OPTIMASI HP 1: Angka diperkecil jadi text-4xl di HP, tapi tetap text-6xl di PC
+        let overlayQty = qtyInCart > 0 
+            ? `<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center z-20 transition-all duration-300">
+                   <span class="text-4xl md:text-6xl font-black text-white drop-shadow-xl">${qtyInCart}</span>
+               </div>` 
+            : '';
+
+        // 🚀 OPTIMASI HP 2: Padding (p-2) lebih kecil di HP
+        return `<div onclick="${p.maxStok > 0 ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" class="bg-white border-2 border-transparent rounded-2xl md:rounded-[1.5rem] p-2 md:p-3 cursor-pointer shadow-sm md:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col relative group ${isHabis} overflow-hidden">
+            
+            <span class="absolute top-2 right-2 md:top-4 md:right-4 ${p.maxStok <= 0 ? 'bg-red-500' : 'bg-slate-900/80 backdrop-blur-md'} text-white text-[8px] md:text-[10px] font-black px-1.5 py-0.5 md:px-2.5 md:py-1 rounded md:rounded-lg z-30 shadow-md tracking-wider">${p.maxStok <= 0 ? 'HABIS' : `STOK: ${p.maxStok}`}</span>
+            
+            <div class="h-28 sm:h-32 md:h-40 w-full mb-2 md:mb-4 overflow-hidden rounded-xl md:rounded-[1rem] bg-slate-100 relative shadow-inner shrink-0">
+                ${img}
+                ${overlayQty}
+            </div>
+            
+            <div class="flex flex-col flex-1 justify-between px-1 z-10">
+                <h3 class="font-bold text-[11px] md:text-sm text-slate-800 leading-snug mb-1 md:mb-2 line-clamp-2">${p.nama}</h3>
+                
                 <div class="flex items-center justify-between mt-1">
-                    <p class="text-brand-500 font-black text-sm md:text-base tracking-tight">Rp ${p.harga.toLocaleString('id-ID')}</p>
-                    <div class="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-sm"><i class="fas fa-plus text-[10px]"></i></div>
+                    <p class="text-brand-500 font-black text-xs md:text-base tracking-tight">Rp ${p.harga.toLocaleString('id-ID')}</p>
+                    
+                    <div class="w-6 h-6 md:w-7 md:h-7 rounded-full ${qtyInCart > 0 ? 'bg-brand-500 text-white' : 'bg-brand-50 text-brand-500 opacity-100 md:opacity-0 md:group-hover:opacity-100'} flex items-center justify-center transition-opacity duration-300 shadow-sm shrink-0"><i class="fas ${qtyInCart > 0 ? 'fa-check' : 'fa-plus'} text-[8px] md:text-[10px]"></i></div>
                 </div>
             </div>
         </div>`;
     },
+    
     addToCart: function(sku, nama, price, maxStok, skuBahan, event) {
         let currentStokBahanDiKeranjang = 0; let refBahan = skuBahan || sku;
         this.cart.forEach(i => { if ((i.sku_bahan || i.sku) === refBahan) currentStokBahanDiKeranjang += i.qty; });
@@ -1897,6 +1928,17 @@ refreshData: function() {
     renderCart: function() {
         const cont = document.getElementById('cart-container'); let total = 0, items = 0, html = ''; if (!cont) return;
         
+        // 🚀 FITUR 1: Tombol Hapus Semua (Muncul jika ada isinya)
+        if (this.cart.length > 0) {
+            html += `
+            <div class="flex justify-between items-center mb-3 px-1">
+                <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase">Daftar Pesanan</span>
+                <button onclick="superApp.clearCart()" class="text-[10px] font-black text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95">
+                    <i class="fas fa-trash-alt"></i> Hapus Semua
+                </button>
+            </div>`;
+        }
+
         this.cart.forEach((i, idx) => {
             total += (i.price * i.qty); items += i.qty;
             
@@ -1905,23 +1947,34 @@ refreshData: function() {
             this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) sisaBahanDiKeranjang += c.qty; });
             let stokTersisaVisual = i.maxStok - sisaBahanDiKeranjang;
 
-            // 🚀 PERBAIKAN UI: Desain Card Item Premium & Elegan
-            html += `<div class="flex bg-white border border-slate-100 p-3.5 rounded-[1.25rem] shadow-[0_4px_12px_rgba(0,0,0,0.03)] items-center gap-3 text-slate-800 transition transform hover:-translate-y-0.5">
+            // 🚀 FITUR 2: Wrapper UI untuk Swipe-to-Delete
+            html += `
+            <div class="relative overflow-hidden rounded-[1.25rem] mb-3 bg-rose-500 shadow-[0_4px_12px_rgba(0,0,0,0.03)] group">
                 
-                <div class="flex-1 min-w-0">
-                    <h4 class="font-extrabold text-sm truncate text-slate-800 mb-0.5">${i.nama}</h4>
-                    <div class="flex items-center gap-2">
-                        <p class="text-brand-500 font-black text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
-                        <span class="text-[10px] text-slate-400 font-bold border border-slate-100 px-1.5 py-0.5 rounded-md ${stokTersisaVisual <= 0 ? 'bg-red-50 text-red-500 border-red-100' : ''}">Sisa: ${stokTersisaVisual}</span>
+                <button onclick="superApp.changeQty(${idx}, -999)" class="absolute inset-y-0 right-0 w-20 flex flex-col items-center justify-center text-white text-[10px] font-black transition-colors hover:bg-rose-600 active:bg-rose-700">
+                    <i class="fas fa-trash-alt mb-1 text-base drop-shadow-sm"></i> HAPUS
+                </button>
+
+                <div class="flex bg-white border border-slate-100 p-3.5 rounded-[1.25rem] items-center gap-3 text-slate-800 transition-transform duration-300 transform relative z-10 w-full"
+                     ontouchstart="this.startX = event.touches[0].clientX; this.style.transition = 'none';"
+                     ontouchmove="let diff = this.startX - event.touches[0].clientX; if(diff > 0 && diff < 100) { this.style.transform = 'translateX(-' + diff + 'px)'; }"
+                     ontouchend="let diff = this.startX - event.changedTouches[0].clientX; this.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; if(diff > 40) { this.style.transform = 'translateX(-80px)'; } else { this.style.transform = 'translateX(0)'; }">
+                    
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-extrabold text-sm truncate text-slate-800 mb-0.5">${i.nama}</h4>
+                        <div class="flex items-center gap-2">
+                            <p class="text-brand-500 font-black text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
+                            <span class="text-[10px] text-slate-400 font-bold border border-slate-100 px-1.5 py-0.5 rounded-md ${stokTersisaVisual <= 0 ? 'bg-red-50 text-red-500 border-red-100' : ''}">Sisa: ${stokTersisaVisual}</span>
+                        </div>
                     </div>
-                </div>
 
-                <div class="flex bg-slate-50 rounded-xl border border-slate-200 shadow-inner p-1 overflow-hidden shrink-0 items-center">
-                    <button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm"><i class="fas fa-minus text-xs"></i></button>
-                    <span class="w-8 flex items-center justify-center text-sm font-black text-slate-800">${i.qty}</span>
-                    <button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm"><i class="fas fa-plus text-xs"></i></button>
-                </div>
+                    <div class="flex bg-slate-50 rounded-xl border border-slate-200 shadow-inner p-1 overflow-hidden shrink-0 items-center">
+                        <button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm active:scale-90"><i class="fas fa-minus text-xs"></i></button>
+                        <span class="w-8 flex items-center justify-center text-sm font-black text-slate-800">${i.qty}</span>
+                        <button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm active:scale-90"><i class="fas fa-plus text-xs"></i></button>
+                    </div>
 
+                </div>
             </div>`;
         });
         
@@ -1930,7 +1983,7 @@ refreshData: function() {
         const totalEl = document.getElementById('total-price'); if (totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
         const badge = document.getElementById('cart-badge'); if (badge) badge.innerText = `${items} Item`;
         
-        // 🚀 Tembakkan update angka ke Floating Button di HP
+        // Update Mobile Floating Button
         const mobQty = document.getElementById('mobile-cart-qty'); 
         if (mobQty) mobQty.innerText = `${items} ITEM`;
         
@@ -1939,7 +1992,21 @@ refreshData: function() {
 
         this.payTotal = total; 
         
-        this.syncStorage(); // KEMBALIKAN KE NORMAL
+        if (document.getElementById('product-list')) {
+            this.renderProducts();
+        }
+
+        this.syncStorage(); 
+    },
+
+    // 🚀 FUNGSI BARU: Kosongkan seluruh isi keranjang
+    clearCart: function() {
+        if (this.cart.length === 0) return;
+        if (confirm("Hapus semua pesanan dari keranjang?")) {
+            this.cart = [];
+            this.renderCart();
+            this.showToast("Keranjang berhasil dikosongkan", "success");
+        }
     },
     
     // PAYMENT
@@ -4912,7 +4979,7 @@ executeVoidTrx: async function(trxId) {
     },
 
 // 🚀 MESIN PENERJEMAH GAMBAR KE KODE BINER PRINTER THERMAL (ESC/POS)
-    generateRasterImage: function(base64Image) {
+   generateRasterImage: function(base64Image) {
         return new Promise((resolve) => {
             let img = new Image();
             img.onload = () => {
