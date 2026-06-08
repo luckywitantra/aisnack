@@ -5065,10 +5065,10 @@ executeVoidTrx: async function(trxId) {
             printQueue.push(new TextEncoder().encode(str));
             
             for (let chunk of printQueue) {
-                const chunkSize = 40; 
+                const chunkSize = 256; 
                 for (let i = 0; i < chunk.length; i += chunkSize) {
                     await this.printerCharacteristic.writeValue(chunk.slice(i, i + chunkSize));
-                    await new Promise(res => setTimeout(res, 5));
+                    await new Promise(res => setTimeout(res, 1));
                 }
             }
 
