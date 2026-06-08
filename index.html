@@ -1739,6 +1739,24 @@
       <button id="btn-update-app" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md active:scale-95 shrink-0">Update</button>
   </div>
 
+<div id="modal-menu-guide" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[400] hidden flex-col items-center justify-center p-4 transition-opacity">
+    <div id="modal-menu-guide-content" class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 modal-enter">
+        <div class="p-6 text-center pb-2">
+            <div id="guide-icon-container" class="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 border-[6px]">
+                <i id="guide-icon" class="fas fa-info"></i>
+            </div>
+            <h3 id="guide-title" class="font-black text-xl text-slate-800 mb-1">Panduan Menu</h3>
+        </div>
+        
+        <div id="guide-content-body" class="px-6 pb-6 text-left">
+            </div>
+        
+        <div class="p-4 bg-slate-50 border-t border-slate-100">
+            <button onclick="superApp.closeModal('modal-menu-guide')" class="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-sm transition active:scale-95 shadow-md tracking-wider">SAYA MENGERTI</button>
+        </div>
+    </div>
+</div>
+  
   <div id="modal-receipt-builder" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] hidden flex-col items-center justify-center p-2 md:p-6 transition-opacity">
         <div id="modal-receipt-builder-content" class="bg-slate-50 w-full max-w-6xl h-[95dvh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-700 modal-enter">
             
