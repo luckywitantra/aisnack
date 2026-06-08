@@ -378,6 +378,7 @@ const superApp = {
             }
         }
     },
+    
    closeModal: function(id) { 
         const modal = document.getElementById(id); 
         const content = document.getElementById(id + '-content'); 
@@ -392,6 +393,61 @@ const superApp = {
                 modal.classList.add('hidden'); 
             }
         } 
+    },
+
+    // 🚀 FUNGSI BARU: Menampilkan Popup Peringatan Fungsi Menu
+    showMenuGuide: function(type) {
+        let title = ''; let icon = ''; let color = ''; let content = '';
+
+        if (type === 'terima') {
+            title = 'TERIMA BARANG MASUK';
+            icon = 'fa-truck-loading';
+            color = 'text-emerald-500 bg-emerald-50 border-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.4)]';
+            content = `
+                <div class="bg-red-50 border border-red-200 text-red-600 px-3 py-2.5 rounded-xl text-xs font-black mb-4 flex gap-2 items-center">
+                    <i class="fas fa-exclamation-triangle text-lg animate-pulse"></i> 
+                    <span>JANGAN TERTUKAR DENGAN OPNAME!</span>
+                </div>
+                <p class="text-sm font-bold text-slate-700 mb-2">Gunakan menu ini <span class="text-emerald-600 font-black">HANYA KETIKA</span>:</p>
+                <ul class="list-disc pl-5 text-sm space-y-1.5 text-slate-600 font-medium mb-4">
+                    <li>Ada <b>pengiriman bahan baku/barang baru</b> dari Gudang Pusat.</li>
+                    <li>Kurir datang membawa fisik barang ke toko.</li>
+                </ul>
+                <div class="bg-slate-100 p-3 rounded-xl border border-slate-200">
+                    <p class="text-xs text-slate-500"><span class="font-black text-slate-700">Efek:</span> Angka yang diketik akan <b class="text-emerald-600">MENAMBAH</b> stok barang di komputer secara otomatis.</p>
+                </div>
+            `;
+        } else if (type === 'opname') {
+            title = 'OPNAME FISIK (AUDIT)';
+            icon = 'fa-clipboard-check';
+            color = 'text-purple-500 bg-purple-50 border-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.4)]';
+            content = `
+                <div class="bg-red-50 border border-red-200 text-red-600 px-3 py-2.5 rounded-xl text-xs font-black mb-4 flex gap-2 items-center">
+                    <i class="fas fa-exclamation-triangle text-lg animate-pulse"></i> 
+                    <span>JANGAN TERTUKAR DGN TERIMA BARANG!</span>
+                </div>
+                <p class="text-sm font-bold text-slate-700 mb-2">Gunakan menu ini <span class="text-purple-600 font-black">HANYA KETIKA</span>:</p>
+                <ul class="list-disc pl-5 text-sm space-y-1.5 text-slate-600 font-medium mb-4">
+                    <li>Anda sedang <b>menghitung sisa stok asli</b> di laci, etalase, atau kulkas.</li>
+                    <li>Ingin mencocokkan apakah data di komputer sama dengan aslinya.</li>
+                </ul>
+                <div class="bg-slate-100 p-3 rounded-xl border border-slate-200">
+                    <p class="text-xs text-slate-500"><span class="font-black text-slate-700">Cara Isi:</span> Ketik angka <b>SISA FISIK YANG ADA</b>. Sistem akan otomatis menghitung selisih hilang/lebihnya.</p>
+                </div>
+            `;
+        } else {
+            return;
+        }
+
+        const modal = document.getElementById('modal-menu-guide');
+        if (modal) {
+            document.getElementById('guide-icon-container').className = `w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 border-[6px] ${color}`;
+            document.getElementById('guide-icon').className = `fas ${icon}`;
+            document.getElementById('guide-title').innerText = title;
+            document.getElementById('guide-content-body').innerHTML = content;
+
+            this.openModal('modal-menu-guide');
+        }
     },
 
     toggleDarkMode: function() { 
@@ -1852,12 +1908,26 @@ refreshData: function() {
             }
         });
 
-        // PERBAIKAN 3: Daftarkan pemicu halaman Gudang, Outlet, dan Master agar digambar saat diklik
+        // ====================================================================
+        // 🚀 PERBAIKAN 3: Daftarkan pemicu halaman dan Popup Panduannya
+        // ====================================================================
         if (menu === 'pos' && !this.activeShiftId) this.checkShiftStatus();
         if (menu === 'report' && typeof this.renderReport === 'function') this.renderReport();
-        if (menu === 'opname' && typeof this.renderOpname === 'function') this.renderOpname();
+        
+        // Tampilkan Popup setelah merender halaman Opname
+        if (menu === 'opname' && typeof this.renderOpname === 'function') {
+            this.renderOpname();
+            if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('opname'), 200);
+        }
+        
         if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
-        if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') this.renderTerimaBarang();
+        
+        // Tampilkan Popup setelah merender halaman Terima Barang
+        if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
+            this.renderTerimaBarang();
+            if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('terima'), 200);
+        }
+        
         if (menu === 'ai' && typeof this.generateAIReport === 'function') this.generateAIReport();
         if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
         if ((menu === 'gudang' || menu === 'master' || menu === 'outlet') && typeof this.renderGudang === 'function') this.renderGudang();
