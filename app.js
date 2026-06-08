@@ -4919,10 +4919,10 @@ executeVoidTrx: async function(trxId) {
                 let canvas = document.createElement('canvas');
                 let ctx = canvas.getContext('2d');
 
-                // Lebar disesuaikan (200px sangat pas untuk printer 58mm)
+                // 🚀 PERBAIKAN: Lebar diturunkan menjadi 160px agar ukuran data biner menyusut drastis
                 let width = img.width;
                 let height = img.height;
-                let maxWidth = 200;
+                let maxWidth = 160; 
 
                 if (width > maxWidth) {
                     height = Math.floor(height * (maxWidth / width));
