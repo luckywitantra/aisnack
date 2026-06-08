@@ -5068,7 +5068,7 @@ executeVoidTrx: async function(trxId) {
                 const chunkSize = 256; 
                 for (let i = 0; i < chunk.length; i += chunkSize) {
                     await this.printerCharacteristic.writeValue(chunk.slice(i, i + chunkSize));
-                    await new Promise(res => setTimeout(res, 1));
+                    await new Promise(res => setTimeout(res, 2));
                 }
             }
 
