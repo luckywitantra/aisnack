@@ -328,7 +328,7 @@
              <input type="text" readonly onclick="osKeyboard.open('product-search-input', 'text')" id="product-search-input" placeholder="Sentuh untuk Cari Produk..." class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 text-slate-800 transition cursor-pointer" oninput="superApp.filterProducts(this.value)">
           </div>
           
-          <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pb-6 content-start flex-1 min-h-0 custom-scroll" id="product-list"></div>
+          <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pb-6 items-stretch auto-rows-fr flex-1 min-h-0 custom-scroll" id="product-list"></div>
         </div>
         
         <div id="mobile-cart-overlay" class="fixed inset-0 bg-slate-900/60 z-[80] hidden md:hidden backdrop-blur-sm transition-opacity" onclick="superApp.toggleMobileCart()"></div>
@@ -1662,7 +1662,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=116"></script>
+  <script src="app.js?v=120"></script>
   
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
