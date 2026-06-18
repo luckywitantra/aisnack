@@ -5278,4 +5278,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
