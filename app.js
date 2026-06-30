@@ -1662,43 +1662,55 @@ const superApp = {
     },
 
     saveHPP: async function() {
-        if (this.isProcessing) return;
-        
-        let hppData = [];
-        // 1. Kumpulkan semua angka yang diketik Owner
-        this.filteredProducts.forEach(p => {
-            let inputEl = document.getElementById(`hpp-input-${p.sku}`);
-            if (inputEl) {
-                hppData.push({ sku: p.sku, hpp: this.getNumericValue(inputEl.value) });
-            }
-        });
+    // 1. Cek status processing di awal
+    if (this.isProcessing) return;
+    
+    let hppData = [];
+    this.filteredProducts.forEach(p => {
+        let inputEl = document.getElementById(`hpp-input-${p.sku}`);
+        if (inputEl) {
+            hppData.push({ sku: p.sku, hpp: this.getNumericValue(inputEl.value) });
+        }
+    });
 
-        if (hppData.length === 0) return this.showToast("Tidak ada data HPP untuk disimpan", "warning");
-        if (!confirm("Simpan perubahan Master HPP ke database pusat?")) return;
+    if (hppData.length === 0) return this.showToast("Tidak ada data HPP untuk disimpan", "warning");
+    if (!confirm("Simpan perubahan Master HPP ke database pusat?")) return;
 
-        this.setLoading(true, "Menyimpan HPP ke Server...");
-        
-        // 2. Kirim ke Backend Google Sheets
+    // 2. Tandai sedang memproses
+    this.isProcessing = true;
+    this.setLoading(true, "Menyimpan HPP ke Server...");
+    
+    try {
         const payload = {
             action: 'save_hpp',
-            userRole: this.userRole, // 🔒 Gembok Keamanan
+            userRole: this.userRole,
             data: hppData
         };
 
         let res = await this.apiPost(payload);
+        
         if (res.status === 'sukses') {
             this.showToast("Data HPP berhasil diperbarui!", "success");
+            
             if (!res.is_offline) {
-                const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' });
-                this.db = await r.json();
+                // Gunakan fungsi pullFreshData yang sudah ada untuk memperbarui db secara menyeluruh
+                await this.pullFreshData(true, true); 
             }
+            
             this.refreshData(); 
-            this.renderMasterHPP(); // Gambar ulang tabel
+            this.renderMasterHPP(); 
         } else {
             this.showToast("Gagal menyimpan HPP: " + (res.pesan || ''), "error");
         }
+    } catch (e) {
+        console.error("Error saat menyimpan HPP:", e);
+        this.showToast("Terjadi kesalahan koneksi.", "error");
+    } finally {
+        // 🚀 KUNCI PERBAIKAN: Loading pasti berhenti di sini
+        this.isProcessing = false;
         this.setLoading(false);
-    },
+    }
+},
 
     // Tambahkan di dalam object superApp
     profitChart: null,
