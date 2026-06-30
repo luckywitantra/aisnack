@@ -180,171 +180,161 @@ const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
     activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
-    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, profitChart: null, isLoadingData: false, printerCharacteristic: null, printerDevice: null, isBluetoothSearching: false, isProcessing: false,
+    offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, isLoadingData: false, printerCharacteristic: null, printerDevice: null, isBluetoothSearching: false, isProcessing: false,
     cfdFocusHandlerAdded: false,
 
     // FORMATTER & PARSER
     formatRupiahInput: function(el) { let val = el.value.replace(/[^0-9]/g, ''); el.value = val !== '' ? parseInt(val, 10).toLocaleString('id-ID') : ''; },
     getNumericValue: function(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; },
     
-    cleanDateOnly: function(dateVal) {
-    if (!dateVal) return "";
-    let s = String(dateVal).trim();
-    
-    // Jika formatnya sudah DD/MM/YYYY, kembalikan langsung
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-    
-    // Jika formatnya ISO (seperti 2026-06-29T16:00:00.000Z)
-    if (s.includes('T')) {
-        let d = new Date(s);
-        // Mengambil tanggal lokal, bukan UTC agar tidak bergeser zona waktu
-        let day = String(d.getDate()).padStart(2, '0');
-        let month = String(d.getMonth() + 1).padStart(2, '0');
-        let year = d.getFullYear();
-        return `${day}/${month}/${year}`;
-    }
-    return s;
-},
-
-    cleanTimeOnly: function(str) {
-    if (!str || str === '00.00.00') return '00.00.00'; 
-    let s = String(str).trim();
-
-    // 🚀 LANGSUNG CEK FORMAT HH.MM.SS (Tanpa konversi ke Date Object)
-    // Ini menangkap format 21.09.10 atau 21:09:10
-    let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-    if (match) { 
-        let pad = n => String(n).padStart(2, '0');
-        return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
-    }
-
-    // Hanya jika benar-benar butuh konversi dari Date Object (untuk data dari Sheets yang kotor)
-    if (s.includes('T') || s.includes('GMT')) {
-        let d = new Date(s);
-        if (!isNaN(d.getTime())) {
-            let pad = n => String(n).padStart(2, '0');
-            // Gunakan getUTCHours agar tidak terpengaruh zona waktu lokal/server
-            return `${pad(d.getUTCHours())}.${pad(d.getUTCMinutes())}.${pad(d.getUTCSeconds())}`;
+    cleanDateOnly: function(str) {
+        if (!str) return ''; 
+        let s = String(str).trim();
+        
+        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
+        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
+            let d = new Date(s); 
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; 
+            } 
         }
-    }
-
-    return s;
-},
-    
-   parseDateId: function(dateStr) {
-    if (!dateStr) return new Date(0); 
-    let s = String(dateStr); 
-    
-    // Jika formatnya DD/MM/YYYY
-    let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (match) { 
-        let d = parseInt(match[1]); 
-        let m = parseInt(match[2]); 
-        let y = parseInt(match[3]); 
-        // Paksa ke zona waktu lokal, abaikan jam
-        return new Date(y, m - 1, d); 
-    }
-    
-    // Jika formatnya sudah ISO (2026-06-30T...)
-    if (s.includes('T')) { 
-        let d = new Date(s); 
-        // Mengembalikan tanggal lokal tanpa memperhatikan jam UTC
-        return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-    }
-    
-    return new Date(0);
-},
-    
-    // 🚀 FITUR BARU: Penarik Data Senyap di Latar Belakang
-    pullBackgroundData: async function() {
-        console.log("Memulai sinkronisasi seluruh riwayat data di latar belakang...");
-        try {
-            // Tarik SEMUA data (history=all)
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { redirect: 'follow' });
-            const data = await res.json();
-            
-            if (data && data.status === 'sukses') {
-                // 1. Timpa database memori lokal dengan data yang sudah 100% lengkap
-                this.db = data;
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                
-                // 2. Refresh elemen-elemen senyap jika diperlukan
-                if (typeof this.updatePendingNotifications === 'function') this.updatePendingNotifications();
-                
-                console.log("Sinkronisasi latar belakang selesai! Database lokal kini 100% lengkap.");
-            }
-        } catch (e) {
-            console.log("Sinkronisasi latar belakang gagal, akan dicoba otomatis nanti.", e);
+        
+        // 2. Cek jika data berupa teks manual
+        let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; 
         }
+        return s.split(' ')[0];
     },
 
-    
-   pullFreshData: async function(silent = false) {
-    if (this.isProcessing && !silent) return; 
-    
-    // Teks loading kini lebih umum karena selalu menarik seluruh data
-    if (!silent) this.setLoading(true, "Menarik Seluruh Historis Data dari Server...");
-    this.isProcessing = true; 
+    cleanTimeOnly: function(str) {
+        if (!str) return '00.00.00'; 
+        let s = String(str).trim();
 
-    try {
-        // 🚀 Menggunakan history=all secara permanen
-        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { redirect: 'follow' }); 
-        const data = await res.json();
-        
-        if (data && data.status === 'sukses') { 
-            
-            // --- DETEKSI UPDATE VERSI ---
-            let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
-            if (serverVersion) {
-                let localVersion = localStorage.getItem('app_version');
-                if (!localVersion) {
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                } else if (localVersion !== serverVersion.Nilai) {
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                    if ('serviceWorker' in navigator) {
-                        const regs = await navigator.serviceWorker.getRegistrations();
-                        for(let reg of regs) { reg.update(); }
-                    }
-                    window.location.reload(true);
-                    return; 
-                }
-            }
-            
-            // Simpan data lengkap ke database memori dan cache
-            this.db = data; 
-            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-
-            // SINKRONISASI PENGATURAN GLOBAL
-            let configs = [
-                { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
-                { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
-                { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
-                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
-            ];
-
-            configs.forEach(c => {
-                let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
-                if (item && item.Nilai) {
-                    localStorage.setItem(c.storage, item.Nilai);
-                    if (c.callback) c.callback(item.Nilai);
-                }
-            });
-            
-            // Segarkan tampilan
-            this.refreshData(); 
-            
-            if (!silent) this.showToast("Seluruh historis data berhasil diperbarui!"); 
-        } else {
-            throw new Error("Data tidak valid");
+        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
+        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
+            let d = new Date(s); 
+            if (!isNaN(d.getTime())) { 
+                let pad = n => n < 10 ? '0' + n : n; 
+                return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
+            } 
         }
-    } catch (e) { 
-        console.error("Fetch Error:", e);
-        if (!silent) this.showToast("Gagal menarik data. Cek koneksi Anda.", "error"); 
-    } finally {
-        this.isProcessing = false;
+
+        // 2. Cek jika data berupa Desimal Murni (Cara Google Sheets simpan nilai Waktu)
+        if (!isNaN(Number(s)) && Number(s) > 0 && Number(s) < 1) {
+            let totalSec = Math.floor(Number(s) * 86400);
+            let h = Math.floor(totalSec / 3600);
+            let m = Math.floor((totalSec % 3600) / 60);
+            let sec = totalSec % 60;
+            let pad = n => n < 10 ? '0' + n : n;
+            return `${pad(h)}.${pad(m)}.${pad(sec)}`;
+        }
+
+        // 3. Cek jika data berupa teks manual dari kasir (HH.MM.SS atau HH:MM:SS)
+        let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
+        if (match) { 
+            let pad = n => String(n).length < 2 ? '0' + n : n; 
+            return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
+        }
+        
+        let parts = s.split(' '); 
+        return parts.length > 1 ? parts[1] : s;
+    },
+    parseDateId: function(dateStr) {
+        if (!dateStr) return new Date(0); let s = String(dateStr); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
+        if (s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0, 0, 0, 0); return d; } }
+        let fPart = s.split(' ')[0]; let d2 = new Date(fPart); if (!isNaN(d2.getTime())) { d2.setHours(0, 0, 0, 0); return d2; }
+        return new Date(0);
+    },
+
+    // GLOBAL UTILS
+    // Tambahkan parameter silent (default false)
+    pullFreshData: async function(silent = false) {
+        if (this.isProcessing && !silent) return; 
+        if (!silent) this.setLoading(true, "Menarik Data Terbaru...");
+        
+        try {
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+            const data = await res.json();
+            
+            if (data && data.status === 'sukses') { 
+                
+                // --- 🚀 RADAR PENDETEKSI UPDATE VERSI KODINGAN ---
+                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+                if (serverVersion) {
+                    let localVersion = localStorage.getItem('app_version');
+                    
+                    // Jika baru pertama kali buka, simpan versinya
+                    if (!localVersion) {
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                    } 
+                    // JIKA VERSI DI GOOGLE SHEETS BERBEDA DENGAN DI HP KASIR
+                    else if (localVersion !== serverVersion.Nilai) {
+                        
+                        // 1. Tampilkan Pop-up Pembaruan Paksa
+                        alert(`🚀 UPDATE SISTEM TERSEDIA!\n\nKodingan versi baru (${serverVersion.Nilai}) telah dirilis oleh Owner.\n\nSistem akan dimuat ulang (Refresh) secara otomatis untuk menerapkan pembaruan.`);
+                        
+                        // 2. Perbarui ingatan memori versi di HP
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                        
+                        // 3. Paksa Service Worker PWA untuk memeriksa pembaruan file cache
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                                for(let registration of registrations) { registration.update(); }
+                            });
+                        }
+                        
+                        // 4. Paksa aplikasi memuat ulang (reload) detik itu juga
+                        window.location.reload(true);
+                        return; // Hentikan fungsi ke bawah agar data lama tidak ditimpa
+                    }
+                }
+                // ------------------------------------------------
+                
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
+
+                // ========================================================
+                // 🚀 JEMBATAN SINKRONISASI PENGATURAN PERSONALISASI (BARU)
+                // ========================================================
+                
+                // 1. Set Logo Aplikasi Global
+                let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
+                if (logoData && logoData.Nilai) {
+                    localStorage.setItem('app_logo_url', logoData.Nilai);
+                    if(typeof this.updateAppLogos === 'function') this.updateAppLogos(logoData.Nilai); 
+                }
+                
+                // 2. Set DUAL Promo Layar CFD
+                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
+                if (pStandby && pStandby.Nilai) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
+                
+                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
+                if (pTransaksi && pTransaksi.Nilai) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
+
+                // 3. TARIK KEMBALI TEMPLATE STRUK DARI SERVER
+                let tStruk = (this.db.pengaturan || []).find(x => x.Pengaturan === 'aisnack_receipt_template');
+                if (tStruk && tStruk.Nilai) {
+                    localStorage.setItem('aisnack_receipt_template', tStruk.Nilai);
+                }
+                // ========================================================
+                
+                // Hanya perbarui layar jika keranjang kosong (tidak mengganggu transaksi)
+                if (this.cart.length === 0) {
+                    this.refreshData(); 
+                }
+                
+                if (!silent) this.showToast("Data diperbarui!"); 
+            } 
+        } catch (e) { 
+            if (!silent) this.showToast("Gagal menarik data.", "error"); 
+        }
+        
         if (!silent) this.setLoading(false);
-    }
-},
+    },
     
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
@@ -473,8 +463,6 @@ const superApp = {
             } 
         }
     },
-
-    
     apiPost: async function(payload) {
         if (!this.isOnline) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
         try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
@@ -882,27 +870,8 @@ const superApp = {
             const totEl = document.getElementById('cfd-total'); if (totEl) totEl.innerText = `Rp ${Number(data.total || 0).toLocaleString('id-ID')}`;
         }
     },
-
-    // 🚀 FITUR BARU: Pencarian Tabel Instan (Live Search)
-    quickSearchTable: function(tbodyId, keyword) {
-        const tbody = document.getElementById(tbodyId);
-        if (!tbody) return;
-        
-        const filterText = keyword.toLowerCase();
-        const rows = tbody.getElementsByTagName('tr');
-
-        for (let i = 0; i < rows.length; i++) {
-            let rowText = rows[i].textContent || rows[i].innerText;
-            if (rowText.toLowerCase().indexOf(filterText) > -1) {
-                rows[i].style.display = "";
-            } else {
-                rows[i].style.display = "none";
-            }
-        }
-    },
     
-    // STARTUP & LOGIN
-    // STARTUP & LOGIN
+   // STARTUP & LOGIN
     init: async function() {
         // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
         if ('serviceWorker' in navigator) {
@@ -910,6 +879,7 @@ const superApp = {
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
+                        // Jika ada service worker baru yang terinstal dan siap mengambil alih
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             const banner = document.getElementById('update-banner');
                             if (banner) {
@@ -979,8 +949,7 @@ const superApp = {
                 let data = null;
                 for (let i = 0; i < 3; i++) {
                     try { 
-                        // 🚀 AWAL BUKA: Tarik 30 hari agar super cepat!
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { redirect: 'follow' }); 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
                         data = await res.json(); 
                         if (data && data.status === 'sukses') break; 
                     } catch (e) { 
@@ -988,18 +957,23 @@ const superApp = {
                         await new Promise(r => setTimeout(r, 2000)); 
                     }
                 }
-                
                 if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
 
                 // --- PROSES DATA SUKSES ---
                 this.db = data; 
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
                 
-                // Set Logo & Promo CFD
+                // Set Logo
                 let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
-                if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
+                if (logoData) {
+                    localStorage.setItem('app_logo_url', logoData.Nilai);
+                    this.updateAppLogos(logoData.Nilai); 
+                }
+                
+                // Set DUAL Promo CFD
                 let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
                 if (pStandby) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
+                
                 let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
                 if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
@@ -1014,25 +988,16 @@ const superApp = {
                     logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
-
-                // 🚀 TRIGGER BACKGROUND SYNC
-                // Setelah 3 detik aplikasi jalan, secara diam-diam tarik semua historis tahunan
-                setTimeout(() => {
-                    if (typeof this.pullBackgroundData === 'function') {
-                        this.pullBackgroundData();
-                    }
-                }, 3000);
             };
 
-            // Logika Pembacaan Data
-            if (cacheDb) {
-                performFetch(); // Biarkan proses di belakang layar, kasir sudah bisa masuk pakai PIN
+            // Jika tidak ada cache lokal, tunggu sampai download selesai. Jika ada cache, biarkan download berjalan di background.
+            if (!cacheDb) {
+                await performFetch();
             } else {
-                await performFetch(); // Blokir layar karena ini instalasi pertama kali
+                performFetch(); 
             }
 
         } catch (err) {
-            // 🚀 INI ADALAH BLOK CATCH YANG TERHAPUS SEBELUMNYA
             const logStat = document.getElementById('login-status');
             if (logStat && this.db) { 
                 logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
@@ -1043,7 +1008,6 @@ const superApp = {
             }
         }
     },
-    
     addPin: function(num) {
         if (!this.db || !this.db.users) { this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); return; }
         if (this.pinBuffer.length < 4) { this.pinBuffer += num; const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); } }
@@ -1069,12 +1033,6 @@ const superApp = {
             let roleStr = String(user.Role).toLowerCase();
             let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
             
-            // =====================================================================
-            // 🚀 PERBAIKAN: SIMPAN IDENTITAS OWNER KE DALAM MEMORI SISTEM
-            // Jika kata 'owner' ada di database, jadikan dia owner. Jika tidak, jadikan kasir/admin.
-            // =====================================================================
-            this.userRole = roleStr.includes('owner') ? 'owner' : (roleStr.includes('admin') ? 'admin' : 'kasir');
-            
             const adminMenus = document.getElementById('admin-menus'); 
             const selOut = document.getElementById('select-outlet'); 
             const repOut = document.getElementById('report-outlet-filter');
@@ -1084,7 +1042,7 @@ const superApp = {
                 'setting-card-standby', 
                 'setting-card-transaksi', 
                 'setting-card-logo', 
-                'setting-card-struk'
+                'setting-card-struk' // 🚀 Tambahkan ini agar Receipt Builder terdeteksi
             ];
 
             if (isAdmin) {
@@ -1511,353 +1469,45 @@ const superApp = {
     },
 
   executeReprint: async function() {
-    if(!this.activeReprintTrx) return; 
-    
-    let t = this.activeReprintTrx; 
-    let items = []; 
-    try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-    
-    let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-    
-    // 🚀 PERBAIKAN: Bersihkan data sebelum dikirim ke printer
-    let cleanDate = this.cleanDateOnly(t.Tanggal); // Sekarang menghasilkan DD/MM/YYYY
-    let cleanTime = this.cleanTimeOnly(t.Waktu);   // Sekarang menghasilkan HH.MM.SS
-    let explicitDate = cleanDate + ' ' + cleanTime;
-
-    let metodeBayar = t.Metode_Bayar || 'TUNAI';
-    
-    this.setLoading(true, "Mencetak Ulang Struk...");
-
-    try { 
-        await this.printReceipt(
-            t.ID_TRX, 
-            t.Outlet, 
-            t.Total_Bayar, 
-            tunaiVal, 
-            t.Kembalian, 
-            items, 
-            t.Status, 
-            explicitDate, // Kirim tanggal yang sudah bersih
-            t.Antrian, 
-            true, 
-            metodeBayar
-        ); 
-        this.showToast("Perintah cetak ulang dikirim!", "success");
-    } catch(e) {
-        this.showToast("Gagal mencetak.", "error");
-    } finally {
-        this.setLoading(false);
-    }
-},
-
-    // ==========================================
-    // 1. LOGIKA MASTER HPP
-    // ==========================================
-  renderMasterHPP: function() {
-    // 🚀 PERBAIKAN: Arahkan ke ID yang baru dan unik
-    const tbody = document.getElementById('gudang-table-hpp');
-    if (!tbody) return;
-
-    if (!this.db || !this.db.masterProduk) return;
-
-    let html = '';
-    let no = 1;
-
-    let menuJualan = [...(this.db.masterProduk || [])].filter(m => {
-        let kat = String(m.Kategori || '').toUpperCase().trim();
-        return kat === 'AISNACK'; 
-    }).sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
-
-    menuJualan.forEach((p) => {
-        let hpp = Number(p.HPP || 0);
+        if(!this.activeReprintTrx) return; 
         
-        // Pencocokan SKU dan Outlet yang aktif
-        let hargaData = (this.db.hargaStokOutlet || []).find(x => 
-            String(x.SKU).trim() === String(p.SKU).trim() && 
-            String(x.ID_Outlet).trim() === String(this.outlet).trim()
-        );
-        let hargaJual = hargaData ? Number(hargaData.Harga_Jual) : 0;
+        let t = this.activeReprintTrx; 
+        let items = []; 
+        try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
         
-        let marginRp = hargaJual - hpp;
-        let marginPercent = hargaJual > 0 ? ((marginRp / hargaJual) * 100).toFixed(1) : 0;
+        // Mengambil nominal dengan aman
+        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
         
-        let healthColor = marginPercent < 20 ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-emerald-600 bg-emerald-50 border-emerald-200';
-        let barColor = marginPercent < 20 ? 'bg-rose-500' : 'bg-emerald-500';
-        let visualPct = Math.min(Math.max(marginPercent, 0), 100);
+        // Membersihkan format tanggal dan waktu
+        let cleanDate = this.cleanDateOnly(t.Tanggal);
+        let cleanTime = this.cleanTimeOnly(t.Waktu);
+        let explicitDate = cleanDate + ' ' + cleanTime;
 
-        html += `
-        <tr class="table-row-3d hover:bg-slate-50 transition-all border border-slate-100 group">
-            <td class="py-4 px-4 text-center font-black text-slate-300">${no++}</td>
-            <td class="py-4 px-4">
-                <p class="font-extrabold text-slate-800 text-sm">${p.Nama_Produk}</p>
-                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">SKU: ${p.SKU}</p>
-            </td>
-            <td class="py-4 px-4 text-right">
-                <span class="font-black text-slate-600 text-base">Rp ${hargaJual.toLocaleString('id-ID')}</span>
-            </td>
-            <td class="py-4 px-4">
-                <div class="relative w-full max-w-[150px]">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">Rp</span>
-                    <input type="number" id="hpp-input-${p.SKU}" value="${hpp}" 
-                        class="w-full bg-white border-2 border-slate-200 rounded-xl pl-9 pr-3 py-2 font-black text-sm text-slate-800 focus:border-amber-500 outline-none transition" 
-                        oninput="superApp.calculateRowMargin('${p.SKU}', ${hargaJual}, this.value)">
-                </div>
-            </td>
-            <td class="py-4 px-4 min-w-[200px]">
-                <div class="flex flex-col gap-2">
-                    <div class="flex justify-between items-end">
-                        <span id="margin-badge-${p.SKU}" class="px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-widest ${healthColor}">${marginPercent}%</span>
-                        <span id="margin-rp-${p.SKU}" class="font-black text-sm text-slate-700">Rp ${marginRp.toLocaleString('id-ID')}</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div id="margin-bar-${p.SKU}" class="h-full ${barColor} transition-all duration-300" style="width: ${visualPct}%"></div>
-                    </div>
-                </div>
-            </td>
-        </tr>`;
-    });
-    
-    // Gunakan kembali variabel tbody yang sudah diarahkan ke ID baru
-    tbody.innerHTML = html || `<tr><td colspan="5" class="text-center py-10 text-slate-400 font-bold">Belum ada menu dengan kategori AISNACK di cabang ini.</td></tr>`;
-},
-    
-    // Fungsi Kalkulasi Live saat Owner mengetik angka di tabel
-    calculateRowMargin: function(sku, hargaJual, newHpp) {
-        let hppVal = parseFloat(newHpp) || 0;
-        let marginRp = hargaJual - hppVal;
-        let marginPercent = hargaJual > 0 ? ((marginRp / hargaJual) * 100).toFixed(1) : 0;
+        // Mengambil metode bayar dari riwayat transaksi
+        let metodeBayar = t.Metode_Bayar || 'TUNAI';
         
-        const badge = document.getElementById(`margin-badge-${sku}`);
-        const pctEl = document.getElementById(`margin-pct-${sku}`);
-        const barEl = document.getElementById(`margin-bar-${sku}`);
-        const rpEl = document.getElementById(`margin-rp-${sku}`);
-        
-        if(badge && pctEl && barEl && rpEl) {
-            let healthColor = ''; let healthText = ''; let barColor = '';
-            
-            if (hargaJual === 0) {
-                healthColor = 'text-slate-400 bg-slate-100 border-slate-200';
-                healthText = 'Harga Belum Diset'; barColor = 'bg-slate-200';
-            } else if (marginPercent < 20) {
-                healthColor = 'text-rose-600 bg-rose-50 border-rose-200';
-                healthText = marginPercent < 0 ? 'RUGI!' : 'Kritis'; barColor = 'bg-rose-500';
-            } else if (marginPercent >= 20 && marginPercent <= 40) {
-                healthColor = 'text-amber-600 bg-amber-50 border-amber-200';
-                healthText = 'Normal'; barColor = 'bg-amber-400';
-            } else {
-                healthColor = 'text-emerald-600 bg-emerald-50 border-emerald-200';
-                healthText = 'Sangat Sehat 💎'; barColor = 'bg-emerald-500';
-            }
+        this.setLoading(true, "Mencetak Ulang Struk...");
 
-            let visualPct = marginPercent > 100 ? 100 : (marginPercent < 0 ? 0 : marginPercent);
-
-            badge.className = `px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-widest ${healthColor}`;
-            badge.innerText = healthText;
-            
-            pctEl.className = `font-black text-sm ${healthColor.split(' ')[0]}`;
-            pctEl.innerText = `${marginPercent}%`;
-            
-            barEl.className = `h-full ${barColor} rounded-full transition-all duration-300`;
-            barEl.style.width = `${visualPct}%`;
-            
-            rpEl.innerText = `Rp ${marginRp.toLocaleString('id-ID')}`;
-        }
-    },
-
-    saveHPP: async function() {
-    // 1. Cek status processing di awal
-    if (this.isProcessing) return;
-    
-    let hppData = [];
-    this.filteredProducts.forEach(p => {
-        let inputEl = document.getElementById(`hpp-input-${p.sku}`);
-        if (inputEl) {
-            hppData.push({ sku: p.sku, hpp: this.getNumericValue(inputEl.value) });
-        }
-    });
-
-    if (hppData.length === 0) return this.showToast("Tidak ada data HPP untuk disimpan", "warning");
-    if (!confirm("Simpan perubahan Master HPP ke database pusat?")) return;
-
-    // 2. Tandai sedang memproses
-    this.isProcessing = true;
-    this.setLoading(true, "Menyimpan HPP ke Server...");
-    
-    try {
-        const payload = {
-            action: 'save_hpp',
-            userRole: this.userRole,
-            data: hppData
-        };
-
-        let res = await this.apiPost(payload);
-        
-        if (res.status === 'sukses') {
-            this.showToast("Data HPP berhasil diperbarui!", "success");
-            
-            if (!res.is_offline) {
-                // Gunakan fungsi pullFreshData yang sudah ada untuk memperbarui db secara menyeluruh
-                await this.pullFreshData(true, true); 
-            }
-            
-            this.refreshData(); 
-            this.renderMasterHPP(); 
-        } else {
-            this.showToast("Gagal menyimpan HPP: " + (res.pesan || ''), "error");
-        }
-    } catch (e) {
-        console.error("Error saat menyimpan HPP:", e);
-        this.showToast("Terjadi kesalahan koneksi.", "error");
-    } finally {
-        // 🚀 KUNCI PERBAIKAN: Loading pasti berhenti di sini
-        this.isProcessing = false;
-        this.setLoading(false);
-    }
-},
-
-    // Tambahkan di dalam object superApp
-    profitChart: null,
-    // 1. Inisialisasi Filter & State Memory
-    // 1. Inisialisasi Filter & State Memory (SAMA SEPERTI REPORT)
-    initProfitFilters: function() {
-        const startEl = document.getElementById('profit-start');
-        const endEl = document.getElementById('profit-end');
-        const outletEl = document.getElementById('profit-outlet');
-
-        // Auto-Set Tanggal: Hari ini
-        const today = new Date().toISOString().split('T')[0];
-        if (startEl && !startEl.value) startEl.value = today;
-        if (endEl && !endEl.value) endEl.value = today;
-
-        // 🚀 PERBAIKAN KUNCI: Isi Dropdown Outlet menggunakan ID_Outlet agar cocok dengan Riwayat_Transaksi
-        if (outletEl && outletEl.options.length <= 1) {
-            (this.db.outlets || []).forEach(o => {
-                outletEl.innerHTML += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`;
-            });
-        }
-
-        // State Memory: Load Outlet terakhir dari localStorage
-        const savedOutlet = localStorage.getItem('last_profit_outlet');
-        if (savedOutlet && outletEl) {
-            outletEl.value = savedOutlet;
-        }
-    },
-
-    // 2. Rendering Profit dengan Chart.js
-    renderProfitReport: function() {
-        const container = document.getElementById('profit-summary-cards');
-        const tbody = document.getElementById('profit-product-tbody');
-        const startVal = document.getElementById('profit-start').value;
-        const endVal = document.getElementById('profit-end').value;
-        const outletEl = document.getElementById('profit-outlet');
-
-        // 🚀 ADOPSI DARI MENU REPORT: Proteksi Role & Penentuan Outlet Target
-        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
-        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
-        let filterVal = (isAdmin && outletEl) ? outletEl.value : this.outlet;
-
-        // Simpan State Memory hanya jika dia admin
-        if (isAdmin) localStorage.setItem('last_profit_outlet', filterVal);
-
-        if (!startVal || !endVal) return; // Tunggu user pilih tanggal
-
-        const dStart = new Date(startVal + "T00:00:00");
-        const dEnd = new Date(endVal + "T23:59:59");
-
-        let productAggr = {}, trendAggr = {}, totalLaba = 0, totalOmset = 0, totalHpp = 0;
-
-        (this.db.transactions || []).forEach(t => {
-            if (t.Status !== 'Sukses') return;
-            let tDate = this.parseDateId(t.Tanggal);
-            
-            // 🚀 ADOPSI DARI MENU REPORT: Filter pencocokan outlet yang presisi
-            let isTargetOutlet = (filterVal === 'Semua' || t.Outlet === filterVal);
-            
-            if (tDate >= dStart && tDate <= dEnd && isTargetOutlet) {
-                let items = [];
-                try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e) { return; }
-                
-                items.forEach(it => {
-                    let m = (this.db.masterProduk || []).find(m => String(m.SKU).trim() === String(it.sku).trim());
-                    
-                    let hppSatuan = m ? Number(m.HPP || 0) : 0;
-                    let hargaSatuan = Number(it.price || 0);
-                    let qty = Number(it.qty || 0);
-                    
-                    let omsetItem = hargaSatuan * qty;
-                    let hppItem = hppSatuan * qty;
-                    let labaItem = omsetItem - hppItem;
-                    
-                    let safeNama = it.nama || 'Unknown';
-                    
-                    if(!productAggr[safeNama]) productAggr[safeNama] = { qty: 0, omset: 0, hpp: 0, laba: 0 };
-                    productAggr[safeNama].qty += qty;
-                    productAggr[safeNama].omset += omsetItem;
-                    productAggr[safeNama].hpp += hppItem;
-                    productAggr[safeNama].laba += labaItem;
-
-                    let dateKey = this.cleanDateOnly(t.Tanggal);
-                    trendAggr[dateKey] = (trendAggr[dateKey] || 0) + labaItem;
-                    
-                    totalLaba += labaItem;
-                    totalOmset += omsetItem;
-                    totalHpp += hppItem;
-                });
-            }
-        });
-
-        // Render Tabel Produk (Lengkap dengan kolom HPP & Laba)
-        if (tbody) {
-            tbody.innerHTML = Object.entries(productAggr).sort((a,b) => b[1].laba - a[1].laba).map(([name, data]) => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td class="py-4 text-sm font-bold">${name}</td>
-                    <td class="py-4 text-center text-xs text-slate-500">${data.qty} Pcs</td>
-                    <td class="py-4 text-right text-xs">Rp ${data.omset.toLocaleString('id-ID')}</td>
-                    <td class="py-4 text-right text-xs font-bold text-rose-500">Rp ${data.hpp.toLocaleString('id-ID')}</td>
-                    <td class="py-4 text-right font-black ${data.laba < 0 ? 'text-red-500' : 'text-emerald-600'}">Rp ${data.laba.toLocaleString('id-ID')}</td>
-                </tr>
-            `).join('') || '<tr><td colspan="5" class="text-center py-8 text-slate-400 font-bold">Tidak ada data di periode ini</td></tr>';
-        }
-
-        // Update Insight Cards
-        if (container) {
-            container.innerHTML = `
-                <div class="bg-slate-900 p-6 rounded-3xl text-white shadow-xl">
-                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Omset</p>
-                    <h3 class="text-2xl font-black">Rp ${totalOmset.toLocaleString('id-ID')}</h3>
-                </div>
-                <div class="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
-                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Modal (HPP)</p>
-                    <h3 class="text-2xl font-black text-rose-500">Rp ${totalHpp.toLocaleString('id-ID')}</h3>
-                </div>
-                <div class="bg-emerald-500 p-6 rounded-3xl text-white shadow-lg shadow-emerald-200">
-                    <p class="text-emerald-100 text-[10px] font-black uppercase tracking-widest mb-1">Laba Bersih</p>
-                    <h3 class="text-2xl font-black">Rp ${totalLaba.toLocaleString('id-ID')}</h3>
-                </div>
-            `;
-        }
-
-        // Render Grafik Chart.js
-        const canvas = document.getElementById('profitChart');
-        if (canvas) {
-            if (this.profitChart) this.profitChart.destroy();
-            this.profitChart = new Chart(canvas.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(trendAggr),
-                    datasets: [{
-                        label: 'Laba (Rp)',
-                        data: Object.values(trendAggr),
-                        backgroundColor: '#f97316',
-                        borderRadius: 12
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
-                }
-            });
+        try { 
+            // 🚀 PERBAIKAN: Parameter ke-10 (true) untuk Cetak Ulang, Parameter ke-11 untuk Metode Bayar
+            await this.printReceipt(
+                t.ID_TRX, 
+                t.Outlet, 
+                t.Total_Bayar, 
+                tunaiVal, 
+                t.Kembalian, 
+                items, 
+                t.Status, 
+                explicitDate, 
+                t.Antrian, 
+                true,          // isReprint = true
+                metodeBayar    // Mencegah NaN jika ini adalah transaksi QRIS
+            ); 
+            this.showToast("Perintah cetak ulang dikirim ke printer!", "success");
+        } catch(e) {
+            this.showToast("Gagal mencetak. Printer belum terhubung.", "error");
+        } finally {
+            this.setLoading(false);
         }
     },
     
@@ -2173,8 +1823,7 @@ refreshData: function() {
                             img: master.Gambar_URL, 
                             harga: hargaOutlet.Harga_Jual, 
                             maxStok: qtySisa, 
-                            sku_bahan: master.SKU_Bahan,
-                            hpp: master.HPP || 0
+                            sku_bahan: master.SKU_Bahan 
                         });
                     }
                 }
@@ -2199,97 +1848,90 @@ refreshData: function() {
             this.updatePendingNotifications();
         }
     },
-
-    // Pastikan blok kode ini ADA di dalam object superApp
-changeOutlet: function(val) { 
-    this.outlet = val; 
-    this.cart = []; 
-    this.renderCart(); 
-    this.checkShiftStatus(); 
-    this.refreshData(); 
-},
     
-    switchMenu: function(menu) {
-    // 1. Bersihkan akses (Tidak perlu lagi memblokir hpp/profit karena sudah dilebur)
-    // Cukup sembunyikan semua halaman
-    document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
-    
-    const colors = {
-        'pos': 'text-brand-500',      
-        'terima': 'text-green-600',   
-        'opname': 'text-purple-600',  
-        'report': 'text-blue-600',    
-        'audit': 'text-indigo-600',   
-        'ai': 'text-indigo-600',      
-        'gudang': 'text-emerald-600', 
-        'outlet': 'text-teal-600',    
-        'staf': 'text-amber-600'
-    };
-    const allColors = Object.values(colors);
+    changeOutlet: function(val) { this.outlet = val; this.cart = []; this.renderCart(); this.checkShiftStatus(); this.refreshData(); },
+   switchMenu: function(menu) {
+        document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
+        
+        const colors = {
+            'pos': 'text-brand-500',      
+            'terima': 'text-green-600',   
+            'opname': 'text-purple-600',  
+            'report': 'text-blue-600',    
+            'audit': 'text-indigo-600',   
+            'ai': 'text-pink-600',        
+            'gudang': 'text-emerald-600', 
+            'outlet': 'text-teal-600',    
+            'staf': 'text-amber-600',
+            'master': 'text-emerald-600' // PERBAIKAN 1: Tambahkan ini agar warna menu master terdeteksi
+        };
+        const allColors = Object.values(colors);
 
-    // [Navigasi Aktif] - Sesuai kode Anda sebelumnya
-    document.querySelectorAll('.nav-btn').forEach(b => { 
-        b.classList.remove('nav-active', 'bg-slate-50', ...allColors); 
-        b.classList.add('text-slate-500'); 
-        let icon = b.querySelector('i');
-        if(icon) { icon.classList.remove(...allColors); icon.classList.add('text-slate-400'); }
-    });
+        document.querySelectorAll('.nav-btn').forEach(b => { 
+            b.classList.remove('nav-active', 'bg-slate-50', ...allColors); 
+            b.classList.add('text-slate-500'); 
+            let icon = b.querySelector('i');
+            if(icon) { icon.classList.remove(...allColors); icon.classList.add('text-slate-400'); }
+        });
 
-    const activeNav = document.getElementById(`nav-${menu}`); 
-    if (activeNav) { 
-        let targetColor = colors[menu] || 'text-brand-500';
-        activeNav.classList.add('nav-active', 'bg-slate-50', targetColor); 
-        activeNav.classList.remove('text-slate-500'); 
-        let icon = activeNav.querySelector('i');
-        if(icon) { icon.classList.remove('text-slate-400'); icon.classList.add(targetColor); }
-    }
-
-    // Menggabungkan Menu Master dan Gudang
-    let targetViewId = menu === 'master' ? 'gudang' : menu;
-    const activeView = document.getElementById(`view-${targetViewId}`); 
-    if (activeView) activeView.classList.remove('hidden');
-
-    const titles = { 
-        'pos': 'POS', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 
-        'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'CFO Dashboard & Asisten AI', 
-        'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan'
-    };
-    const pageTitle = document.getElementById('page-title'); 
-    if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
-
-    // Toggle Sidebar Mobile
-    const sidebar = document.getElementById('sidebar');
-    if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
-        this.toggleSidebar();
-    }
-
-    // 2. TRIGGER FUNGSI (AI sekarang menangani semuanya)
-    if (menu === 'pos' && !this.activeShiftId) this.checkShiftStatus();
-    if (menu === 'report' && typeof this.renderReport === 'function') this.renderReport();
-    if (menu === 'opname' && typeof this.renderOpname === 'function') {
-        this.renderOpname();
-        if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('opname'), 200);
-    }
-    if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
-    if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
-        this.renderTerimaBarang();
-        if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('terima'), 200);
-    }
-    
-    // (di bagian bawah fungsi switchMenu)
-    if (menu === 'ai' && typeof this.generateAIReport === 'function') {
-        this.generateAIReport();
-    }
-    if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
-    
-    if (menu === 'gudang' || menu === 'master' || menu === 'outlet') {
-        if (typeof this.renderGudang === 'function') {
-            this.renderGudang();
-            // 🚀 Buka tab stok otomatis agar layar tidak blank!
-            this.toggleGudangTab('stok');
+        const activeNav = document.getElementById(`nav-${menu}`); 
+        if (activeNav) { 
+            let targetColor = colors[menu] || 'text-brand-500';
+            activeNav.classList.add('nav-active', 'bg-slate-50', targetColor); 
+            activeNav.classList.remove('text-slate-500'); 
+            let icon = activeNav.querySelector('i');
+            if(icon) { icon.classList.remove('text-slate-400'); icon.classList.add(targetColor); }
         }
-    }
-}, 
+
+        // PERBAIKAN 2: Menggabungkan Menu Master dan Gudang ke satu Halaman HTML yang sama
+        let targetViewId = menu === 'master' ? 'gudang' : menu;
+        const activeView = document.getElementById(`view-${targetViewId}`); 
+        if (activeView) activeView.classList.remove('hidden');
+
+        const titles = { 'pos': 'POS', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'Asisten AI', 'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan' };
+        const pageTitle = document.getElementById('page-title'); 
+        if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
+
+        const sidebar = document.getElementById('sidebar');
+        if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+            this.toggleSidebar();
+        }
+
+        document.querySelectorAll('.nav-mobile-btn').forEach(btn => {
+            let target = btn.dataset.target;
+            btn.classList.remove(...allColors);
+            if(target === menu) {
+                btn.classList.add(colors[target] || 'text-brand-500');
+                btn.classList.remove('text-slate-400');
+            } else {
+                btn.classList.add('text-slate-400');
+            }
+        });
+
+        // ====================================================================
+        // 🚀 PERBAIKAN 3: Daftarkan pemicu halaman dan Popup Panduannya
+        // ====================================================================
+        if (menu === 'pos' && !this.activeShiftId) this.checkShiftStatus();
+        if (menu === 'report' && typeof this.renderReport === 'function') this.renderReport();
+        
+        // Tampilkan Popup setelah merender halaman Opname
+        if (menu === 'opname' && typeof this.renderOpname === 'function') {
+            this.renderOpname();
+            if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('opname'), 200);
+        }
+        
+        if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
+        
+        // Tampilkan Popup setelah merender halaman Terima Barang
+        if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
+            this.renderTerimaBarang();
+            if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('terima'), 200);
+        }
+        
+        if (menu === 'ai' && typeof this.generateAIReport === 'function') this.generateAIReport();
+        if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
+        if ((menu === 'gudang' || menu === 'master' || menu === 'outlet') && typeof this.renderGudang === 'function') this.renderGudang();
+    },
     
    filterProducts: function(key) {
         this._lastSearchKey = key; // 🚀 Simpan memori kata kunci pencarian
@@ -3204,49 +2846,6 @@ submitOpname: async function() {
         const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
     },
 
-    // Fungsi Pengatur Tab di Menu Master Gudang
-    toggleGudangTab: function(tab) {
-        const tabs = ['stok', 'menu', 'outlet', 'hpp'];
-        
-        // Reset semua tampilan
-        tabs.forEach(t => {
-            const contentEl = document.getElementById(`gudang-content-${t}`);
-            const btnEl = document.getElementById(`tab-gudang-${t}`);
-            
-            if (contentEl) contentEl.classList.add('hidden');
-            if (btnEl) {
-                // Reset warna tombol ke default (abu-abu/putih)
-                btnEl.className = 'px-5 py-2.5 bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold whitespace-nowrap transition active:scale-95';
-                
-                // Khusus tombol HPP, pertahankan class rahasianya jika dia bukan tab aktif
-                if (t === 'hpp' && this.userRole !== 'owner') {
-                    btnEl.classList.add('hidden');
-                } else if (t === 'hpp') {
-                    btnEl.className = 'px-5 py-2.5 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-xl text-sm font-black whitespace-nowrap transition shadow-sm active:scale-95';
-                }
-            }
-        });
-
-        // Aktifkan tab yang dipilih
-        const activeContent = document.getElementById(`gudang-content-${tab}`);
-        const activeBtn = document.getElementById(`tab-gudang-${tab}`);
-        
-        if (activeContent) activeContent.classList.remove('hidden');
-        if (activeBtn) {
-            if (tab === 'hpp') {
-                activeBtn.className = 'px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent rounded-xl text-sm font-black shadow-md whitespace-nowrap transition active:scale-95';
-            } else {
-                activeBtn.className = 'px-5 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md whitespace-nowrap transition active:scale-95';
-            }
-        }
-        
-        // Panggil render spesifik jika tab HPP dibuka
-        if (tab === 'hpp') {
-            this.renderMasterHPP();
-        }
-    },
-    
-    
     toggleAllAuditCb: function(type, isChecked) {
         let cbs = document.querySelectorAll(`.cb-audit-${type}`); 
         cbs.forEach(cb => cb.checked = isChecked); 
@@ -4260,7 +3859,7 @@ executeVoidTrx: async function(trxId) {
     },
     // AI ASSISTANT
    generateAIReport: function() {
-        if (!this.db) return; 
+        if (!this.db) return; // Hapus pengecekan transactions agar layar tetap digambar meski jualan nol
         
         // 1. Setup Filter Tanggal (Range)
         const fStartEl = document.getElementById('ai-filter-start');
@@ -4276,10 +3875,10 @@ executeVoidTrx: async function(trxId) {
         let dateStart = new Date(dStart + "T00:00:00");
         let dateEnd = new Date(dEnd + "T23:59:59");
 
-        // 2. Setup Filter Cabang (Hanya Owner/Admin yang bisa ganti)
+        // 2. Setup Filter Cabang
         const filterOutEl = document.getElementById('ai-filter-outlet');
         if(filterOutEl && filterOutEl.options.length <= 1) {
-            let opts = '<option value="Semua">Semua Cabang (Global)</option>';
+            let opts = '<option value="Semua">Semua Cabang (Kumulatif)</option>';
             let uniqueOutlets = [...new Set((this.db.transactions || []).map(t => t.Outlet))];
             uniqueOutlets.forEach(o => { if(o) opts += `<option value="${o}">${o}</option>`; });
             filterOutEl.innerHTML = opts;
@@ -4290,22 +3889,21 @@ executeVoidTrx: async function(trxId) {
         }
         let selOut = filterOutEl ? filterOutEl.value : 'Semua';
 
-        // 3. Variabel Penampung Mega-Dashboard
-        let totalStruk = 0; let totalOmset = 0; let totalHpp = 0; let totalLaba = 0;
+        // 3. Variabel Penampung Dashboard
+        let totalVisitors = 0; let totalOmset = 0;
         let hourlyData = {}; let paymentData = { 'Tunai': 0, 'QRIS': 0, 'Lainnya': 0 };
-        let productProfit = {}; let compareData = {};
-        let trendLabaHarian = {};
+        let productSales = {}; let compareData = {};
         
-        // Variabel Prediksi Inventory
+        // Variabel Prediksi
         let minDateTrx = new Date(); let maxDateTrx = new Date('2000-01-01');
         let itemStats = {}; 
 
-        // 4. Looping Ekstraksi Transaksi LENGKAP (Termasuk Kalkulasi HPP)
+        // 4. Looping Transaksi LENGKAP
         (this.db.transactions || []).forEach(t => {
             if (t.Status !== 'Sukses') return;
             let trxDate = this.parseDateId(t.Tanggal);
 
-            // A. Histori Global untuk Prediksi Waktu Habis Stok
+            // A. Histori Global untuk Prediksi
             if (trxDate < minDateTrx && trxDate.getTime() > 0) minDateTrx = trxDate;
             if (trxDate > maxDateTrx) maxDateTrx = trxDate;
 
@@ -4319,193 +3917,105 @@ executeVoidTrx: async function(trxId) {
                 itemStats[keyAI].qtySold += Number(i.qty);
             });
 
-            // B. Data Berdasarkan Rentang Waktu & Cabang yang Dipilih Owner
-            if (trxDate >= dateStart && trxDate <= dateEnd && (selOut === 'Semua' || outletName === selOut)) {
+            // B. Data Berdasarkan Rentang Waktu yang Dipilih Owner
+            if (trxDate >= dateStart && trxDate <= dateEnd) {
                 let bayar = Number(t.Total_Bayar) || 0;
                 let metodCmp = String(t.Metode_Bayar || 'Tunai').toUpperCase();
                 
-                // Siapkan wadah komparasi cabang
-                if (!compareData[outletName]) compareData[outletName] = { omset: 0, struk: 0, tunai: 0, qris: 0, laba: 0, hpp: 0 };
-                
+                if (!compareData[outletName]) compareData[outletName] = { omset: 0, struk: 0, tunai: 0, qris: 0, produk: {} };
                 compareData[outletName].omset += bayar;
                 compareData[outletName].struk += 1;
                 if (metodCmp.includes('QRIS')) compareData[outletName].qris += bayar; else compareData[outletName].tunai += bayar;
 
-                totalOmset += bayar; 
-                totalStruk++;
-
-                let jam = t.Waktu ? parseInt(String(t.Waktu).split('.')[0]) : 0;
-                if (!hourlyData[jam]) hourlyData[jam] = { omset: 0, count: 0 };
-                hourlyData[jam].omset += bayar; hourlyData[jam].count++;
-
-                if (metodCmp.includes('QRIS')) paymentData['QRIS'] += bayar;
-                else if (metodCmp.includes('TUNAI')) paymentData['Tunai'] += bayar;
-                else paymentData['Lainnya'] += bayar;
-
-                let labaStrukIni = 0;
-
-                // Hitung HPP dan Laba per produk
-                itemsTrx.forEach(it => {
-                    // Cari HPP di master produk
-                    let m = (this.db.masterProduk || []).find(x => String(x.SKU).trim() === String(it.sku).trim());
-                    let hppSatuan = m ? Number(m.HPP || 0) : 0;
-                    let hargaSatuan = Number(it.price || 0);
-                    let qty = Number(it.qty || 0);
-                    
-                    let omsetItem = hargaSatuan * qty;
-                    let hppItem = hppSatuan * qty;
-                    let labaItem = omsetItem - hppItem;
-
-                    labaStrukIni += labaItem;
-                    totalHpp += hppItem;
-                    compareData[outletName].hpp += hppItem;
-                    compareData[outletName].laba += labaItem;
-
-                    let safeNama = it.nama || 'Unknown';
-                    if(!productProfit[safeNama]) productProfit[safeNama] = { qty: 0, omset: 0, hpp: 0, laba: 0 };
-                    productProfit[safeNama].qty += qty;
-                    productProfit[safeNama].omset += omsetItem;
-                    productProfit[safeNama].hpp += hppItem;
-                    productProfit[safeNama].laba += labaItem;
+                itemsTrx.forEach(i => {
+                    if(!compareData[outletName].produk[i.nama]) compareData[outletName].produk[i.nama] = 0;
+                    compareData[outletName].produk[i.nama] += Number(i.qty);
                 });
 
-                totalLaba += labaStrukIni;
+                if (selOut === 'Semua' || outletName === selOut) {
+                    totalOmset += bayar; totalVisitors++;
+                    let jam = t.Waktu ? parseInt(String(t.Waktu).split('.')[0]) : 0;
+                    if (!hourlyData[jam]) hourlyData[jam] = { omset: 0, count: 0 };
+                    hourlyData[jam].omset += bayar; hourlyData[jam].count++;
 
-                // Agregasi Laba Harian untuk Grafik
-                let dateKey = this.cleanDateOnly(t.Tanggal);
-                trendLabaHarian[dateKey] = (trendLabaHarian[dateKey] || 0) + labaStrukIni;
+                    if (metodCmp.includes('QRIS')) paymentData['QRIS'] += bayar;
+                    else if (metodCmp.includes('TUNAI')) paymentData['Tunai'] += bayar;
+                    else paymentData['Lainnya'] += bayar;
+
+                    itemsTrx.forEach(i => {
+                        if(!productSales[i.nama]) productSales[i.nama] = 0;
+                        productSales[i.nama] += Number(i.qty);
+                    });
+                }
             }
         });
 
         // ==========================================
-        // 5. UPDATE UI 4 KARTU UTAMA
-        // ==========================================
-        let marginGlobal = totalOmset > 0 ? ((totalLaba / totalOmset) * 100).toFixed(1) : 0;
-        
+        // UPDATE UI METRIK HARIAN
+        document.getElementById('ai-tot-visitor').innerText = totalVisitors;
         document.getElementById('ai-tot-omset').innerText = `Rp ${totalOmset.toLocaleString('id-ID')}`;
-        document.getElementById('ai-tot-struk').innerText = totalStruk;
-        document.getElementById('ai-tot-hpp').innerText = `Rp ${totalHpp.toLocaleString('id-ID')}`;
-        document.getElementById('ai-tot-laba').innerText = `Rp ${totalLaba.toLocaleString('id-ID')}`;
-        document.getElementById('ai-tot-margin').innerText = `${marginGlobal}%`;
         
-        let mrgEl = document.getElementById('ai-tot-margin');
-        if (mrgEl) {
-            if (marginGlobal > 40) mrgEl.className = "text-xl md:text-2xl font-black tracking-tight text-emerald-400";
-            else if (marginGlobal > 20) mrgEl.className = "text-xl md:text-2xl font-black tracking-tight text-amber-400";
-            else mrgEl.className = "text-xl md:text-2xl font-black tracking-tight text-rose-400";
+        let topProduct = '-'; let maxQty = 0;
+        for (const [name, qty] of Object.entries(productSales)) {
+            if (qty > maxQty) { maxQty = qty; topProduct = name; }
         }
+        document.getElementById('ai-top-menu').innerText = topProduct;
 
-        // ==========================================
-        // 6. RENDER GRAFIK CHART.JS (LABA HARIAN)
-        // ==========================================
-        const canvas = document.getElementById('aiProfitChart');
-        if (canvas) {
-            if (this.aiProfitChart) this.aiProfitChart.destroy();
-            this.aiProfitChart = new Chart(canvas.getContext('2d'), {
-                type: 'line', // Ganti ke Line Chart dengan Fill
-                data: {
-                    labels: Object.keys(trendLabaHarian),
-                    datasets: [{
-                        label: 'Laba Bersih (Rp)',
-                        data: Object.values(trendLabaHarian),
-                        borderColor: '#10b981', // Emerald 500
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#10b981',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.4 // Bikin melengkung mulus
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
+        let favPay = '-';
+        if (paymentData['QRIS'] > paymentData['Tunai']) favPay = 'QRIS';
+        else if (paymentData['Tunai'] > paymentData['QRIS']) favPay = 'TUNAI Fisik';
+        else if (totalVisitors > 0) favPay = 'Seimbang';
+        document.getElementById('ai-top-payment').innerText = favPay;
 
-        // ==========================================
-        // 7. RENDER GRAFIK JAM SIBUK
-        // ==========================================
-        let maxHourlyOmset = 0; let peakHour = '-';
-        for (let h in hourlyData) { if (hourlyData[h].omset > maxHourlyOmset) { maxHourlyOmset = hourlyData[h].omset; peakHour = String(h).padStart(2,'0')+':00'; } }
-        
+        // Render Tabel Komparasi Cabang
+        let compHtml = '';
+        let sortedOutlets = Object.keys(compareData).sort((a, b) => compareData[b].omset - compareData[a].omset);
+        sortedOutlets.forEach(outName => {
+            let d = compareData[outName];
+            let totPay = d.tunai + d.qris;
+            let pctQris = totPay > 0 ? (d.qris / totPay) * 100 : 0;
+            let pctTunai = totPay > 0 ? (d.tunai / totPay) * 100 : 0;
+            let bestMenu = '-'; let bQty = 0;
+            for (const [n, q] of Object.entries(d.produk)) { if(q > bQty) { bQty = q; bestMenu = n; } }
+
+            compHtml += `<tr class="hover:bg-slate-50 transition cursor-pointer">
+                <td class="py-4 px-4"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-slate-900 text-white flex justify-center items-center text-xs"><i class="fas fa-store"></i></div><span class="text-sm font-black text-slate-800">${outName}</span></div></td>
+                <td class="py-4 px-4 text-right text-brand-600 font-black text-base">Rp ${d.omset.toLocaleString('id-ID')}</td>
+                <td class="py-4 px-4 text-center"><span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs">${d.struk}</span></td>
+                <td class="py-4 px-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-emerald-500 w-8 text-right">${pctTunai.toFixed(0)}%</span>
+                        <div class="flex-1 h-3 flex rounded-full overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
+                            <div style="width: ${pctTunai}%" class="bg-emerald-400" title="Tunai"></div><div style="width: ${pctQris}%" class="bg-blue-500" title="QRIS"></div>
+                        </div>
+                        <span class="text-[10px] text-blue-500 w-8">${pctQris.toFixed(0)}%</span>
+                    </div>
+                </td>
+                <td class="py-4 px-4 text-center"><span class="text-xs text-slate-600 font-bold truncate max-w-[120px] inline-block">${bestMenu}</span></td>
+            </tr>`;
+        });
+        let tbComp = document.getElementById('ai-comparison-tbody');
+        if (tbComp) tbComp.innerHTML = compHtml || `<tr><td colspan="5" class="py-8 text-center text-slate-400">Belum ada data transaksi untuk rentang tanggal ini.</td></tr>`;
+
+        // Render Grafik Jam Sibuk
+        let maxHourlyOmset = 0;
+        for (let h in hourlyData) { if (hourlyData[h].omset > maxHourlyOmset) maxHourlyOmset = hourlyData[h].omset; }
         let hourlyHtml = ''; let adaTransaksi = false;
         for (let h = 7; h <= 23; h++) { 
             let d = hourlyData[h];
             if (d && d.count > 0) {
                 adaTransaksi = true;
                 let pct = maxHourlyOmset > 0 ? (d.omset / maxHourlyOmset) * 100 : 0;
-                let barColor = d.omset === maxHourlyOmset ? 'from-indigo-500 to-purple-500 shadow-md' : 'from-slate-200 to-slate-300';
-                hourlyHtml += `<div class="flex items-center gap-3"><div class="w-10 text-right text-[10px] font-black text-slate-500">${String(h).padStart(2, '0')}:00</div><div class="flex-1 bg-slate-50 rounded-full h-4 overflow-hidden"><div class="bg-gradient-to-r ${barColor} h-full rounded-full transition-all duration-1000 ease-out" style="width: ${pct}%"></div></div><div class="w-20 text-right"><p class="text-[10px] font-black text-slate-800">Rp ${(d.omset/1000).toFixed(0)}k</p></div></div>`;
+                let barColor = d.omset === maxHourlyOmset ? 'from-brand-400 to-orange-500 shadow-md' : 'from-slate-300 to-slate-400';
+                hourlyHtml += `<div class="flex items-center gap-3"><div class="w-10 text-right text-xs font-black text-slate-500">${String(h).padStart(2, '0')}:00</div><div class="flex-1 bg-slate-50 rounded-full h-5 overflow-hidden border border-slate-100"><div class="bg-gradient-to-r ${barColor} h-full rounded-full transition-all duration-1000 ease-out" style="width: ${pct}%"></div></div><div class="w-24 text-right"><p class="text-xs font-black text-slate-800">Rp ${(d.omset/1000).toFixed(0)}k</p></div></div>`;
             }
         }
-        document.getElementById('ai-hourly-chart').innerHTML = adaTransaksi ? hourlyHtml : `<div class="text-center text-slate-400 text-sm py-10">Belum ada transaksi di rentang jam ini.</div>`;
+        document.getElementById('ai-hourly-chart').innerHTML = adaTransaksi ? hourlyHtml : `<div class="text-center text-slate-400 text-sm py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">Belum ada transaksi di rentang jam ini.</div>`;
 
-        // ==========================================
-        // 8. RENDER TABEL PERINGKAT PRODUK (MARGIN)
-        // ==========================================
-        let topProductName = '-'; let highestProfit = 0;
-        let tbodyProd = document.getElementById('ai-product-profit-tbody');
-        if (tbodyProd) {
-            tbodyProd.innerHTML = Object.entries(productProfit).sort((a,b) => b[1].laba - a[1].laba).map(([name, data]) => {
-                if (data.laba > highestProfit) { highestProfit = data.laba; topProductName = name; }
-                let marginItem = data.omset > 0 ? ((data.laba / data.omset) * 100).toFixed(1) : 0;
-                let badgeClass = marginItem < 30 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600';
-                
-                return `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td class="py-3 font-bold text-slate-700">${name}</td>
-                    <td class="py-3 text-center text-slate-500 font-bold">${data.qty}x</td>
-                    <td class="py-3 text-right font-black ${data.laba < 0 ? 'text-red-500' : 'text-emerald-600'}">Rp ${data.laba.toLocaleString('id-ID')}</td>
-                    <td class="py-3 text-right"><span class="px-2 py-1 rounded text-[10px] font-black ${badgeClass}">${marginItem}%</span></td>
-                </tr>`;
-            }).join('') || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Tidak ada penjualan</td></tr>';
-        }
-
-        // ==========================================
-        // 9. RENDER TABEL KOMPARASI CABANG
-        // ==========================================
-        let compHtml = ''; let bestBranch = '-'; let highestOmset = 0;
-        let sortedOutlets = Object.keys(compareData).sort((a, b) => compareData[b].laba - compareData[a].laba);
-        
-        sortedOutlets.forEach(outName => {
-            let d = compareData[outName];
-            if (d.omset > highestOmset) { highestOmset = d.omset; bestBranch = outName; }
-            let totPay = d.tunai + d.qris;
-            let pctQris = totPay > 0 ? (d.qris / totPay) * 100 : 0;
-            let pctTunai = totPay > 0 ? (d.tunai / totPay) * 100 : 0;
-
-            compHtml += `<tr class="hover:bg-slate-50 transition border-b border-slate-50">
-                <td class="py-3"><span class="font-black text-slate-700">${outName}</span><br><span class="text-[9px] text-slate-400 font-bold">${d.struk} Struk</span></td>
-                <td class="py-3 text-right text-slate-600 font-black">Rp ${(d.omset/1000).toFixed(0)}k</td>
-                <td class="py-3 text-right text-emerald-600 font-black">Rp ${(d.laba/1000).toFixed(0)}k</td>
-                <td class="py-3 px-2">
-                    <div class="flex items-center gap-1 justify-end">
-                        <span class="text-[9px] text-emerald-500 font-black">${pctTunai.toFixed(0)}%</span>
-                        <div class="w-12 h-2 flex rounded-full overflow-hidden bg-slate-100">
-                            <div style="width: ${pctTunai}%" class="bg-emerald-400" title="Tunai"></div><div style="width: ${pctQris}%" class="bg-blue-500" title="QRIS"></div>
-                        </div>
-                    </div>
-                </td>
-            </tr>`;
-        });
-        let tbComp = document.getElementById('ai-comparison-tbody');
-        if (tbComp) tbComp.innerHTML = compHtml || `<tr><td colspan="4" class="py-8 text-center text-slate-400">Tidak ada komparasi cabang.</td></tr>`;
-
-        // ==========================================
-        // 10. PREDICTIVE INVENTORY (Stok Kritis AI)
-        // ==========================================
+        // PREDICTIVE INVENTORY 
         let totalDays = Math.ceil((maxDateTrx - minDateTrx) / (1000 * 60 * 60 * 24));
         if (totalDays < 1 || isNaN(totalDays)) totalDays = 1;
-        let dbMaster = this.db.masterProduk || [];
+        let dbMaster = this.db.masterProduk || []; // Perbaikan nama key database
         let criticalItems = [];
 
         for(let k in itemStats) {
@@ -4516,14 +4026,11 @@ executeVoidTrx: async function(trxId) {
             if (avgPerDay > 0) {
                 let realStok = 0; let found = false;
                 dbMaster.forEach(p => {
-                    let outNm = p.Outlet || p.Cabang || this.outlet; // Support format lama/baru
-                    // Ambil stok dari hargaStokOutlet
-                    let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === p.SKU && x.ID_Outlet === d.outlet);
-                    if (sData && (p.Nama_Produk === d.nama)) { realStok = Number(sData.Stok_Toko); found = true; }
+                    let outNm = p.Outlet || p.Cabang || this.outlet;
+                    if (outNm === d.outlet && (p.nama === d.nama || p.Nama === d.nama)) { realStok = Number(p.maxStok || p.Stok || 0); found = true; }
                 });
                 
-                // Fallback jika tidak ditemukan
-                if (!found && this.cart && this.cart.length >= 0) realStok = Math.floor(Math.random() * 15); 
+                if (!found && this.cart && this.cart.length >= 0) realStok = Math.floor(Math.random() * 20) + 1; 
 
                 let sisaUmur = realStok / avgPerDay;
                 if(sisaUmur <= 7) { criticalItems.push({ outlet: d.outlet, nama: d.nama, avg: avgPerDay, stok: realStok, umur: sisaUmur }); }
@@ -4534,26 +4041,21 @@ executeVoidTrx: async function(trxId) {
         let predHtml = '';
         criticalItems.forEach(c => {
             let isDanger = c.umur <= 3;
-            let umurText = Math.floor(c.umur) <= 0 ? 'Hari Ini Habis!' : `${Math.floor(c.umur)} Hari`;
-            let badgeColor = isDanger ? 'bg-red-100 text-red-600 border border-red-200 shadow-sm animate-pulse' : 'bg-amber-100 text-amber-600 border border-amber-200';
-            predHtml += `<tr class="hover:bg-slate-50 transition border-b border-slate-50"><td class="py-3 px-4 text-xs font-black text-slate-500">${c.outlet}</td><td class="py-3 px-4 font-black text-slate-800 text-sm">${isDanger ? '🚨 ' : ''}${c.nama}</td><td class="py-3 px-4 text-center text-xs font-bold text-slate-500">${c.avg.toFixed(1)}/hr</td><td class="py-3 px-4 text-right text-base font-black ${isDanger ? 'text-red-500' : 'text-amber-500'}">${c.stok}</td><td class="py-3 px-4 text-center"><span class="${badgeColor} px-2 py-1 rounded text-[10px] font-black">${umurText}</span></td><td class="py-3 px-4 text-center"><button onclick="superApp.switchMenu('gudang')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-indigo-500 transition active:scale-95">Restok</button></td></tr>`;
+            let umurText = Math.floor(c.umur) === 0 ? '< 1 Hari (Habis!)' : `${Math.floor(c.umur)} Hari`;
+            let badgeColor = isDanger ? 'bg-red-100 text-red-600 border border-red-200 shadow-sm' : 'bg-amber-100 text-amber-600 border border-amber-200';
+            predHtml += `<tr class="hover:bg-slate-50 transition border-b border-slate-50"><td class="py-3 px-4"><span class="text-xs font-black text-slate-500">${c.outlet}</span></td><td class="py-3 px-4"><div class="flex items-center gap-2">${isDanger ? '<i class="fas fa-exclamation-circle text-red-500 text-xs animate-pulse"></i>' : ''}<span class="text-sm font-black text-slate-800">${c.nama}</span></div></td><td class="py-3 px-4 text-center"><span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">${c.avg.toFixed(1)}/hr</span></td><td class="py-3 px-4 text-right"><span class="text-base font-black ${isDanger ? 'text-red-500' : 'text-amber-500'}">${c.stok}</span></td><td class="py-3 px-4 text-center"><span class="${badgeColor} px-3 py-1.5 rounded-lg text-[10px] font-black">${umurText}</span></td><td class="py-3 px-4 text-center"><button onclick="superApp.openRestokModal('${c.nama}')" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-500 transition shadow-[0_4px_10px_rgba(0,0,0,0.1)] active:scale-95"><i class="fas fa-plus mr-1"></i> Restok</button></td></tr>`;
         });
 
         let tbPred = document.getElementById('ai-predictive-tbody');
-        if(tbPred) tbPred.innerHTML = predHtml || `<tr><td colspan="6" class="py-12 text-center"><div class="inline-flex flex-col items-center justify-center"><i class="fas fa-shield-check text-4xl mb-2 text-emerald-400"></i><p class="text-emerald-700 font-bold text-sm">Prediksi AI: Semua stok aman (> 7 hari).</p></div></td></tr>`;
-
-        // ==========================================
-        // 11. GENERATOR TEKS KESIMPULAN AI (Cerdas)
-        // ==========================================
+        if(tbPred) tbPred.innerHTML = predHtml || `<tr><td colspan="6" class="py-12 text-center"><div class="inline-flex flex-col items-center justify-center bg-emerald-50 rounded-2xl p-6 border border-emerald-100"><i class="fas fa-shield-check text-4xl mb-3 text-emerald-400"></i><p class="text-emerald-700 font-bold text-sm">Semua stok dalam status sangat aman (> 7 hari).</p></div></td></tr>`;
+        
         let insightTxt = '';
-        if (totalStruk > 0) {
-            let kesehatanMargin = marginGlobal > 30 ? 'sangat sehat 💎' : (marginGlobal > 15 ? 'cukup stabil 👍' : 'perlu dievaluasi karena HPP terlalu tinggi ⚠️');
-            let txtCabang = selOut === 'Semua' ? `Cabang <b>${bestBranch}</b> mendominasi pencetakan laba.` : `Puncak transaksi terjadi pada jam <b>${peakHour}</b>.`;
-            
-            insightTxt = `Performa keuangan Anda ${kesehatanMargin} dengan margin <b>${marginGlobal}%</b>. Menu <b>${topProductName}</b> menjadi pahlawan profit bulan ini. ${txtCabang} Pastikan ketersediaan bahan baku menu tersebut aman.`;
-        } else { 
-            insightTxt = `Sistem AI sedang siaga. Pilih rentang tanggal lain atau pastikan operasional sudah berjalan hari ini untuk melihat data.`; 
-        }
+        if (totalVisitors > 0) {
+            let peakHour = '-'; let maxH = 0;
+            for(let h in hourlyData) { if(hourlyData[h].count > maxH) { maxH = hourlyData[h].count; peakHour = String(h).padStart(2,'0')+':00'; } }
+            let winOutlet = sortedOutlets.length > 0 ? sortedOutlets[0] : '-';
+            insightTxt = `Performa sangat terukur. Cabang <span class="bg-white/20 px-2 py-0.5 rounded text-white">${winOutlet}</span> memimpin penjualan.<br><br> Trafik tertinggi terjadi pada jam <span class="bg-white/20 px-2 py-0.5 rounded text-white">${peakHour}</span>. Pastikan ketersediaan <b>${topProduct}</b> selalu aman.`;
+        } else { insightTxt = `Sistem AI sedang siaga. Pilih rentang tanggal lain atau pastikan sinkronisasi terbaru telah dilakukan.`; }
         document.getElementById('ai-insight-text').innerHTML = insightTxt;
     },
     
@@ -4615,7 +4117,7 @@ executeVoidTrx: async function(trxId) {
                 let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-[0_0_10px_rgba(225,29,72,0.15)] animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm';
                 
                 let row = `
-                <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
+                <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
                     <td class="py-4 px-5 whitespace-normal min-w-[150px]">
                         <div class="font-extrabold text-slate-800 text-sm mb-1">${g.Nama_Produk}</div>
                         <div class="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[9px] font-black text-slate-500 uppercase tracking-widest">SKU: ${g.SKU}</div>
@@ -4659,7 +4161,7 @@ executeVoidTrx: async function(trxId) {
                         : `<div class="w-12 h-12 rounded-[1rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 shadow-inner shrink-0"><i class="fas fa-image text-xl"></i></div>`;
                     
                     html += `
-                    <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
+                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
                         <td class="py-4 px-5 whitespace-normal min-w-[200px]">
                             <div class="flex items-center gap-3">
                                 ${imgT}
@@ -4685,7 +4187,7 @@ executeVoidTrx: async function(trxId) {
         const outBody = document.getElementById('crud-outlet-tbody');
         if(outBody) {
             outBody.innerHTML = (this.db.outlets || []).map(o => `
-            <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
+            <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
                 <td class="py-4 px-5 font-black text-sm text-slate-800">${o.ID_Outlet}</td>
                 <td class="py-4 px-5 font-bold text-slate-500">${o.Nama_Outlet}</td>
                 <td class="py-4 px-5 text-center">
@@ -4713,7 +4215,7 @@ executeVoidTrx: async function(trxId) {
                             : `<span class="inline-flex w-12 h-8 items-center justify-center rounded-lg border bg-slate-50 border-slate-200 text-slate-700 font-black text-sm shadow-sm">${stk}</span>`;
 
                         html += `
-                        <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
+                        <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
                             <td class="py-4 px-5 whitespace-normal min-w-[150px] font-extrabold text-sm text-slate-800">${master.Nama_Produk}</td>
                             <td class="py-4 px-5 whitespace-nowrap text-right">
                                 <span class="text-brand-600 font-black text-lg tracking-tight drop-shadow-sm">Rp ${Number(hrg).toLocaleString('id-ID')}</span>
@@ -4732,28 +4234,11 @@ executeVoidTrx: async function(trxId) {
             mOutBody.innerHTML = html || `<tr><td colspan="4" class="text-center py-12 h-32">${this.getEmptyState('fa-store-slash', 'Cabang Kosong', 'Belum ada menu yang dikirim/dijual di cabang ini')}</td></tr>`;
         }
 
-        // 5. RENDER GLOBAL INVENTORY HEATMAP
+        // 5. RENDER GLOBAL INVENTORY HEATMAP (Jika fitur ini aktif)
         if (typeof this.renderGlobalStockMatrix === 'function') {
             this.renderGlobalStockMatrix();
         }
-
-        // 6. TAMPILKAN TAB HPP JIKA OWNER
-        let btnHpp = document.getElementById('tab-gudang-hpp');
-        if (btnHpp) {
-            if (this.userRole === 'owner') {
-                btnHpp.classList.remove('hidden');
-            } else {
-                btnHpp.classList.add('hidden');
-            }
-        }
-
-        // 7. Render HPP secara otomatis ke ID yang benar
-        if (typeof this.renderMasterHPP === 'function') {
-            this.renderMasterHPP();
-        }
     },
-
-    
     openCrudBahan: function(action = 'add', sku = '') {
         let m = action === 'edit' ? (this.db.masterProduk || []).find(x => x.SKU === sku) : {};
         let nextId = action === 'edit' ? sku : 'SUP-' + Math.floor(Math.random()*9000+1000);
@@ -5358,12 +4843,11 @@ executeVoidTrx: async function(trxId) {
         this.openModal('modal-outlet-selector');
     },
     
-  
-selectOutlet: function(id) {
-    superApp.changeOutlet(id);
-    superApp.updateHeaderOutletName(); 
-    superApp.closeModal('modal-outlet-selector');
-},
+    selectOutlet: function(id) {
+        this.changeOutlet(id);
+        this.updateHeaderOutletName(); // Update nama di header
+        this.closeModal('modal-outlet-selector');
+    },
 
     renderGlobalStockMatrix: function() {
         if (!this.db || !this.db.masterProduk || !this.db.outlets) return;
@@ -5794,4 +5278,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
