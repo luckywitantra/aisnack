@@ -281,7 +281,7 @@ const superApp = {
         this.isProcessing = true; 
 
         try {
-            let historyParam = fetchAll ? "&history=all" : "&history=14";
+            let historyParam = fetchAll ? "&history=all";
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + historyParam, { redirect: 'follow' }); 
             const data = await res.json();
             
