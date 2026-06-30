@@ -210,52 +210,54 @@ const superApp = {
     },
 
     cleanTimeOnly: function(str) {
-    if (!str || str === 'undefined' || str === 'null') return '00.00.00'; 
+    if (!str || str === '00.00.00') return '00.00.00'; 
     let s = String(str).trim();
 
-    // 1. Cek format waktu standar: HH.MM.SS atau HH:MM:SS
-    // Menangkap pola 2 digit, pemisah (titik/titik dua), 2 digit, pemisah, 2 digit
+    // 🚀 LANGSUNG CEK FORMAT HH.MM.SS (Tanpa konversi ke Date Object)
+    // Ini menangkap format 21.09.10 atau 21:09:10
     let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
     if (match) { 
         let pad = n => String(n).padStart(2, '0');
         return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
     }
 
-    // 2. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
-    if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
-        let d = new Date(s); 
-        if (!isNaN(d.getTime())) { 
+    // Hanya jika benar-benar butuh konversi dari Date Object (untuk data dari Sheets yang kotor)
+    if (s.includes('T') || s.includes('GMT')) {
+        let d = new Date(s);
+        if (!isNaN(d.getTime())) {
             let pad = n => String(n).padStart(2, '0');
-            return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
-        } 
+            // Gunakan getUTCHours agar tidak terpengaruh zona waktu lokal/server
+            return `${pad(d.getUTCHours())}.${pad(d.getUTCMinutes())}.${pad(d.getUTCSeconds())}`;
+        }
     }
 
-    // 3. Cek jika data berupa Desimal Murni (Angka pecahan waktu di Sheets)
-    if (!isNaN(Number(s)) && Number(s) > 0 && Number(s) < 1) {
-        let totalSec = Math.floor(Number(s) * 86400);
-        let h = Math.floor(totalSec / 3600);
-        let m = Math.floor((totalSec % 3600) / 60);
-        let sec = totalSec % 60;
-        let pad = n => String(n).padStart(2, '0');
-        return `${pad(h)}.${pad(m)}.${pad(sec)}`;
+    return s;
+},
+    
+   parseDateId: function(dateStr) {
+    if (!dateStr) return new Date(0); 
+    let s = String(dateStr); 
+    
+    // Jika formatnya DD/MM/YYYY
+    let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (match) { 
+        let d = parseInt(match[1]); 
+        let m = parseInt(match[2]); 
+        let y = parseInt(match[3]); 
+        // Paksa ke zona waktu lokal, abaikan jam
+        return new Date(y, m - 1, d); 
     }
     
-    // 4. Jika ada spasi (misal: 30/06/2026 21.09.10), ambil bagian belakang
-    let parts = s.split(' '); 
-    if (parts.length > 1) {
-        // Coba bersihkan lagi bagian belakang yang mungkin masih mengandung titik
-        return this.cleanTimeOnly(parts[parts.length - 1]); 
+    // Jika formatnya sudah ISO (2026-06-30T...)
+    if (s.includes('T')) { 
+        let d = new Date(s); 
+        // Mengembalikan tanggal lokal tanpa memperhatikan jam UTC
+        return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     }
-
-    return '00.00.00'; // Default aman jika format benar-benar tidak dikenal
+    
+    return new Date(0);
 },
-    parseDateId: function(dateStr) {
-        if (!dateStr) return new Date(0); let s = String(dateStr); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
-        if (s.includes('T')) { let d = new Date(s); if (!isNaN(d.getTime())) { d.setHours(0, 0, 0, 0); return d; } }
-        let fPart = s.split(' ')[0]; let d2 = new Date(fPart); if (!isNaN(d2.getTime())) { d2.setHours(0, 0, 0, 0); return d2; }
-        return new Date(0);
-    },
+    
     // 🚀 FITUR BARU: Penarik Data Senyap di Latar Belakang
     pullBackgroundData: async function() {
         console.log("Memulai sinkronisasi seluruh riwayat data di latar belakang...");
