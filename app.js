@@ -187,27 +187,24 @@ const superApp = {
     formatRupiahInput: function(el) { let val = el.value.replace(/[^0-9]/g, ''); el.value = val !== '' ? parseInt(val, 10).toLocaleString('id-ID') : ''; },
     getNumericValue: function(val) { return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0; },
     
-    cleanDateOnly: function(str) {
-        if (!str) return ''; 
-        let s = String(str).trim();
-        
-        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
-        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
-            let d = new Date(s); 
-            if (!isNaN(d.getTime())) { 
-                let pad = n => n < 10 ? '0' + n : n; 
-                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; 
-            } 
-        }
-        
-        // 2. Cek jika data berupa teks manual
-        let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        if (match) { 
-            let pad = n => String(n).length < 2 ? '0' + n : n; 
-            return `${pad(match[1])}/${pad(match[2])}/${match[3]}`; 
-        }
-        return s.split(' ')[0];
-    },
+    cleanDateOnly: function(dateVal) {
+    if (!dateVal) return "";
+    let s = String(dateVal).trim();
+    
+    // Jika formatnya sudah DD/MM/YYYY, kembalikan langsung
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    
+    // Jika formatnya ISO (seperti 2026-06-29T16:00:00.000Z)
+    if (s.includes('T')) {
+        let d = new Date(s);
+        // Mengambil tanggal lokal, bukan UTC agar tidak bergeser zona waktu
+        let day = String(d.getDate()).padStart(2, '0');
+        let month = String(d.getMonth() + 1).padStart(2, '0');
+        let year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+    return s;
+},
 
     cleanTimeOnly: function(str) {
     if (!str || str === '00.00.00') return '00.00.00'; 
