@@ -273,79 +273,72 @@ const superApp = {
     },
 
     
-   pullFreshData: async function(silent = false, fetchAll = false) {
-        if (this.isProcessing && !silent) return; 
+   pullFreshData: async function(silent = false) {
+    if (this.isProcessing && !silent) return; 
+    
+    // Teks loading kini lebih umum karena selalu menarik seluruh data
+    if (!silent) this.setLoading(true, "Menarik Seluruh Historis Data dari Server...");
+    this.isProcessing = true; 
+
+    try {
+        // 🚀 Menggunakan history=all secara permanen
+        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { redirect: 'follow' }); 
+        const data = await res.json();
         
-        // 1. Amankan status processing dengan try...finally agar loading pasti mati
-        if (!silent) this.setLoading(true, fetchAll ? "Menarik Seluruh Historis Data..." : "Menarik Data 14 Hari Terakhir...");
-        this.isProcessing = true; 
-
-        try {
-            let historyParam = fetchAll ? "&history=all";
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + historyParam, { redirect: 'follow' }); 
-            const data = await res.json();
+        if (data && data.status === 'sukses') { 
             
-            if (data && data.status === 'sukses') { 
-                
-                // --- 🚀 DETEKSI UPDATE VERSI ---
-                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
-                if (serverVersion) {
-                    let localVersion = localStorage.getItem('app_version');
-                    
-                    if (!localVersion) {
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                    } 
-                    else if (localVersion !== serverVersion.Nilai) {
-                        // Opsi: Gunakan Toast agar tidak memblokir user secara paksa jika sedang transaksi
-                        console.log("Versi baru ditemukan, memuat ulang...");
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                        
-                        // Perbarui Service Worker
-                        if ('serviceWorker' in navigator) {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            for(let reg of regs) { reg.update(); }
-                        }
-                        
-                        window.location.reload(true);
-                        return; 
+            // --- DETEKSI UPDATE VERSI ---
+            let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+            if (serverVersion) {
+                let localVersion = localStorage.getItem('app_version');
+                if (!localVersion) {
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                } else if (localVersion !== serverVersion.Nilai) {
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                    if ('serviceWorker' in navigator) {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for(let reg of regs) { reg.update(); }
                     }
+                    window.location.reload(true);
+                    return; 
                 }
-                
-                this.db = data; 
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-
-                // 🚀 JEMBATAN PENGATURAN
-                let configs = [
-                    { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
-                    { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
-                    { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
-                    { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
-                ];
-
-                configs.forEach(c => {
-                    let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
-                    if (item && item.Nilai) {
-                        localStorage.setItem(c.storage, item.Nilai);
-                        if (c.callback) c.callback(item.Nilai);
-                    }
-                });
-                
-                // Refresh layar jika tidak sedang transaksi
-                if (this.cart.length === 0) this.refreshData(); 
-                
-                if (!silent) this.showToast(fetchAll ? "Semua data ditarik!"); 
-            } else {
-                throw new Error("Data tidak valid");
             }
-        } catch (e) { 
-            console.error("Fetch Error:", e);
-            if (!silent) this.showToast("Gagal menarik data. Cek koneksi Anda.", "error"); 
-        } finally {
-            // 🚀 KUNCI: Pastikan loading selalu mati apapun yang terjadi
-            this.isProcessing = false;
-            if (!silent) this.setLoading(false);
+            
+            // Simpan data lengkap ke database memori dan cache
+            this.db = data; 
+            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+
+            // SINKRONISASI PENGATURAN GLOBAL
+            let configs = [
+                { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
+                { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
+                { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
+                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
+            ];
+
+            configs.forEach(c => {
+                let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
+                if (item && item.Nilai) {
+                    localStorage.setItem(c.storage, item.Nilai);
+                    if (c.callback) c.callback(item.Nilai);
+                }
+            });
+            
+            // Segarkan tampilan
+            this.refreshData(); 
+            
+            if (!silent) this.showToast("Seluruh historis data berhasil diperbarui!"); 
+        } else {
+            throw new Error("Data tidak valid");
         }
-    },
+    } catch (e) { 
+        console.error("Fetch Error:", e);
+        if (!silent) this.showToast("Gagal menarik data. Cek koneksi Anda.", "error"); 
+    } finally {
+        this.isProcessing = false;
+        if (!silent) this.setLoading(false);
+    }
+},
     
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
