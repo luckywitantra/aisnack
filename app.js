@@ -333,7 +333,7 @@ const superApp = {
                 // Refresh layar jika tidak sedang transaksi
                 if (this.cart.length === 0) this.refreshData(); 
                 
-                if (!silent) this.showToast(fetchAll ? "Semua data ditarik!" : "Data 14 hari diperbarui!"); 
+                if (!silent) this.showToast(fetchAll ? "Semua data ditarik!"); 
             } else {
                 throw new Error("Data tidak valid");
             }
