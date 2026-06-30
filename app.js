@@ -210,38 +210,45 @@ const superApp = {
     },
 
     cleanTimeOnly: function(str) {
-        if (!str) return '00.00.00'; 
-        let s = String(str).trim();
+    if (!str || str === 'undefined' || str === 'null') return '00.00.00'; 
+    let s = String(str).trim();
 
-        // 1. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
-        if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
-            let d = new Date(s); 
-            if (!isNaN(d.getTime())) { 
-                let pad = n => n < 10 ? '0' + n : n; 
-                return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
-            } 
-        }
+    // 1. Cek format waktu standar: HH.MM.SS atau HH:MM:SS
+    // Menangkap pola 2 digit, pemisah (titik/titik dua), 2 digit, pemisah, 2 digit
+    let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
+    if (match) { 
+        let pad = n => String(n).padStart(2, '0');
+        return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
+    }
 
-        // 2. Cek jika data berupa Desimal Murni (Cara Google Sheets simpan nilai Waktu)
-        if (!isNaN(Number(s)) && Number(s) > 0 && Number(s) < 1) {
-            let totalSec = Math.floor(Number(s) * 86400);
-            let h = Math.floor(totalSec / 3600);
-            let m = Math.floor((totalSec % 3600) / 60);
-            let sec = totalSec % 60;
-            let pad = n => n < 10 ? '0' + n : n;
-            return `${pad(h)}.${pad(m)}.${pad(sec)}`;
-        }
+    // 2. Cek jika data dari Google Sheets berupa Object Date (ISO/GMT)
+    if ((s.includes('T') && (s.includes('Z') || s.includes('+'))) || s.includes('GMT')) { 
+        let d = new Date(s); 
+        if (!isNaN(d.getTime())) { 
+            let pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; 
+        } 
+    }
 
-        // 3. Cek jika data berupa teks manual dari kasir (HH.MM.SS atau HH:MM:SS)
-        let match = s.match(/(\d{1,2})[.:](\d{1,2})[.:](\d{1,2})/);
-        if (match) { 
-            let pad = n => String(n).length < 2 ? '0' + n : n; 
-            return `${pad(match[1])}.${pad(match[2])}.${pad(match[3])}`; 
-        }
-        
-        let parts = s.split(' '); 
-        return parts.length > 1 ? parts[1] : s;
-    },
+    // 3. Cek jika data berupa Desimal Murni (Angka pecahan waktu di Sheets)
+    if (!isNaN(Number(s)) && Number(s) > 0 && Number(s) < 1) {
+        let totalSec = Math.floor(Number(s) * 86400);
+        let h = Math.floor(totalSec / 3600);
+        let m = Math.floor((totalSec % 3600) / 60);
+        let sec = totalSec % 60;
+        let pad = n => String(n).padStart(2, '0');
+        return `${pad(h)}.${pad(m)}.${pad(sec)}`;
+    }
+    
+    // 4. Jika ada spasi (misal: 30/06/2026 21.09.10), ambil bagian belakang
+    let parts = s.split(' '); 
+    if (parts.length > 1) {
+        // Coba bersihkan lagi bagian belakang yang mungkin masih mengandung titik
+        return this.cleanTimeOnly(parts[parts.length - 1]); 
+    }
+
+    return '00.00.00'; // Default aman jika format benar-benar tidak dikenal
+},
     parseDateId: function(dateStr) {
         if (!dateStr) return new Date(0); let s = String(dateStr); let match = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
         if (match) { let p1 = parseInt(match[1]); let p2 = parseInt(match[2]); let y = parseInt(match[3]); let d = p1, m = p2; if (p2 > 12) { m = p1; d = p2; } return new Date(y, m - 1, d, 0, 0, 0, 0); }
@@ -1505,47 +1512,44 @@ const superApp = {
     },
 
   executeReprint: async function() {
-        if(!this.activeReprintTrx) return; 
-        
-        let t = this.activeReprintTrx; 
-        let items = []; 
-        try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
-        
-        // Mengambil nominal dengan aman
-        let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
-        
-        // Membersihkan format tanggal dan waktu
-        let cleanDate = this.cleanDateOnly(t.Tanggal);
-        let cleanTime = this.cleanTimeOnly(t.Waktu);
-        let explicitDate = cleanDate + ' ' + cleanTime;
+    if(!this.activeReprintTrx) return; 
+    
+    let t = this.activeReprintTrx; 
+    let items = []; 
+    try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+    
+    let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
+    
+    // 🚀 PERBAIKAN: Bersihkan data sebelum dikirim ke printer
+    let cleanDate = this.cleanDateOnly(t.Tanggal); // Sekarang menghasilkan DD/MM/YYYY
+    let cleanTime = this.cleanTimeOnly(t.Waktu);   // Sekarang menghasilkan HH.MM.SS
+    let explicitDate = cleanDate + ' ' + cleanTime;
 
-        // Mengambil metode bayar dari riwayat transaksi
-        let metodeBayar = t.Metode_Bayar || 'TUNAI';
-        
-        this.setLoading(true, "Mencetak Ulang Struk...");
+    let metodeBayar = t.Metode_Bayar || 'TUNAI';
+    
+    this.setLoading(true, "Mencetak Ulang Struk...");
 
-        try { 
-            // 🚀 PERBAIKAN: Parameter ke-10 (true) untuk Cetak Ulang, Parameter ke-11 untuk Metode Bayar
-            await this.printReceipt(
-                t.ID_TRX, 
-                t.Outlet, 
-                t.Total_Bayar, 
-                tunaiVal, 
-                t.Kembalian, 
-                items, 
-                t.Status, 
-                explicitDate, 
-                t.Antrian, 
-                true,          // isReprint = true
-                metodeBayar    // Mencegah NaN jika ini adalah transaksi QRIS
-            ); 
-            this.showToast("Perintah cetak ulang dikirim ke printer!", "success");
-        } catch(e) {
-            this.showToast("Gagal mencetak. Printer belum terhubung.", "error");
-        } finally {
-            this.setLoading(false);
-        }
-    },
+    try { 
+        await this.printReceipt(
+            t.ID_TRX, 
+            t.Outlet, 
+            t.Total_Bayar, 
+            tunaiVal, 
+            t.Kembalian, 
+            items, 
+            t.Status, 
+            explicitDate, // Kirim tanggal yang sudah bersih
+            t.Antrian, 
+            true, 
+            metodeBayar
+        ); 
+        this.showToast("Perintah cetak ulang dikirim!", "success");
+    } catch(e) {
+        this.showToast("Gagal mencetak.", "error");
+    } finally {
+        this.setLoading(false);
+    }
+},
 
     // ==========================================
     // 1. LOGIKA MASTER HPP
