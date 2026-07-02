@@ -3526,15 +3526,31 @@ submitOpname: async function() {
     // LAPORAN & PDF
     toggleReportTab: function(tab) {
         const tabs = ['trx', 'rekap', 'kas', 'selisih', 'bom'];
+        
+        // CSS Tab Aktif (Nyala Biru/Brand)
+        const activeClass = 'px-6 py-3 bg-white text-brand-600 rounded-xl text-xs md:text-sm font-black shadow-sm whitespace-nowrap transition border border-slate-200 flex items-center gap-2 shrink-0';
+        
+        // CSS Tab Tidak Aktif (Mati)
+        const inactiveClass = 'px-6 py-3 text-slate-500 hover:bg-white hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition border border-transparent flex items-center gap-2 shrink-0';
+
         tabs.forEach(t => {
-            const el = document.getElementById(`report-content-${t}`);
+            const content = document.getElementById(`report-content-${t}`);
             const btn = document.getElementById(`tab-${t}`);
-            if(el) el.classList.add('hidden');
-            if(btn) btn.className = 'px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold whitespace-nowrap transition border border-transparent';
+            if (content) content.classList.add('hidden');
+            if (btn) btn.className = inactiveClass;
         });
 
-        const rct = document.getElementById(`report-content-${tab}`); if(rct) rct.classList.remove('hidden'); 
-        const tbtn = document.getElementById(`tab-${tab}`); if(tbtn) tbtn.className = 'px-5 py-2.5 bg-white text-slate-800 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap transition border border-slate-200';
+        const activeContent = document.getElementById(`report-content-${tab}`);
+        const activeBtn = document.getElementById(`tab-${tab}`);
+        
+        // Menampilkan tab yang dipilih
+        if (activeContent) {
+            activeContent.classList.remove('hidden');
+            activeContent.classList.add('flex');
+        }
+        
+        // Mengubah warna tombol tab yang dipilih
+        if (activeBtn) activeBtn.className = activeClass;
     },
     
   renderReport: function() {
