@@ -2740,20 +2740,73 @@ changeOutlet: function(val) {
         this.closeModal('modal-wa-history');
         this.showWaModal(waText);
     },
-renderTerimaBarang: function() {
+
+    // =========================================================
+    // 🚀 SWITCHER SUB-TAB UNTUK PENERIMAAN BARANG & OPNAME
+    // =========================================================
+    switchTerimaSubTab: function(tab) {
+        const tbUtama = document.getElementById('terima-tbody-utama');
+        const tbPend = document.getElementById('terima-tbody-pendukung');
+        const mobUtama = document.getElementById('terima-mob-utama');
+        const mobPend = document.getElementById('terima-mob-pendukung');
+        const btnUtama = document.getElementById('subtab-terima-utama');
+        const btnPend = document.getElementById('subtab-terima-pendukung');
+
+        const activeClass = 'flex-1 md:flex-none px-6 py-3 bg-white text-emerald-600 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-200/60';
+        const inactiveClass = 'flex-1 md:flex-none px-6 py-3 text-slate-500 hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-2 border border-transparent';
+
+        if (tab === 'utama') {
+            if(tbUtama) tbUtama.classList.remove('hidden'); if(tbPend) tbPend.classList.add('hidden');
+            if(mobUtama) mobUtama.classList.remove('hidden'); if(mobPend) mobPend.classList.add('hidden');
+            if(btnUtama) btnUtama.className = activeClass; if(btnPend) btnPend.className = inactiveClass;
+        } else {
+            if(tbUtama) tbUtama.classList.add('hidden'); if(tbPend) tbPend.classList.remove('hidden');
+            if(mobUtama) mobUtama.classList.add('hidden'); if(mobPend) mobPend.classList.remove('hidden');
+            if(btnUtama) btnUtama.className = inactiveClass; if(btnPend) btnPend.className = activeClass;
+        }
+    },
+
+    switchOpnameSubTab: function(tab) {
+        const tbUtama = document.getElementById('opname-tbody-utama');
+        const tbPend = document.getElementById('opname-tbody-pendukung');
+        const mobUtama = document.getElementById('opname-mob-utama');
+        const mobPend = document.getElementById('opname-mob-pendukung');
+        const btnUtama = document.getElementById('subtab-opname-utama');
+        const btnPend = document.getElementById('subtab-opname-pendukung');
+
+        const activeClass = 'flex-1 md:flex-none px-6 py-3 bg-white text-purple-600 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-200/60';
+        const inactiveClass = 'flex-1 md:flex-none px-6 py-3 text-slate-500 hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-2 border border-transparent';
+
+        if (tab === 'utama') {
+            if(tbUtama) tbUtama.classList.remove('hidden'); if(tbPend) tbPend.classList.add('hidden');
+            if(mobUtama) mobUtama.classList.remove('hidden'); if(mobPend) mobPend.classList.add('hidden');
+            if(btnUtama) btnUtama.className = activeClass; if(btnPend) btnPend.className = inactiveClass;
+        } else {
+            if(tbUtama) tbUtama.classList.add('hidden'); if(tbPend) tbPend.classList.remove('hidden');
+            if(mobUtama) mobUtama.classList.add('hidden'); if(mobPend) mobPend.classList.remove('hidden');
+            if(btnUtama) btnUtama.className = inactiveClass; if(btnPend) btnPend.className = activeClass;
+        }
+    },
+
+   // =========================================================
+    // 🚀 1. RENDER TERIMA BARANG (TERHUBUNG KE SUB-TAB & MOBILE)
+    // =========================================================
+    renderTerimaBarang: function() {
         const lbl = document.getElementById('lbl-terima-outlet'); 
         if (lbl) lbl.innerText = this.outlet;
-        
-        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
+
+        let hu = ''; let hp = ''; let hum = ''; let hpm = ''; 
+        let cUtama = 0; let cPend = 0;
         
         [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
-            if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
+            let kat = String(m.Kategori || '').toLowerCase();
+            if (kat === 'bahan' || kat === 'pendukung') {
                 
-                // 🚀 TAMPILAN DESKTOP (Tabel Row)
+                // --- BARIS TABEL DESKTOP ---
                 let strHtml = `
-                <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group">
+                <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors group">
                     <td class="py-3.5 px-5 min-w-[200px] whitespace-normal">
-                        <div class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</div>
+                        <div class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</div>
                         <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</div>
                     </td>
                     <td class="py-3.5 px-5 text-center w-[180px]">
@@ -2764,67 +2817,136 @@ renderTerimaBarang: function() {
                     </td>
                 </tr>`;
                 
-                // 🚀 TAMPILAN MOBILE (Card Layout)
+                // --- KARTU PADAT MOBILE ---
                 let strMobile = `
-                <div class="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group">
-                    <div>
-                        <h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4>
-                        <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</p>
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex flex-col gap-2.5 group">
+                    <div class="flex justify-between items-start gap-2">
+                        <h4 class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
+                        <span class="text-[9px] text-slate-400 font-bold bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shrink-0 uppercase">${m.SKU}</span>
                     </div>
-                    <div class="flex gap-2.5 mt-1">
-                        <input type="text" id="trm-qty-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-2 py-2.5 text-center outline-none font-black text-emerald-600 transition-all shadow-inner cursor-pointer text-sm" readonly onclick="osKeyboard.open('trm-qty-mob-${m.SKU}', 'numeric')" placeholder="Qty">
-                        <input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('trm-note-mob-${m.SKU}', 'text')" placeholder="Catatan...">
+                    <div class="flex gap-2">
+                        <input type="text" id="trm-qty-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-2 py-2 text-center outline-none font-black text-emerald-600 transition-all shadow-inner cursor-pointer text-sm" readonly onclick="osKeyboard.open('trm-qty-mob-${m.SKU}', 'numeric')" placeholder="Qty">
+                        <input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('trm-note-mob-${m.SKU}', 'text')" placeholder="Catatan fisik/kurir...">
                     </div>
                 </div>`;
                 
-                if (String(m.Kategori || '').toLowerCase() === 'bahan') { 
-                    hu += strHtml; hum += strMobile; 
-                } else { 
-                    hp += strHtml; hpm += strMobile; 
-                }
+                if (kat === 'bahan') { hu += strHtml; hum += strMobile; cUtama++; } 
+                else { hp += strHtml; hpm += strMobile; cPend++; }
             }
         });
 
-        // INJEKSI KE TABEL DESKTOP
+        // Injeksi ke Tabel Desktop
         const tU = document.getElementById('terima-tbody-utama'); 
         if (tU) tU.innerHTML = hu || `<tr><td colspan="3" class="py-12">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-        
         const tP = document.getElementById('terima-tbody-pendukung'); 
         if (tP) tP.innerHTML = hp || `<tr><td colspan="3" class="py-12">${this.getEmptyState('fa-pump-soap', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        
+        // Injeksi ke Kartu Mobile
+        const mU = document.getElementById('terima-mob-utama'); 
+        if (mU) mU.innerHTML = hum || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada bahan utama</div>';
+        const mP = document.getElementById('terima-mob-pendukung'); 
+        if (mP) mP.innerHTML = hpm || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada barang pendukung</div>';
 
-        // 🚀 INJEKSI KE MOBILE CARDS (Dengan Header Modern)
-        const tMob = document.getElementById('terima-mobile-cards'); 
-        if (tMob) {
-            let mobileLayout = '';
-            
-            // Kategori Bahan Utama
-            mobileLayout += `
-            <div class="sticky top-0 z-20 bg-[#f4f7f9]/95 backdrop-blur-md pt-1 pb-3 mb-1">
-                <div class="flex items-center justify-between bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent p-3.5 rounded-2xl border-l-4 border-emerald-500">
-                    <h4 class="font-black text-emerald-950 text-xs tracking-widest uppercase flex items-center gap-2.5">
-                        <i class="fas fa-box-open text-emerald-600 text-base"></i> A. Bahan Utama
-                    </h4>
-                </div>
-            </div>
-            <div class="flex flex-col gap-3 mb-6">
-                ${hum || '<div class="text-center py-8 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada bahan utama</div>'}
-            </div>`;
+        // Update Angka Badge pada Sub-Tab
+        const bU = document.getElementById('count-terima-utama'); if(bU) bU.innerText = cUtama;
+        const bP = document.getElementById('count-terima-pendukung'); if(bP) bP.innerText = cPend;
+    },
 
-            // Kategori Pendukung
-            mobileLayout += `
-            <div class="sticky top-0 z-20 bg-[#f4f7f9]/95 backdrop-blur-md pt-1 pb-3 mb-1">
-                <div class="flex items-center justify-between bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-transparent p-3.5 rounded-2xl border-l-4 border-slate-600">
-                    <h4 class="font-black text-slate-800 text-xs tracking-widest uppercase flex items-center gap-2.5">
-                        <i class="fas fa-pump-soap text-slate-600 text-base"></i> B. Barang Pendukung
-                    </h4>
-                </div>
-            </div>
-            <div class="flex flex-col gap-3">
-                ${hpm || '<div class="text-center py-8 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada barang pendukung</div>'}
-            </div>`;
+    // =========================================================
+    // 🚀 2. RENDER OPNAME FISIK (TERHUBUNG KE SUB-TAB & MOBILE)
+    // =========================================================
+    renderOpname: function() {
+        const lbl = document.getElementById('lbl-opname-outlet'); 
+        if (lbl) lbl.innerText = this.outlet;
 
-            tMob.innerHTML = mobileLayout;
-        }
+        let hu = ''; let hp = ''; let hum = ''; let hpm = ''; 
+        let cUtama = 0; let cPend = 0;
+        let autoFillData = []; 
+
+        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
+        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+
+        [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
+            let kat = String(m.Kategori || '').toLowerCase();
+            if (kat === 'bahan' || kat === 'pendukung') {
+                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+                let sys = sData ? Number(sData.Stok_Toko) : 0;
+                autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
+
+                let sysHtmlDesk = isAdmin 
+                    ? `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl border border-indigo-200/60 hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 mx-auto w-full max-w-[80px]" title="Lihat Analisis & Tren"><i class="fas fa-chart-area"></i> <span id="opn-sys-${m.SKU}" class="font-black">${sys}</span></button>` 
+                    : `<span id="opn-sys-${m.SKU}" class="font-black text-indigo-600 text-base">${sys}</span>`;
+                
+                let sysHtmlMob = isAdmin 
+                    ? `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-200/60 shadow-sm active:scale-95"><i class="fas fa-chart-area text-[10px]"></i> <span id="opn-sys-mob-${m.SKU}" class="font-black">${sys}</span></button>` 
+                    : `<span id="opn-sys-mob-${m.SKU}" class="font-black text-indigo-600">${sys}</span>`;
+
+                // --- BARIS TABEL DESKTOP ---
+                let desk = `
+                <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors group">
+                    <td class="py-3.5 px-5 min-w-[200px] whitespace-normal">
+                        <div class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</div>
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</div>
+                    </td>
+                    <td class="py-3.5 px-5 text-center">${sysHtmlDesk}</td>
+                    <td class="py-3.5 px-5 text-center">
+                        <input type="text" id="opn-fisik-${m.SKU}" class="w-24 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-center outline-none font-black text-purple-600 transition-all shadow-inner cursor-pointer text-sm" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
+                    </td>
+                    <td class="py-3.5 px-5 text-right font-black text-slate-300 text-xl" id="opn-selisih-${m.SKU}">0</td>
+                    <td class="py-3.5 px-5 min-w-[250px]">
+                        <input type="text" id="opn-note-${m.SKU}" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik...">
+                    </td>
+                </tr>`;
+                
+                // --- KARTU PADAT MOBILE ---
+                let mob = `
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex flex-col gap-2.5 group">
+                    <div class="flex justify-between items-center gap-2">
+                        <div>
+                            <h4 class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
+                            <div class="text-[10px] text-slate-400 font-bold uppercase mt-0.5 flex items-center gap-1.5">Sys: ${sysHtmlMob}</div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="text-[8px] text-slate-400 uppercase font-black tracking-wider block">Selisih</span>
+                            <span class="font-black text-slate-300 text-xl leading-none" id="opn-selisih-mob-${m.SKU}">0</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-1 border-t border-slate-50">
+                        <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-purple-500 rounded-xl px-2 py-2 text-center outline-none font-black text-purple-600 text-sm cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
+                        <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 outline-none text-xs font-bold text-slate-700 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Alasan selisih...">
+                    </div>
+                </div>`;
+
+                if (kat === 'bahan') { hu += desk; hum += mob; cUtama++; } 
+                else { hp += desk; hpm += mob; cPend++; }
+            }
+        });
+
+        // Injeksi ke Tabel Desktop
+        const tU = document.getElementById('opname-tbody-utama'); 
+        if (tU) tU.innerHTML = hu || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
+        const tP = document.getElementById('opname-tbody-pendukung'); 
+        if (tP) tP.innerHTML = hp || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-pump-soap', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
+        
+        // Injeksi ke Kartu Mobile
+        const mU = document.getElementById('opname-mob-utama'); 
+        if (mU) mU.innerHTML = hum || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada bahan utama</div>';
+        const mP = document.getElementById('opname-mob-pendukung'); 
+        if (mP) mP.innerHTML = hpm || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada barang pendukung</div>';
+
+        // Update Angka Badge pada Sub-Tab
+        const bU = document.getElementById('count-opname-utama'); if(bU) bU.innerText = cUtama;
+        const bP = document.getElementById('count-opname-pendukung'); if(bP) bP.innerText = cPend;
+
+        // Auto-fill Nilai Stok Sistem ke Input Fisik (Setelah DOM Selesai Render)
+        setTimeout(() => {
+            autoFillData.forEach(item => {
+                let elDesk = document.getElementById(item.idDesk); 
+                let elMob = document.getElementById(item.idMob);
+                if (elDesk) elDesk.value = item.val; 
+                if (elMob) elMob.value = item.val;
+            });
+        }, 50); 
     },
     
    submitTerimaBarang: async function() {
@@ -2889,126 +3011,7 @@ renderTerimaBarang: function() {
     }
     this.setLoading(false);
 },
- renderOpname: function() {
-        const lbl = document.getElementById('lbl-opname-outlet'); 
-        if (lbl) lbl.innerText = this.outlet;
-        
-        let hu = ''; let hp = ''; let hum = ''; let hpm = '';
-        let autoFillData = []; 
 
-        let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
-        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
-
-        [...(this.db.masterProduk || [])].sort((a, b) => String(a.Nama_Produk || '').localeCompare(String(b.Nama_Produk || ''))).forEach(m => {
-            if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
-                let sys = sData ? Number(sData.Stok_Toko) : 0;
-
-                autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
-
-                // TOMBOL SISTEM (DESKTOP)
-                let sysHtmlDesk = '';
-                if (isAdmin) {
-                    sysHtmlDesk = `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl border border-indigo-200/60 hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 mx-auto w-full max-w-[80px]" title="Lihat Analisis & Tren"><i class="fas fa-chart-area"></i> <span id="opn-sys-${m.SKU}" class="font-black">${sys}</span></button>`;
-                } else {
-                    sysHtmlDesk = `<span id="opn-sys-${m.SKU}" class="font-black text-indigo-600 text-lg">${sys}</span>`;
-                }
-
-                // TOMBOL SISTEM (MOBILE)
-                let sysHtmlMob = '';
-                if (isAdmin) {
-                    sysHtmlMob = `<button onclick="superApp.openDetailStokOpname('${m.SKU}')" class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-200/60 shadow-sm active:scale-95"><i class="fas fa-chart-area text-[10px]"></i> <span id="opn-sys-mob-${m.SKU}" class="font-black">${sys}</span></button>`;
-                } else {
-                    sysHtmlMob = `<span id="opn-sys-mob-${m.SKU}" class="font-black text-indigo-600">${sys}</span>`;
-                }
-
-                // 🚀 ROW DESKTOP MODERN
-                let desk = `
-                <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group">
-                    <td class="py-3.5 px-5 min-w-[200px] whitespace-normal">
-                        <div class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</div>
-                    </td>
-                    <td class="py-3.5 px-5 text-center">${sysHtmlDesk}</td>
-                    <td class="py-3.5 px-5 text-center">
-                        <input type="text" id="opn-fisik-${m.SKU}" class="w-24 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-center outline-none font-black text-purple-600 transition-all shadow-inner cursor-pointer text-sm" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
-                    </td>
-                    <td class="py-3.5 px-5 text-right font-black text-slate-300 text-xl" id="opn-selisih-${m.SKU}">0</td>
-                    <td class="py-3.5 px-5 min-w-[250px]">
-                        <input type="text" id="opn-note-${m.SKU}" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik...">
-                    </td>
-                </tr>`;
-                
-                // 🚀 CARD MOBILE MODERN
-                let mob = `
-                <div class="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h4 class="font-extrabold text-sm text-slate-800">${m.Nama_Produk}</h4>
-                            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 flex items-center gap-2">Sys: ${sysHtmlMob}</div>
-                        </div>
-                        <span class="font-black text-slate-300 text-2xl" id="opn-selisih-mob-${m.SKU}">0</span>
-                    </div>
-                    <div class="flex gap-2.5 mt-1">
-                        <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-purple-500 rounded-xl px-2 py-2.5 text-center outline-none font-black text-purple-600 transition-all shadow-inner cursor-pointer text-sm" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
-                        <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Catatan...">
-                    </div>
-                </div>`;
-
-                if (String(m.Kategori || '').toLowerCase() === 'bahan') { 
-                    hu += desk; hum += mob; 
-                } else { 
-                    hp += desk; hpm += mob; 
-                }
-            }
-        });
-
-        const tU = document.getElementById('opname-tbody-utama'); 
-        if (tU) tU.innerHTML = hu || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
-        
-        const tP = document.getElementById('opname-tbody-pendukung'); 
-        if (tP) tP.innerHTML = hp || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-pump-soap', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
-        
-        const mobCards = document.getElementById('opname-mobile-cards'); 
-        if (mobCards) {
-            let mobileLayout = '';
-            
-            mobileLayout += `
-            <div class="sticky top-0 z-20 bg-[#f4f7f9]/95 backdrop-blur-md pt-1 pb-3 mb-1">
-                <div class="flex items-center justify-between bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent p-3.5 rounded-2xl border-l-4 border-purple-500">
-                    <h4 class="font-black text-purple-950 text-xs tracking-widest uppercase flex items-center gap-2.5">
-                        <i class="fas fa-box-open text-purple-600 text-base"></i> A. Bahan Utama
-                    </h4>
-                </div>
-            </div>
-            <div class="flex flex-col gap-3 mb-6">
-                ${hum || '<div class="text-center py-8 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada bahan utama</div>'}
-            </div>`;
-
-            mobileLayout += `
-            <div class="sticky top-0 z-20 bg-[#f4f7f9]/95 backdrop-blur-md pt-1 pb-3 mb-1">
-                <div class="flex items-center justify-between bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-transparent p-3.5 rounded-2xl border-l-4 border-slate-600">
-                    <h4 class="font-black text-slate-800 text-xs tracking-widest uppercase flex items-center gap-2.5">
-                        <i class="fas fa-pump-soap text-slate-600 text-base"></i> B. Barang Pendukung
-                    </h4>
-                </div>
-            </div>
-            <div class="flex flex-col gap-3">
-                ${hpm || '<div class="text-center py-8 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada barang pendukung</div>'}
-            </div>`;
-
-            mobCards.innerHTML = mobileLayout;
-        }
-
-        setTimeout(() => {
-            autoFillData.forEach(item => {
-                let elDesk = document.getElementById(item.idDesk);
-                let elMob = document.getElementById(item.idMob);
-                if (elDesk) elDesk.value = item.val;
-                if (elMob) elMob.value = item.val;
-            });
-        }, 50); 
-    },
     
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
@@ -3318,46 +3321,108 @@ submitOpname: async function() {
         const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = activeClass;
     },
 
-    // Fungsi Pengatur Tab di Menu Master Gudang
     toggleGudangTab: function(tab) {
         const tabs = ['stok', 'menu', 'outlet', 'hpp'];
-        
-        // Reset semua tampilan
+        const activeClass = 'snap-start px-4 md:px-5 py-2 md:py-2.5 bg-slate-900 text-white rounded-xl md:rounded-2xl text-xs md:text-sm font-black shadow-sm whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border border-slate-800';
+        const inactiveClass = 'snap-start px-4 md:px-5 py-2 md:py-2.5 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border border-slate-200/80';
+
         tabs.forEach(t => {
-            const contentEl = document.getElementById(`gudang-content-${t}`);
-            const btnEl = document.getElementById(`tab-gudang-${t}`);
-            
-            if (contentEl) contentEl.classList.add('hidden');
-            if (btnEl) {
-                // Reset warna tombol ke default (abu-abu/putih)
-                btnEl.className = 'px-5 py-2.5 bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold whitespace-nowrap transition active:scale-95';
-                
-                // Khusus tombol HPP, pertahankan class rahasianya jika dia bukan tab aktif
-                if (t === 'hpp' && this.userRole !== 'owner') {
-                    btnEl.classList.add('hidden');
-                } else if (t === 'hpp') {
-                    btnEl.className = 'px-5 py-2.5 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-xl text-sm font-black whitespace-nowrap transition shadow-sm active:scale-95';
-                }
-            }
+            const content = document.getElementById(`gudang-content-${t}`);
+            const btn = document.getElementById(`tab-gudang-${t}`);
+            if (content) content.classList.add('hidden');
+            if (btn) btn.className = inactiveClass;
         });
 
-        // Aktifkan tab yang dipilih
         const activeContent = document.getElementById(`gudang-content-${tab}`);
         const activeBtn = document.getElementById(`tab-gudang-${tab}`);
-        
-        if (activeContent) activeContent.classList.remove('hidden');
-        if (activeBtn) {
-            if (tab === 'hpp') {
-                activeBtn.className = 'px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent rounded-xl text-sm font-black shadow-md whitespace-nowrap transition active:scale-95';
-            } else {
-                activeBtn.className = 'px-5 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md whitespace-nowrap transition active:scale-95';
+        if (activeContent) {
+            activeContent.classList.remove('hidden');
+            activeContent.classList.add('flex');
+        }
+        if (activeBtn) activeBtn.className = activeClass;
+
+        // 🚀 KELOLA STICKY BOTTOM BAR KHUSUS HP
+        const mobBar = document.getElementById('gudang-mobile-bottom-bar');
+        if (mobBar) {
+            if (tab === 'stok') {
+                mobBar.innerHTML = `
+                <button onclick="superApp.openCrudBahan()" class="flex-1 bg-slate-900 text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-plus text-emerald-400"></i> BAHAN BARU
+                </button>
+                <button onclick="superApp.openRestokModal()" class="flex-[1.5] bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-truck-loading"></i> RESTOK SUPLIER
+                </button>`;
+            } else if (tab === 'menu') {
+                mobBar.innerHTML = `
+                <button onclick="superApp.openCrudMasterMenu('add')" class="w-full bg-gradient-to-r from-brand-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-plus"></i> TAMBAH MENU POS BARU
+                </button>`;
+            } else if (tab === 'outlet') {
+                mobBar.innerHTML = `
+                <button onclick="superApp.openCrudOutlet('add')" class="flex-1 bg-slate-900 text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-plus text-emerald-400"></i> TOKO BARU
+                </button>
+                <button onclick="superApp.openDistribusiModal()" class="flex-[1.5] bg-blue-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-truck-fast"></i> DISTRIBUSI SUPLAI
+                </button>`;
+            } else if (tab === 'hpp') {
+                mobBar.innerHTML = `
+                <button onclick="superApp.saveHPP()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="fas fa-save"></i> SIMPAN PERUBAHAN HPP
+                </button>`;
             }
         }
-        
-        // Panggil render spesifik jika tab HPP dibuka
-        if (tab === 'hpp') {
-            this.renderMasterHPP();
+    },
+
+    // =========================================================
+    // 🚀 1. SWITCHER SUB-TAB STOK PUSAT (DESKTOP & MOBILE SYNC)
+    // =========================================================
+    switchGudangStokSubTab: function(tab) {
+        const tbUtama = document.getElementById('gudang-tbody-utama');
+        const tbPend = document.getElementById('gudang-tbody-pendukung');
+        const mobUtama = document.getElementById('gudang-mob-stok-utama');
+        const mobPend = document.getElementById('gudang-mob-stok-pendukung');
+        const btnUtama = document.getElementById('subtab-gstok-utama');
+        const btnPend = document.getElementById('subtab-gstok-pendukung');
+
+        const activeClass = 'flex-1 md:flex-none py-2 md:py-2.5 px-4 md:px-5 bg-white text-emerald-600 rounded-lg md:rounded-xl text-xs md:text-sm font-black shadow-2xs transition flex items-center justify-center gap-1.5 border border-slate-200/60';
+        const inactiveClass = 'flex-1 md:flex-none py-2 md:py-2.5 px-4 md:px-5 text-slate-500 hover:text-slate-800 rounded-lg md:rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-1.5 border border-transparent';
+
+        if (tab === 'utama') {
+            if(tbUtama) tbUtama.classList.remove('hidden'); if(tbPend) tbPend.classList.add('hidden');
+            if(mobUtama) mobUtama.classList.remove('hidden'); if(mobPend) mobPend.classList.add('hidden');
+            if(btnUtama) btnUtama.className = activeClass; if(btnPend) btnPend.className = inactiveClass;
+        } else {
+            if(tbUtama) tbUtama.classList.add('hidden'); if(tbPend) tbPend.classList.remove('hidden');
+            if(mobUtama) mobUtama.classList.add('hidden'); if(mobPend) mobPend.classList.remove('hidden');
+            if(btnUtama) btnUtama.className = inactiveClass; if(btnPend) btnPend.className = activeClass;
         }
+    },
+
+   
+
+    // =========================================================
+    // 🚀 SUB-TAB SWITCHER MANAJEMEN CABANG
+    // =========================================================
+    switchOutletSubTab: function(tab) {
+        const sections = ['daftar', 'harga', 'matrix'];
+        const activeClass = 'flex-1 md:flex-none px-5 py-2.5 bg-white text-blue-600 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-200/60';
+        const inactiveClass = 'flex-1 md:flex-none px-5 py-2.5 text-slate-500 hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-2 border border-transparent';
+
+        sections.forEach(s => {
+            const sec = document.getElementById(`out-section-${s}`);
+            const btn = document.getElementById(`subtab-out-${s}`);
+            if(sec) sec.classList.add('hidden');
+            if(btn) btn.className = inactiveClass;
+        });
+
+        const activeSec = document.getElementById(`out-section-${tab}`);
+        const activeBtn = document.getElementById(`subtab-out-${tab}`);
+        if(activeSec) {
+            activeSec.classList.remove('hidden');
+            activeSec.classList.add('flex');
+        }
+        if(activeBtn) activeBtn.className = activeClass;
     },
     
     
@@ -5030,44 +5095,69 @@ executeVoidTrx: async function(trxId) {
         };
         reader.readAsDataURL(file);
     },
+    
     renderGudang: function() {
         const gBodyUtama = document.getElementById('gudang-tbody-utama');
         const gBodyPendukung = document.getElementById('gudang-tbody-pendukung');
+        
+        // 🚀 Wadah tambahan untuk Mobile (Jika belum ada di HTML, tambahkan <div id="gudang-mob-utama"></div>)
+        const gMobUtama = document.getElementById('gudang-mob-utama');
+        const gMobPend = document.getElementById('gudang-mob-pendukung');
+
         let htmlUtama = ''; let htmlPendukung = '';
+        let mobUtama = ''; let mobPend = '';
 
         let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
         
-        // 1. RENDER GUDANG PUSAT (STOK FISIK)
         sortedMaster.forEach(g => {
-            if(String(g.Kategori||'').toLowerCase() === 'bahan' || String(g.Kategori||'').toLowerCase() === 'pendukung') {
+            let kat = String(g.Kategori||'').toLowerCase();
+            if(kat === 'bahan' || kat === 'pendukung') {
                 let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
                 let isKritis = stok <= 5;
-                let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-[0_0_10px_rgba(225,29,72,0.15)] animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm';
+                let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100';
                 
+                // BARIS TABEL DESKTOP
                 let row = `
                 <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
-                    <td class="py-4 px-5 whitespace-normal min-w-[150px]">
-                        <div class="font-extrabold text-slate-800 text-sm mb-1">${g.Nama_Produk}</div>
-                        <div class="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[9px] font-black text-slate-500 uppercase tracking-widest">SKU: ${g.SKU}</div>
+                    <td class="py-4 px-5 whitespace-normal">
+                        <div class="font-extrabold text-slate-800 text-sm mb-0.5">${g.Nama_Produk}</div>
+                        <div class="inline-flex px-1.5 py-0.5 rounded bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-widest">SKU: ${g.SKU}</div>
                     </td>
-                    <td class="py-4 px-5 whitespace-nowrap text-right">
-                        <span class="inline-flex w-14 h-9 items-center justify-center rounded-xl border font-black text-lg ${stokBadge}">${stok}</span>
+                    <td class="py-4 px-5 text-right">
+                        <span class="inline-flex w-16 h-9 items-center justify-center rounded-xl border font-black text-lg ${stokBadge}">${stok}</span>
                     </td>
-                    <td class="py-4 px-5 whitespace-nowrap text-center">
+                    <td class="py-4 px-5 text-center">
                         <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-90" title="Edit Bahan"><i class="fas fa-edit"></i></button> 
-                            <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-200 transition-all active:scale-90" title="Hapus Bahan"><i class="fas fa-trash"></i></button>
+                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition-all active:scale-90"><i class="fas fa-edit"></i></button>
+                            <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90"><i class="fas fa-trash"></i></button>
                         </div>
                     </td>
                 </tr>`;
-                
-                if(String(g.Kategori||'').toLowerCase() === 'bahan') htmlUtama += row; else htmlPendukung += row;
+
+                // KARTU MOBILE (Hanya muncul di HP)
+                let mobCard = `
+                <div class="md:hidden bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center">
+                    <div>
+                        <div class="font-black text-sm text-slate-800">${g.Nama_Produk}</div>
+                        <div class="text-[9px] text-slate-400 font-bold uppercase mt-1">SKU: ${g.SKU}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[9px] font-black text-slate-400 uppercase">Sisa</div>
+                        <div class="font-black text-lg ${isKritis ? 'text-rose-600' : 'text-emerald-600'}">${stok}</div>
+                    </div>
+                </div>`;
+
+                if(kat === 'bahan') { htmlUtama += row; mobUtama += mobCard; } 
+                else { htmlPendukung += row; mobPend += mobCard; }
             }
         });
         
-        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-10 h-32">${this.getEmptyState('fa-box', 'Bahan Kosong', 'Belum ada bahan baku utama.')}</td></tr>`;
-        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-10 h-32">${this.getEmptyState('fa-pump-soap', 'Pendukung Kosong', 'Belum ada barang kemasan/saus.')}</td></tr>`;
-        
+        // Update DOM
+        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Kosong</td></tr>`;
+        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Kosong</td></tr>`;
+        if(gMobUtama) gMobUtama.innerHTML = mobUtama || '<div class="p-4 text-center text-slate-400 text-xs">Kosong</div>';
+        if(gMobPend) gMobPend.innerHTML = mobPend || '<div class="p-4 text-center text-slate-400 text-xs">Kosong</div>';
+       
         // 2. RENDER MASTER PRODUK (MENU POS)
         const masterBody = document.getElementById('master-tbody');
         if(masterBody) {
@@ -5625,16 +5715,6 @@ executeVoidTrx: async function(trxId) {
         }
     },
 
-    gnTarget: null,
-    
-    toggleReportFilter: function() {
-        const modal = document.getElementById('mobile-filter-modal');
-        if(modal.classList.contains('translate-y-full')) {
-            modal.classList.remove('translate-y-full');
-        } else {
-            modal.classList.add('translate-y-full');
-        }
-    },
 
     openGiantNumpad: function(targetId, title, subtitle) {
         this.gnTarget = document.getElementById(targetId);
@@ -6237,4 +6317,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
