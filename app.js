@@ -1553,6 +1553,238 @@ const superApp = {
         }
     },
 
+
+    // =========================================================
+    // 🚀 1. RENDER MANAJEMEN USER (PC & MOBILE DUAL RENDER)
+    // =========================================================
+    renderUserManagement: function() {
+        if (!this.db || !this.db.users) return;
+
+        // Populate Dropdown Filter Outlet jika belum terisi
+        const filterOutEl = document.getElementById('user-outlet-filter');
+        if (filterOutEl && filterOutEl.options.length <= 1) {
+            let opts = '<option value="Semua">Semua Cabang</option>';
+            (this.db.outlets || []).forEach(o => {
+                opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`;
+            });
+            filterOutEl.innerHTML = opts;
+        }
+
+        let searchKey = (document.getElementById('user-search-input')?.value || '').toLowerCase();
+        let selectedOutlet = filterOutEl ? filterOutEl.value : 'Semua';
+
+        let tbodyDesk = document.getElementById('user-mgt-tbody');
+        let mobContainer = document.getElementById('user-mgt-mobile');
+        
+        let htmlDesk = ''; let htmlMob = '';
+        let totAll = 0, totKasir = 0, totAdmin = 0;
+
+        let sortedUsers = [...this.db.users].sort((a,b) => String(a.Nama||'').localeCompare(String(b.Nama||'')));
+
+        sortedUsers.forEach(u => {
+            let nama = String(u.Nama || '-');
+            let uname = String(u.Username || u.ID_User || '-');
+            let role = String(u.Role || 'Kasir');
+            let outId = String(u.Outlet || u.ID_Outlet || 'Semua');
+
+            // Filter Pencarian & Outlet
+            let matchSearch = nama.toLowerCase().includes(searchKey) || uname.toLowerCase().includes(searchKey);
+            let matchOutlet = selectedOutlet === 'Semua' || outId === selectedOutlet;
+
+            if (!matchSearch || !matchOutlet) return;
+
+            // Hitung KPI
+            totAll++;
+            if (role.toLowerCase().includes('kasir')) totKasir++;
+            else totAdmin++;
+
+            // Nama Outlet Visual
+            let outName = outId;
+            let findOut = (this.db.outlets || []).find(x => x.ID_Outlet === outId);
+            if (findOut) outName = findOut.Nama_Outlet;
+
+            // Badge Desain Role
+            let roleBadge = '';
+            if (role.toLowerCase().includes('owner')) roleBadge = 'bg-purple-50 text-purple-700 border-purple-200';
+            else if (role.toLowerCase().includes('admin') || role.toLowerCase().includes('manajer')) roleBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+            else roleBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+            // --- STRUKTUR TABEL DESKTOP ---
+            htmlDesk += `
+            <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50/80 transition-all group">
+                <td class="py-4 px-5 whitespace-normal">
+                    <div class="font-extrabold text-slate-800 text-sm leading-snug">${nama}</div>
+                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">ID: @${uname}</div>
+                </td>
+                <td class="py-4 px-5 whitespace-nowrap">
+                    <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider"><i class="fas fa-store mr-1.5 opacity-70"></i>${outName}</span>
+                </td>
+                <td class="py-4 px-5 text-center whitespace-nowrap">
+                    <code class="bg-slate-100 px-3 py-1 rounded-lg font-mono text-xs font-black text-slate-500 tracking-widest">••••</code>
+                </td>
+                <td class="py-4 px-5 text-center whitespace-nowrap">
+                    <span class="inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${roleBadge}">${role}</span>
+                </td>
+                <td class="py-4 px-5 text-center whitespace-nowrap">
+                    <div class="flex items-center justify-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <button onclick="superApp.openCrudUser('edit', '${uname}')" class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition-all active:scale-90 flex items-center justify-center" title="Edit User"><i class="fas fa-edit text-xs"></i></button>
+                        <button onclick="superApp.executeDeleteUser('${uname}')" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90 flex items-center justify-center" title="Hapus User"><i class="fas fa-trash text-xs"></i></button>
+                    </div>
+                </td>
+            </tr>`;
+
+            // --- STRUKTUR KARTU MOBILE ---
+            htmlMob += `
+            <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex justify-between items-center gap-3">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-extrabold text-sm text-slate-800 truncate">${nama}</h4>
+                        <span class="px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wider ${roleBadge} shrink-0">${role}</span>
+                    </div>
+                    <div class="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400 font-bold">
+                        <span><i class="fas fa-user text-slate-300 mr-1"></i>@${uname}</span>
+                        <span><i class="fas fa-store text-indigo-400 mr-1"></i>${outName}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0 border-l border-slate-50 pl-2">
+                    <button onclick="superApp.openCrudUser('edit', '${uname}')" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold flex items-center justify-center active:scale-90"><i class="fas fa-edit text-xs"></i></button>
+                    <button onclick="superApp.executeDeleteUser('${uname}')" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 font-bold flex items-center justify-center active:scale-90"><i class="fas fa-trash text-xs"></i></button>
+                </div>
+            </div>`;
+        });
+
+        // Update DOM
+        if (tbodyDesk) tbodyDesk.innerHTML = htmlDesk || `<tr><td colspan="5" class="py-12 text-center text-slate-400 font-bold text-xs">User tidak ditemukan</td></tr>`;
+        if (mobContainer) mobContainer.innerHTML = htmlMob || `<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">User tidak ditemukan</div>`;
+
+        // Update KPI
+        if (document.getElementById('usr-tot-all')) document.getElementById('usr-tot-all').innerText = totAll;
+        if (document.getElementById('usr-tot-kasir')) document.getElementById('usr-tot-kasir').innerText = totKasir;
+        if (document.getElementById('usr-tot-admin')) document.getElementById('usr-tot-admin').innerText = totAdmin;
+    },
+
+    // =========================================================
+    // 🚀 2. MODAL FORM TAMBAH & EDIT USER
+    // =========================================================
+    openCrudUser: function(mode, username = '') {
+        let u = mode === 'edit' ? (this.db.users || []).find(x => (x.Username || x.ID_User) === username) : null;
+        
+        // Pilihan Cabang Dinamis
+        let outletOptions = `<option value="Pusat">Semua Cabang / Pusat (Akses Global)</option>`;
+        (this.db.outlets || []).forEach(o => {
+            let sel = (u && (u.Outlet === o.ID_Outlet || u.ID_Outlet === o.ID_Outlet)) ? 'selected' : '';
+            outletOptions += `<option value="${o.ID_Outlet}" ${sel}>Cabang ${o.Nama_Outlet}</option>`;
+        });
+
+        let inputs = `
+            ${this.makeInput('Nama Lengkap Karyawan', 'usr-nama', u ? u.Nama : '', 'text', 'Nama asli untuk laporan absen & audit')}
+            <div class="grid grid-cols-2 gap-3">
+                ${this.makeInput('Username ID', 'usr-id', u ? (u.Username || u.ID_User) : '', 'text', 'Untuk login sistem', mode === 'edit')}
+                ${this.makeInput('PIN Otorisasi (4 Digit)', 'usr-pin', '', 'password', mode === 'edit' ? 'Kosongkan jika PIN tetap' : 'Wajib 4 Angka')}
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">Hak Akses (Role)</label>
+                    <select id="frm-usr-role" class="w-full border-2 border-slate-200 rounded-xl px-3.5 py-3 font-bold text-sm bg-white outline-none focus:border-purple-500 transition cursor-pointer">
+                        <option value="Kasir" ${u && u.Role === 'Kasir' ? 'selected' : ''}>Kasir / Operator</option>
+                        <option value="Manajer" ${u && u.Role === 'Manajer' ? 'selected' : ''}>Manajer Toko</option>
+                        <option value="Admin" ${u && u.Role === 'Admin' ? 'selected' : ''}>Admin Gudang</option>
+                        <option value="Owner" ${u && u.Role === 'Owner' ? 'selected' : ''}>Owner / Pemilik</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-widest">Penempatan Kerja</label>
+                    <select id="frm-usr-outlet" class="w-full border-2 border-slate-200 rounded-xl px-3.5 py-3 font-bold text-sm bg-white outline-none focus:border-purple-500 transition cursor-pointer">
+                        ${outletOptions}
+                    </select>
+                </div>
+            </div>`;
+
+        this.buildForm(mode === 'edit' ? "Edit Profil Pengguna" : "Tambah User Baru", inputs, `superApp.executeSaveUser('${mode}', '${mode === 'edit' ? username : ''}')`);
+        
+        // Aktifkan Numpad virtual saat input PIN dklik
+        setTimeout(() => {
+            let pinInput = document.getElementById('frm-usr-pin');
+            if (pinInput) {
+                pinInput.setAttribute('readonly', 'readonly');
+                pinInput.classList.add('cursor-pointer');
+                pinInput.onclick = () => osKeyboard.open('frm-usr-pin', 'numeric');
+            }
+        }, 100);
+    },
+
+    // =========================================================
+    // 🚀 3. EKSEKUSI SIMPAN DATA USER
+    // =========================================================
+    executeSaveUser: async function(mode, oldUsername) {
+        if (this.isProcessing) return;
+        const fNama = document.getElementById('frm-usr-nama')?.value.trim();
+        const fId = document.getElementById('frm-usr-id')?.value.trim();
+        const fPin = document.getElementById('frm-usr-pin')?.value.trim();
+        const fRole = document.getElementById('frm-usr-role')?.value;
+        const fOutlet = document.getElementById('frm-usr-outlet')?.value;
+
+        if (!fNama || !fId) return this.showToast("Nama Lengkap dan Username wajib diisi!", "error");
+        if (mode === 'add' && (!fPin || fPin.length !== 4)) return this.showToast("PIN baru wajib 4 digit angka!", "error");
+
+        this.setLoading(true, "Menyimpan Data Pengguna...");
+
+        // Update Memori Lokal Secara Instan (Agar UI Cepat)
+        if (!this.db.users) this.db.users = [];
+        if (mode === 'add') {
+            this.db.users.push({ Username: fId, ID_User: fId, Nama: fNama, Role: fRole, Outlet: fOutlet, ID_Outlet: fOutlet, PIN: fPin });
+        } else {
+            let idx = this.db.users.findIndex(x => (x.Username || x.ID_User) === oldUsername);
+            if (idx > -1) {
+                this.db.users[idx].Nama = fNama;
+                this.db.users[idx].Role = fRole;
+                this.db.users[idx].Outlet = fOutlet;
+                this.db.users[idx].ID_Outlet = fOutlet;
+                if (fPin && fPin.length === 4) this.db.users[idx].PIN = fPin;
+            }
+        }
+        localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+
+        // Kirim ke Backend Google Sheets
+        const payload = { action: 'save_user', mode: mode, old_username: oldUsername, username: fId, nama: fNama, role: fRole, outlet: fOutlet, pin: fPin };
+        let res = await this.apiPost(payload);
+
+        this.closeModal('modal-form');
+        this.renderUserManagement();
+        this.showToast(mode === 'edit' ? "Profil pengguna diperbarui!" : "Pengguna baru berhasil ditambahkan!");
+        this.setLoading(false);
+
+        // Tarik data baru di background jika online
+        if (!res.is_offline) {
+            fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
+                .then(r => r.json()).then(data => { if (data.status === 'sukses') { this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); this.renderUserManagement(); } });
+        }
+    },
+
+    // =========================================================
+    // 🚀 4. EKSEKUSI HAPUS USER
+    // =========================================================
+    executeDeleteUser: async function(username) {
+        if (this.isProcessing) return;
+        if (this.currentUser && this.currentUser.Username === username) {
+            return this.showToast("Anda tidak dapat menghapus akun yang sedang Anda gunakan saat ini!", "error");
+        }
+        if (!confirm(`Yakin ingin menghapus hak akses untuk pengguna "@${username}"?`)) return;
+
+        this.setLoading(true, "Menghapus Pengguna...");
+
+        // Hapus dari Memori Lokal
+        this.db.users = (this.db.users || []).filter(x => (x.Username || x.ID_User) !== username);
+        localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+
+        const payload = { action: 'delete_user', username: username };
+        await this.apiPost(payload);
+
+        this.renderUserManagement();
+        this.showToast("Pengguna berhasil dihapus!");
+        this.setLoading(false);
+    },
+
     // ==========================================
     // 1. LOGIKA MASTER HPP
     // ==========================================
@@ -2200,7 +2432,7 @@ changeOutlet: function(val) {
     this.refreshData(); 
 },
     
-    switchMenu: function(menu) {
+   switchMenu: function(menu) {
     // 1. Bersihkan akses (Tidak perlu lagi memblokir hpp/profit karena sudah dilebur)
     // Cukup sembunyikan semua halaman
     document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
@@ -2214,7 +2446,8 @@ changeOutlet: function(val) {
         'ai': 'text-indigo-600',      
         'gudang': 'text-emerald-600', 
         'outlet': 'text-teal-600',    
-        'staf': 'text-amber-600'
+        'staf': 'text-amber-600',
+        'user': 'text-purple-600' // 🚀 TAMBAHAN: Warna ungu elegan untuk Manajemen User
     };
     const allColors = Object.values(colors);
 
@@ -2243,7 +2476,8 @@ changeOutlet: function(val) {
     const titles = { 
         'pos': 'POS', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 
         'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'CFO Dashboard & Asisten AI', 
-        'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan'
+        'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan',
+        'user': 'Manajemen Pengguna' // 🚀 TAMBAHAN: Judul halaman otomatis untuk User
     };
     const pageTitle = document.getElementById('page-title'); 
     if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
@@ -2267,11 +2501,15 @@ changeOutlet: function(val) {
         if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('terima'), 200);
     }
     
-    // (di bagian bawah fungsi switchMenu)
     if (menu === 'ai' && typeof this.generateAIReport === 'function') {
         this.generateAIReport();
     }
     if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
+    
+    // 🚀 TAMBAHAN: Trigger fungsi render saat menu Manajemen User dibuka
+    if (menu === 'user' && typeof this.renderUserManagement === 'function') {
+        this.renderUserManagement();
+    }
     
     if (menu === 'gudang' || menu === 'master' || menu === 'outlet') {
         if (typeof this.renderGudang === 'function') {
@@ -2280,7 +2518,7 @@ changeOutlet: function(val) {
             this.toggleGudangTab('stok');
         }
     }
-}, 
+},
     
    filterProducts: function(key) {
         this._lastSearchKey = key; // 🚀 Simpan memori kata kunci pencarian
@@ -2293,12 +2531,36 @@ changeOutlet: function(val) {
     
     renderProducts: function() {
         const list = document.getElementById('product-list'); if (!list) return;
-        if (this.isLoadingData) { list.innerHTML = Array(8).fill(0).map(() => `<div class="bg-white border border-slate-100 rounded-2xl p-3 shadow-sm flex flex-col h-40"><div class="skeleton h-24 rounded-xl mb-3 w-full"></div><div class="skeleton h-4 w-3/4 rounded mb-2"></div><div class="skeleton h-4 w-1/2 rounded"></div></div>`).join(''); return; }
+        
+        // Desain Skeleton Modern (Shimmer Effect) saat memuat data
+        if (this.isLoadingData) { 
+            list.innerHTML = Array(8).fill(0).map(() => `
+                <div class="bg-white border border-slate-100 rounded-3xl p-3 shadow-2xs flex flex-col h-[200px] sm:h-[220px] md:h-[250px] animate-pulse">
+                    <div class="bg-slate-100 h-[55%] rounded-2xl mb-3 w-full"></div>
+                    <div class="flex-1 flex flex-col justify-between p-1">
+                        <div class="space-y-1.5">
+                            <div class="bg-slate-100 h-3.5 w-5/6 rounded-lg"></div>
+                            <div class="bg-slate-100 h-3 w-1/2 rounded-lg"></div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <div class="bg-slate-100 h-4 w-2/5 rounded-lg"></div>
+                            <div class="bg-slate-100 h-7 w-7 rounded-full"></div>
+                        </div>
+                    </div>
+                </div>`).join(''); 
+            return; 
+        }
         
         // 🚀 Gunakan memori pencarian jika kasir sedang mencari barang
         let key = this._lastSearchKey || ''; 
         let itemsToRender = key ? this.filteredProducts.filter(p => String(p.nama || '').toLowerCase().includes(key.toLowerCase())) : this.filteredProducts;
         
+        // Render empty state jika produk tidak ditemukan
+        if (itemsToRender.length === 0) {
+            list.innerHTML = `<div class="col-span-full py-16 text-center text-slate-400 font-bold text-sm bg-white/50 rounded-3xl border-2 border-dashed border-slate-200">Produk yang dicari tidak ditemukan</div>`;
+            return;
+        }
+
         list.innerHTML = itemsToRender.map(p => this.createProductCard(p)).join('');
     },
     
@@ -2307,45 +2569,62 @@ changeOutlet: function(val) {
         let cartItem = this.cart.find(i => i.sku === p.sku);
         if (cartItem) qtyInCart = cartItem.qty;
 
-        let img = p.img ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 opacity-50 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
+        let img = p.img 
+            ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` 
+            : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
         
-        let isHabis = p.maxStok <= 0 ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:-translate-y-1 md:hover:-translate-y-1.5 hover:shadow-[0_10px_20px_rgba(0,0,0,0.08)] hover:border-brand-200';
+        let isHabis = p.maxStok <= 0;
+        let cardInteractiveStyle = isHabis 
+            ? 'opacity-50 grayscale cursor-not-allowed border-transparent' 
+            : 'hover:-translate-y-1.5 hover:shadow-[0_12px_25px_-5px_rgba(0,0,0,0.08)] hover:border-brand-300 border-slate-100/80 active:scale-[0.98]';
         
+        // Lencana Stok Kapsul Kaca (Glass Badge)
+        let stokBadgeStyle = isHabis 
+            ? 'bg-rose-500 text-white shadow-rose-500/30' 
+            : (p.maxStok <= 5 ? 'bg-amber-500/90 text-white animate-pulse' : 'bg-slate-900/75 text-white backdrop-blur-md');
+        let stokText = isHabis ? 'HABIS' : `STOK: ${p.maxStok}`;
+
+        // Overlay Jumlah Pesanan Bergaya Kaca 3D
         let overlayQty = qtyInCart > 0 
-            ? `<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center z-20 transition-all duration-300">
-                   <span class="text-4xl md:text-5xl font-black text-white drop-shadow-xl">${qtyInCart}</span>
+            ? `<div class="absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] flex items-center justify-center z-20 transition-all duration-300 animate-[fadeIn_0.2s_ease-out]">
+                   <div class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-900/85 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl transform scale-100">
+                       <span class="text-xl md:text-2xl font-black text-white drop-shadow-md">${qtyInCart}</span>
+                   </div>
                </div>` 
             : '';
 
         let namaProduk = p.nama || 'Nama Tidak Tersedia';
 
-        // 🚀 KUNCI 1: Tinggi Kartu Dikunci Mati (h-[220px] di HP, h-[250px] di PC)
-        // Kartu tidak lagi memanjang atau memendek mengikuti isi, melainkan isi yang harus patuh pada kartu.
-        return `<div onclick="${p.maxStok > 0 ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" 
-            class="bg-white border-2 border-transparent rounded-2xl md:rounded-[1.5rem] cursor-pointer shadow-sm md:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col relative group ${isHabis} overflow-hidden 
-            h-[200px] sm:h-[220px] md:h-[250px]"> 
+        // 🚀 TINGGI KARTU DIKUNCI PRESISI (h-[200px] di HP, h-[250px] di PC)
+        return `
+        <div onclick="${!isHabis ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" 
+            class="bg-white border-2 rounded-[1.25rem] md:rounded-[1.75rem] cursor-pointer shadow-2xs transition-all duration-300 flex flex-col relative group overflow-hidden select-none h-[200px] sm:h-[220px] md:h-[250px] ${cardInteractiveStyle}"> 
             
-            <span class="absolute top-2 right-2 md:top-3 md:right-3 ${p.maxStok <= 0 ? 'bg-red-500' : 'bg-slate-900/80 backdrop-blur-md'} text-white text-[8px] md:text-[10px] font-black px-1.5 py-0.5 md:px-2.5 md:py-1 rounded z-30 shadow-md tracking-wider">${p.maxStok <= 0 ? 'HABIS' : `STOK: ${p.maxStok}`}</span>
+            <span class="absolute top-2.5 right-2.5 md:top-3 md:right-3 ${stokBadgeStyle} text-[9px] md:text-[10px] font-black px-2.5 py-1 rounded-full z-30 shadow-md tracking-wider leading-none">
+                ${stokText}
+            </span>
             
-            <div class="h-[55%] w-full overflow-hidden bg-slate-100 relative shrink-0 border-b border-slate-50">
+            <div class="h-[55%] w-full overflow-hidden bg-slate-50 relative shrink-0">
                 ${img}
                 ${overlayQty}
             </div>
             
-            <div class="h-[45%] w-full flex flex-col justify-between p-2 md:p-3 bg-white">
+            <div class="h-[45%] w-full flex flex-col justify-between p-3 md:p-3.5 bg-white">
                 
-                <h3 class="font-bold text-[11px] md:text-sm text-slate-800 leading-tight break-words" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                <h3 class="font-extrabold text-xs md:text-sm text-slate-800 leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors">
                     ${namaProduk}
                 </h3>
                 
-                <div class="flex items-center justify-between w-full mt-auto">
-                    <p class="text-brand-500 font-black text-[12px] md:text-[14px] xl:text-base tracking-tight truncate pr-1">
+                <div class="flex items-center justify-between w-full mt-auto pt-1">
+                    <p class="text-brand-600 font-black text-xs md:text-sm xl:text-base tracking-tight truncate pr-1">
                         Rp ${Number(p.harga || 0).toLocaleString('id-ID')}
                     </p>
-                    <div class="w-6 h-6 md:w-7 md:h-7 rounded-full ${qtyInCart > 0 ? 'bg-brand-500 text-white' : 'bg-brand-50 text-brand-500 opacity-100 md:opacity-0 md:group-hover:opacity-100'} flex items-center justify-center transition-opacity duration-300 shadow-sm shrink-0">
-                        <i class="fas ${qtyInCart > 0 ? 'fa-check' : 'fa-plus'} text-[8px] md:text-[10px]"></i>
+                    
+                    <div class="w-7 h-7 md:w-8 md:h-8 rounded-full ${qtyInCart > 0 ? 'bg-gradient-to-tr from-brand-500 to-orange-500 text-white shadow-md shadow-brand-500/30' : 'bg-slate-100 text-slate-600 group-hover:bg-brand-50 group-hover:text-brand-600'} flex items-center justify-center transition-all duration-300 shrink-0">
+                        <i class="fas ${qtyInCart > 0 ? 'fa-check' : 'fa-plus'} text-[10px] md:text-xs"></i>
                     </div>
                 </div>
+                
             </div>
         </div>`;
     },
@@ -2385,80 +2664,96 @@ changeOutlet: function(val) {
         this.renderCart(); 
     },
     
-    renderCart: function() {
-        const cont = document.getElementById('cart-container'); let total = 0, items = 0, html = ''; if (!cont) return;
+   renderCart: function() {
+        const cont = document.getElementById('cart-container'); 
+        let total = 0, items = 0, html = ''; 
+        if (!cont) return;
         
-        // 🚀 FITUR 1: Tombol Hapus Semua (Muncul jika ada isinya)
+        // 🚀 FITUR 1: Tombol Hapus Semua Minimalis (Muncul jika keranjang terisi)
         if (this.cart.length > 0) {
             html += `
-            <div class="flex justify-between items-center mb-3 px-1">
-                <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase">Daftar Pesanan</span>
-                <button onclick="superApp.clearCart()" class="text-[10px] font-black text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95">
-                    <i class="fas fa-trash-alt"></i> Hapus Semua
+            <div class="flex justify-between items-center mb-3.5 px-1 shrink-0">
+                <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-1.5">
+                    <i class="fas fa-list-ul text-slate-300"></i> Daftar Pesanan
+                </span>
+                <button onclick="superApp.clearCart()" class="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50/80 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-90 border border-rose-100/60">
+                    <i class="fas fa-trash-alt text-[11px]"></i> Hapus Semua
                 </button>
             </div>`;
         }
 
         this.cart.forEach((i, idx) => {
-            total += (i.price * i.qty); items += i.qty;
+            total += (i.price * i.qty); 
+            items += i.qty;
             
             // Logika hitung sisa stok aktual di keranjang
-            let sisaBahanDiKeranjang = 0; let refBahan = i.sku_bahan || i.sku;
+            let sisaBahanDiKeranjang = 0; 
+            let refBahan = i.sku_bahan || i.sku;
             this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) sisaBahanDiKeranjang += c.qty; });
             let stokTersisaVisual = i.maxStok - sisaBahanDiKeranjang;
 
-            // 🚀 FITUR 2: Wrapper UI untuk Swipe-to-Delete
+            // Efek visual jika stok limit/habis
+            let stokLimitStyle = stokTersisaVisual <= 0 
+                ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse font-black' 
+                : (stokTersisaVisual <= 5 ? 'bg-amber-50 text-amber-600 border-amber-200 font-extrabold' : 'bg-slate-50 text-slate-400 border-slate-100 font-bold');
+
+            // 🚀 FITUR 2: Wrapper Kartu Pesanan dengan Swipe-to-Delete Modern
             html += `
-            <div class="relative overflow-hidden rounded-[1.25rem] mb-3 bg-rose-500 shadow-[0_4px_12px_rgba(0,0,0,0.03)] group">
+            <div class="relative overflow-hidden rounded-2xl mb-2.5 bg-rose-500 shadow-2xs group select-none transition-all">
                 
-                <button onclick="superApp.changeQty(${idx}, -999)" class="absolute inset-y-0 right-0 w-20 flex flex-col items-center justify-center text-white text-[10px] font-black transition-colors hover:bg-rose-600 active:bg-rose-700">
-                    <i class="fas fa-trash-alt mb-1 text-base drop-shadow-sm"></i> HAPUS
+                <button onclick="superApp.changeQty(${idx}, -999)" class="absolute inset-y-0 right-0 w-20 flex flex-col items-center justify-center text-white text-[10px] font-black transition-colors hover:bg-rose-600 active:bg-rose-700 tracking-wider">
+                    <i class="fas fa-trash-alt mb-1 text-base drop-shadow-sm group-hover:scale-110 transition-transform"></i> HAPUS
                 </button>
 
-                <div class="flex bg-white border border-slate-100 p-3.5 rounded-[1.25rem] items-center gap-3 text-slate-800 transition-transform duration-300 transform relative z-10 w-full"
+                <div class="flex bg-white border border-slate-100/80 p-3.5 rounded-2xl items-center gap-3 text-slate-800 transition-transform duration-300 transform relative z-10 w-full hover:border-slate-200"
                      ontouchstart="this.startX = event.touches[0].clientX; this.style.transition = 'none';"
                      ontouchmove="let diff = this.startX - event.touches[0].clientX; if(diff > 0 && diff < 100) { this.style.transform = 'translateX(-' + diff + 'px)'; }"
-                     ontouchend="let diff = this.startX - event.changedTouches[0].clientX; this.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; if(diff > 40) { this.style.transform = 'translateX(-80px)'; } else { this.style.transform = 'translateX(0)'; }">
+                     ontouchend="let diff = this.startX - event.changedTouches[0].clientX; this.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; if(diff > 45) { this.style.transform = 'translateX(-80px)'; } else { this.style.transform = 'translateX(0)'; }">
                     
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-extrabold text-sm truncate text-slate-800 mb-0.5">${i.nama}</h4>
-                        <div class="flex items-center gap-2">
-                            <p class="text-brand-500 font-black text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
-                            <span class="text-[10px] text-slate-400 font-bold border border-slate-100 px-1.5 py-0.5 rounded-md ${stokTersisaVisual <= 0 ? 'bg-red-50 text-red-500 border-red-100' : ''}">Sisa: ${stokTersisaVisual}</span>
+                    <div class="flex-1 min-w-0 pr-1">
+                        <h4 class="font-extrabold text-xs md:text-sm truncate text-slate-800 mb-1 leading-snug">${i.nama}</h4>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <p class="text-brand-600 font-black text-xs md:text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
+                            <span class="text-[9px] border px-1.5 py-0.5 rounded-md ${stokLimitStyle}">Sisa: ${stokTersisaVisual}</span>
                         </div>
                     </div>
 
-                    <div class="flex bg-slate-50 rounded-xl border border-slate-200 shadow-inner p-1 overflow-hidden shrink-0 items-center">
-                        <button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm active:scale-90"><i class="fas fa-minus text-xs"></i></button>
-                        <span class="w-8 flex items-center justify-center text-sm font-black text-slate-800">${i.qty}</span>
-                        <button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg transition-all hover:shadow-sm active:scale-90"><i class="fas fa-plus text-xs"></i></button>
+                    <div class="flex bg-slate-100/80 rounded-xl border border-slate-200/60 p-1 shrink-0 items-center shadow-inner">
+                        <button onclick="superApp.changeQty(${idx}, -1)" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center font-black text-slate-500 hover:text-rose-600 hover:bg-white rounded-lg transition-all shadow-2xs active:scale-90"><i class="fas fa-minus text-[10px]"></i></button>
+                        <span class="w-7 md:w-8 flex items-center justify-center text-xs md:text-sm font-black text-slate-800 tracking-tight">${i.qty}</span>
+                        <button onclick="superApp.changeQty(${idx}, 1)" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center font-black text-slate-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-all shadow-2xs active:scale-90"><i class="fas fa-plus text-[10px]"></i></button>
                     </div>
 
                 </div>
             </div>`;
         });
         
-        cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-shopping-basket', 'Keranjang Kosong', 'Yuk, tambahkan pesanan!');
+        // Render isi keranjang atau Empty State modern
+        cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-shopping-basket', 'Keranjang Kosong', 'Yuk, sentuh produk di samping untuk memesan!');
         
-        const totalEl = document.getElementById('total-price'); if (totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
-        const badge = document.getElementById('cart-badge'); if (badge) badge.innerText = `${items} Item`;
+        // Update Total Tagihan & Badge Item
+        const totalEl = document.getElementById('total-price'); 
+        if (totalEl) totalEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
         
-        // Update Mobile Floating Button
+        const badge = document.getElementById('cart-badge'); 
+        if (badge) badge.innerText = `${items} Item`;
+        
+        // Update Floating Bottom Button (Khusus HP)
         const mobQty = document.getElementById('mobile-cart-qty'); 
-        if (mobQty) mobQty.innerText = `${items} ITEM`;
+        if (mobQty) mobQty.innerText = `${items} Item`;
         
         const mobTotal = document.getElementById('mobile-cart-total'); 
         if (mobTotal) mobTotal.innerText = `Rp ${total.toLocaleString('id-ID')}`;
 
         this.payTotal = total; 
         
+        // Sinkronisasi ulang tampilan kartu katalog (agar angka overlay pesanan ter-update)
         if (document.getElementById('product-list')) {
             this.renderProducts();
         }
 
         this.syncStorage(); 
     },
-
     // 🚀 FUNGSI BARU: Kosongkan seluruh isi keranjang
     clearCart: function() {
         if (this.cart.length === 0) return;
@@ -2949,69 +3244,130 @@ changeOutlet: function(val) {
         }, 50); 
     },
     
-   submitTerimaBarang: async function() {
-    if (this.isProcessing) return;
-    
-    // 1. Kumpulkan data dan hitung total item
-    let items = [];
-    let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+   // =========================================================
+    // 🚀 1. TAHAP VALIDASI & PEMICU MODAL TERIMA BARANG CANTIK
+    // =========================================================
+    submitTerimaBarang: async function() {
+        if (this.isProcessing) return;
+        
+        let items = [];
+        let totalPcs = 0;
+        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
 
-    (this.db.masterProduk || []).forEach(m => {
-        if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-            let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); 
-            let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
-            let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
+        (this.db.masterProduk || []).forEach(m => {
+            if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
+                let inputDesk = document.getElementById(`trm-qty-${m.SKU}`); 
+                let inputMob = document.getElementById(`trm-qty-mob-${m.SKU}`);
+                let qtyStr = inputDesk && inputDesk.value !== '' ? inputDesk.value : (inputMob && inputMob.value !== '' ? inputMob.value : '');
 
-            if (qtyStr !== '' && parseInt(this.getNumericValue(qtyStr)) > 0) {
-                let noteDesk = document.getElementById(`trm-note-${m.SKU}`); 
-                let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
-                let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
-                
-                items.push({ sku: m.SKU, nama: m.Nama_Produk, qty: parseInt(this.getNumericValue(qtyStr)), catatan: note });
-                waText += `📦 *${m.Nama_Produk}*\nQty Diterima: *${qtyStr} Pcs*\nCatatan: ${note || '-'}\n\n`;
+                if (qtyStr !== '' && parseInt(this.getNumericValue(qtyStr)) > 0) {
+                    let qtyNum = parseInt(this.getNumericValue(qtyStr));
+                    let noteDesk = document.getElementById(`trm-note-${m.SKU}`); 
+                    let noteMob = document.getElementById(`trm-note-mob-${m.SKU}`);
+                    let note = noteDesk && noteDesk.value !== '' ? noteDesk.value : (noteMob && noteMob.value !== '' ? noteMob.value : '');
+                    
+                    items.push({ sku: m.SKU, nama: m.Nama_Produk, qty: qtyNum, catatan: note });
+                    totalPcs += qtyNum;
+                    waText += `📦 *${m.Nama_Produk}*\nQty Diterima: *${qtyStr} Pcs*\nCatatan: ${note || '-'}\n\n`;
+                }
+            }
+        });
+
+        if (items.length === 0) return this.showToast("Tidak ada barang masuk yang diinput!", "error");
+
+        // --- CEK DUPLIKAT INPUTAN HARI INI ---
+        let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+        let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        
+        let sudahInputHariIni = this.db.mutasi.some(m => 
+            m.Outlet_Tujuan === this.outlet && 
+            this.cleanDateOnly(m.Waktu) === todayStrLocal &&
+            m.Status_Approval === 'Pending'
+        );
+
+        // Pengkondisian Visual Isi Modal jika terdeteksi Double Input
+        const iconBox = document.getElementById('terima-confirm-icon-box');
+        const titleEl = document.getElementById('terima-confirm-title');
+        const subtitleEl = document.getElementById('terima-confirm-subtitle');
+        const warningBox = document.getElementById('terima-confirm-warning-box');
+
+        if (sudahInputHariIni) {
+            // Ubah tema modal menjadi Kuning Peringatan (Warning)
+            if (iconBox) iconBox.className = "w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-amber-100/60 shadow-inner";
+            if (titleEl) titleEl.innerText = "Laporan Ganda Terdeteksi";
+            if (subtitleEl) subtitleEl.innerText = "Cabang ini sudah mengirim data pending hari ini.";
+            if (warningBox) {
+                warningBox.className = "bg-red-50 border border-red-200/80 rounded-xl p-3 text-left flex items-start gap-2.5 mb-6";
+                warningBox.innerHTML = `<i class="fas fa-triangle-exclamation text-red-500 text-base mt-0.5 shrink-0"></i><p class="text-[11px] font-bold text-red-800 leading-relaxed"><b>PERINGATAN GRAV:</b> Sudah ada input barang datang yang pending hari ini. Yakin ingin mengirim antrean laporan baru?</p>`;
+            }
+        } else {
+            // Kembalikan ke tema Hijau Normal (Success/Info)
+            if (iconBox) iconBox.className = "w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-emerald-100/60 shadow-inner";
+            if (titleEl) titleEl.innerText = "Konfirmasi Barang Datang";
+            if (subtitleEl) subtitleEl.innerText = "Verifikasi jumlah barang yang dikirim kurir pusat.";
+            if (warningBox) {
+                warningBox.className = "bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-left flex items-start gap-2.5 mb-6";
+                warningBox.innerHTML = `<i class="fas fa-circle-info text-amber-500 text-base mt-0.5 shrink-0"></i><p class="text-[11px] font-bold text-amber-800 leading-relaxed">Stok toko <b>tidak langsung bertambah</b>. Laporan ini memerlukan otorisasi dan persetujuan dari Owner di menu Audit.</p>`;
             }
         }
-    });
 
-    if (items.length === 0) return this.showToast("Tidak ada barang masuk yang diinput!", "error");
-
-    // 2. 🚀 CEK DUPLIKAT (PENCEGAHAN INPUT GANDA)
-    let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
-    let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    
-    let sudahInputHariIni = this.db.mutasi.some(m => 
-        m.Outlet_Tujuan === this.outlet && 
-        this.cleanDateOnly(m.Waktu) === todayStrLocal &&
-        m.Status_Approval === 'Pending' // Hanya cek yang masih pending/belum diproses
-    );
-
-    if (sudahInputHariIni) {
-        let konfirmasi = confirm("⚠️ PERINGATAN: Cabang ini sudah memiliki laporan 'Barang Datang' yang sedang menunggu otorisasi hari ini. Yakin ingin menambah input baru?");
-        if (!konfirmasi) return; 
-    }
-
-    if (!confirm("Kirim Laporan Barang Datang ke Owner? Stok tidak akan bertambah hingga di-Setujui.")) return;
-    
-    this.setLoading(true, "Menyimpan...");
-
-    const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
-    let res = await this.apiPost(payload);
-    
-    if (res.status === 'sukses') {
-        this.showToast("Berhasil Disimpan di Sistem!");
-        this.showWaModal(waText);
-        
-        // Refresh data agar database lokal update
-        if (!res.is_offline) { 
-            const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-            this.db = await r.json(); 
-            this.refreshData(); 
+        // Inject Ringkasan Angka
+        const summaryContainer = document.getElementById('terima-confirm-summary');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = `
+                <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span class="text-xs font-bold text-slate-500">Toko Penerima</span>
+                    <span class="text-xs font-black text-slate-800 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">${this.outlet}</span>
+                </div>
+                <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span class="text-xs font-bold text-slate-500">Variasi Produk</span>
+                    <span class="text-xs font-black text-emerald-600">${items.length} Macam</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-slate-500">Total Muatan Fisik</span>
+                    <span class="text-xs font-black text-slate-800">${totalPcs} Pcs Barang</span>
+                </div>
+            `;
         }
-        this.switchMenu('pos');
-    }
-    this.setLoading(false);
-},
 
+        // Tautkan fungsi eksekusi ke tombol
+        const btnExecute = document.getElementById('btn-confirm-terima-execute');
+        if (btnExecute) {
+            btnExecute.onclick = () => this.executeSubmitTerimaBarang(items, waText);
+        }
+
+        // Buka Modal Box
+        this.openModal('modal-confirm-terima');
+    },
+
+    // =========================================================
+    // 🚀 2. TAHAP EKSEKUSI DATA KELUAR KE SERVER & WA MODAL
+    // =========================================================
+    executeSubmitTerimaBarang: async function(items, waText) {
+        if (this.isProcessing) return;
+        this.closeModal('modal-confirm-terima');
+        
+        // Beri sedikit jeda waktu agar transisi modal tutup selesai
+        setTimeout(async () => {
+            this.setLoading(true, "Menyimpan Laporan Masuk...");
+            const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+            
+            let res = await this.apiPost(payload);
+            
+            if (res.status === 'sukses') {
+                this.showToast("Berhasil Disimpan di Sistem!");
+                this.showWaModal(waText);
+                
+                if (!res.is_offline) { 
+                    const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                    this.db = await r.json(); 
+                    this.refreshData(); 
+                }
+                this.switchMenu('pos');
+            }
+            this.setLoading(false);
+        }, 200);
+    },
     
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
@@ -3226,82 +3582,125 @@ openDetailStokOpname: function(sku) {
         this.openModal('modal-stok-detail');
     },
     
-submitOpname: async function() {
-    if (this.isProcessing) return;
-    if (!confirm("Kirim Opname ke Owner? Stok fisik akan diverifikasi (Audit) terlebih dahulu sebelum dirubah pada sistem.")) return;
-    this.setLoading(true, "Menyimpan & Mengirim Audit...");
-    
-    let itemsToSubmit = [];
-    let itemsForWa = [];
+// =========================================================
+    // 🚀 1. PEMERIKSAAN & PEMANGGIL POPUP CANTIK OPNAME
+    // =========================================================
+    submitOpname: function() {
+        if (this.isProcessing) return;
 
-    (this.db.masterProduk || []).forEach(m => {
-        if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
-            
-            // 1. 🚀 AMBIL DATA SISTEM DARI DATABASE (100% Akurat, bebas dari error pembacaan HTML)
-            let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
-            let sys = sData ? Number(sData.Stok_Toko) : 0;
+        let itemsToSubmit = [];
+        let itemsForWa = [];
+        let countSelisih = 0;
 
-            // 2. Ambil elemen input dari kedua versi tampilan
-            let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); 
-            let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
-            let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
-            let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
+        (this.db.masterProduk || []).forEach(m => {
+            let kat = String(m.Kategori || '').toLowerCase();
+            if (kat === 'bahan' || kat === 'pendukung') {
+                
+                // 1. Ambil Data Sistem
+                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
+                let sys = sData ? Number(sData.Stok_Toko) : 0;
 
-            // 3. Baca isian angka kasir (Jika kosong, anggap sama dengan nilai sistem)
-            let valDesk = inputDesk && inputDesk.value !== '' ? this.getNumericValue(inputDesk.value) : sys;
-            let valMob = inputMob && inputMob.value !== '' ? this.getNumericValue(inputMob.value) : sys;
+                // 2. Ambil Elemen Input (Desktop & Mobile)
+                let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); 
+                let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
+                let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
+                let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
 
-            // 4. 🚀 DETEKSI OTOMATIS: Kasir ngetik di HP atau di Laptop?
-            let fisik = sys;
-            let note = '';
+                // 3. Baca Isian Kasir
+                let valDesk = inputDesk && inputDesk.value !== '' ? this.getNumericValue(inputDesk.value) : sys;
+                let valMob = inputMob && inputMob.value !== '' ? this.getNumericValue(inputMob.value) : sys;
 
-            if (valMob !== sys) {
-                // Berarti angka di HP berubah!
-                fisik = valMob;
-                note = noteMob ? noteMob.value : '';
-            } else if (valDesk !== sys) {
-                // Berarti angka di Laptop berubah!
-                fisik = valDesk;
-                note = noteDesk ? noteDesk.value : '';
-            } else {
-                // Angka tidak berubah, tapi siapa tahu kasir kasih catatan tambahan
-                note = (noteMob && noteMob.value !== '') ? noteMob.value : (noteDesk && noteDesk.value !== '' ? noteDesk.value : '');
+                // 4. Deteksi Otomatis Sumber Input
+                let fisik = sys;
+                let note = '';
+
+                if (valMob !== sys) {
+                    fisik = valMob;
+                    note = noteMob ? noteMob.value : '';
+                } else if (valDesk !== sys) {
+                    fisik = valDesk;
+                    note = noteDesk ? noteDesk.value : '';
+                } else {
+                    note = (noteMob && noteMob.value !== '') ? noteMob.value : (noteDesk && noteDesk.value !== '' ? noteDesk.value : '');
+                }
+
+                let selisih = fisik - sys;
+                if (selisih !== 0) countSelisih++;
+
+                // 5. Masukkan ke list WA
+                itemsForWa.push({ sku: m.SKU, nama: m.Nama_Produk, kategori: m.Kategori, sys: sys, fisik: fisik, selisih: selisih, note: note });
+                
+                // 6. Masukkan ke list Submit jika ada perubahan
+                if (fisik !== sys || note !== '') {
+                    itemsToSubmit.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: selisih, catatan: note });
+                }
             }
+        });
+        
+        // Pencegahan jika kasir belum mengubah apapun
+        if (itemsToSubmit.length === 0) { 
+            return this.showToast("Tidak ada perubahan stok atau catatan untuk dilaporkan!", "warning"); 
+        }
 
-            // 5. Masukkan ke list untuk dilaporkan ke Owner via WA (semua barang dikirim)
-            itemsForWa.push({ sku: m.SKU, nama: m.Nama_Produk, kategori: m.Kategori, sys: sys, fisik: fisik, selisih: fisik - sys, note: note });
+        // 🚀 SUSUN KARTU RINGKASAN DI DALAM MODAL
+        const summaryContainer = document.getElementById('opname-confirm-summary');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = `
+                <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span class="text-xs font-bold text-slate-500">Cabang Audit</span>
+                    <span class="text-xs font-black text-slate-800 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">${this.outlet}</span>
+                </div>
+                <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span class="text-xs font-bold text-slate-500">Total Item Diperiksa</span>
+                    <span class="text-xs font-black text-indigo-600">${itemsToSubmit.length} Barang</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-slate-500">Ditemukan Selisih</span>
+                    <span class="text-xs font-black ${countSelisih > 0 ? 'text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md animate-pulse' : 'text-emerald-600'}">${countSelisih} Barang Berselisih</span>
+                </div>
+            `;
+        }
+
+        // Hubungkan data ke tombol "Ya, Kirim Audit"
+        const btnExecute = document.getElementById('btn-confirm-opname-execute');
+        if (btnExecute) {
+            btnExecute.onclick = () => this.executeSubmitOpname(itemsToSubmit, itemsForWa);
+        }
+
+        // Buka Popup Modal
+        this.openModal('modal-confirm-opname');
+    },
+
+    // =========================================================
+    // 🚀 2. EKSEKUSI PENGIRIMAN API & WHATSAPP
+    // =========================================================
+    executeSubmitOpname: async function(itemsToSubmit, itemsForWa) {
+        if (this.isProcessing) return;
+        this.closeModal('modal-confirm-opname');
+        
+        setTimeout(async () => {
+            this.setLoading(true, "Menyimpan & Mengirim Audit...");
             
-            // 6. Masukkan ke list Database JIKA ADA PERUBAHAN (baik fisik maupun catatan)
-            if (fisik !== sys || note !== '') {
-                itemsToSubmit.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: fisik - sys, catatan: note });
+            let waText = this.buildOpnameWaText(this.outlet, this.currentUser.Username, new Date().toLocaleString('id-ID'), itemsForWa);
+            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: itemsToSubmit };
+            
+            let res = await this.apiPost(payload);
+            
+            if (res.status === 'sukses') {
+                this.showToast("Opname berhasil Disimpan!");
+                this.showWaModal(waText);
+                if (!res.is_offline) { 
+                    const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                    this.db = await r.json(); 
+                    this.refreshData(); 
+                    this.switchMenu('pos'); 
+                } else { 
+                    this.switchMenu('pos'); 
+                }
             }
-        }
-    });
-    
-    if (itemsToSubmit.length === 0) { 
-        this.setLoading(false); 
-        return this.showToast("Tidak ada perubahan stok atau catatan untuk dilaporkan!", "warning"); 
-    }
-
-    let waText = this.buildOpnameWaText(this.outlet, this.currentUser.Username, new Date().toLocaleString('id-ID'), itemsForWa);
-
-    const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: itemsToSubmit };
-    let res = await this.apiPost(payload);
-    
-    if (res.status === 'sukses') {
-        this.showToast("Opname berhasil Disimpan!");
-        this.showWaModal(waText);
-        if (!res.is_offline) { 
-            const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-            this.db = await r.json(); 
-            this.refreshData(); 
-            this.switchMenu('pos'); 
-        } else { 
-            this.switchMenu('pos'); 
-        }
-    }
-    this.setLoading(false);
-},
+            this.setLoading(false);
+        }, 200);
+    },
     
     // AUDIT & BULK APPROVAL
     toggleAuditTab: function(tab) {
@@ -3504,34 +3903,136 @@ submitOpname: async function() {
         this.checkBulkAudit();
     },
     
+    // =========================================================
+    // 🚀 1. CEK SELEKSI CHECKBOX AUDIT
+    // =========================================================
     checkBulkAudit: function() {
         let opChecked = document.querySelectorAll('.cb-audit-opname:checked').length;
         let trChecked = document.querySelectorAll('.cb-audit-terima:checked').length;
         let bar = document.getElementById('bulk-action-bar');
-        if (bar) { if (opChecked > 0 || trChecked > 0) bar.classList.remove('hidden'); else bar.classList.add('hidden'); }
+        
+        // Perbarui badge angka pada Floating Action Bar jika ada
+        const countBadge = document.getElementById('bulk-action-count');
+        if (countBadge) countBadge.innerText = `${opChecked + trChecked} Dipilih`;
+
+        if (bar) { 
+            if (opChecked > 0 || trChecked > 0) bar.classList.remove('hidden'); 
+            else bar.classList.add('hidden'); 
+        }
     },
 
-    processBulkApproval: async function(status) {
+    // =========================================================
+    // 🚀 2. PEMICU MODAL KONFIRMASI CANTIK (BULK APPROVAL)
+    // =========================================================
+    processBulkApproval: function(status) {
         if (this.isProcessing) return;
-        let opCbs = document.querySelectorAll('.cb-audit-opname:checked'); let trCbs = document.querySelectorAll('.cb-audit-terima:checked');
-        if (opCbs.length === 0 && trCbs.length === 0) return this.showToast("Tidak ada data dipilih", "warning");
+        
+        let opCbs = document.querySelectorAll('.cb-audit-opname:checked'); 
+        let trCbs = document.querySelectorAll('.cb-audit-terima:checked');
+        let totalSelected = opCbs.length + trCbs.length;
 
-        if (!confirm(`Yakin ingin memproses (${status}) ${opCbs.length + trCbs.length} laporan sekaligus?`)) return;
-        this.setLoading(true, `Memproses Masal (${status})...`);
+        if (totalSelected === 0) return this.showToast("Tidak ada data dipilih", "warning");
 
-        try {
-            if (opCbs.length > 0) {
-                let items = Array.from(opCbs).map(cb => { let p = cb.value.split('|'); return { waktu: p[0], sku: p[1], outlet: p[2], fisik: parseInt(p[3]) }; });
-                await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_opname', items: items, status_app: status }) });
+        let isApprove = status === 'Disetujui';
+
+        // --- PENGATURAN VISUAL DINAMIS MODAL ---
+        const iconBox = document.getElementById('bulk-confirm-icon-box');
+        const icon = document.getElementById('bulk-confirm-icon');
+        const titleEl = document.getElementById('bulk-confirm-title');
+        const subtitleEl = document.getElementById('bulk-confirm-subtitle');
+        const actionBadge = document.getElementById('bulk-confirm-action-badge');
+        const warningBox = document.getElementById('bulk-confirm-warning-box');
+        const warningIcon = document.getElementById('bulk-confirm-warning-icon');
+        const warningText = document.getElementById('bulk-confirm-warning-text');
+        const btnExecute = document.getElementById('btn-confirm-bulk-execute');
+
+        // Isi angka ringkasan
+        if (document.getElementById('bulk-confirm-opname-count')) document.getElementById('bulk-confirm-opname-count').innerText = `${opCbs.length} Item`;
+        if (document.getElementById('bulk-confirm-terima-count')) document.getElementById('bulk-confirm-terima-count').innerText = `${trCbs.length} Item`;
+        if (document.getElementById('bulk-confirm-total-count')) document.getElementById('bulk-confirm-total-count').innerText = `${totalSelected} Laporan`;
+
+        if (isApprove) {
+            // TEMA HIJAU (SETUJUI)
+            if (iconBox) iconBox.className = "w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-emerald-100/60 shadow-inner";
+            if (icon) icon.className = "fas fa-check-double animate-bounce";
+            if (titleEl) titleEl.innerText = "Setujui Laporan Terpilih?";
+            if (subtitleEl) subtitleEl.innerText = "Stok sistem akan langsung diperbarui secara permanen.";
+            if (actionBadge) {
+                actionBadge.innerText = "Disetujui (Approve)";
+                actionBadge.className = "text-xs font-black px-2.5 py-0.5 rounded-md border shadow-2xs uppercase tracking-wider bg-emerald-50 text-emerald-700 border-emerald-200";
             }
-            if (trCbs.length > 0) {
-                let items = Array.from(trCbs).map(cb => cb.value);
-                await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_mutasi', items: items, status_app: status }) });
+            if (warningBox) {
+                warningBox.className = "bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-left flex items-start gap-2.5 mb-6";
+                if (warningIcon) warningIcon.className = "fas fa-circle-info text-amber-500 text-base mt-0.5 shrink-0";
+                if (warningText) warningText.innerHTML = "Dengan menyetujui, angka opname fisik akan <b>menimpa stok komputer</b>, dan barang masuk dari supplier akan <b>mencair ke stok toko</b>.";
             }
-            this.showToast(`Proses Masal Selesai!`);
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await res.json(); this.refreshData();
-        } catch (e) { this.showToast("Gagal memproses", "error"); }
-        this.setLoading(false);
+            if (btnExecute) {
+                btnExecute.className = "w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs md:text-sm rounded-xl shadow-lg shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-2";
+                btnExecute.innerHTML = `<i class="fas fa-check text-xs"></i> Ya, Setujui Semua`;
+            }
+        } else {
+            // TEMA MERAH (TOLAK)
+            if (iconBox) iconBox.className = "w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-rose-100/60 shadow-inner";
+            if (icon) icon.className = "fas fa-xmark animate-bounce";
+            if (titleEl) titleEl.innerText = "Tolak Laporan Terpilih?";
+            if (subtitleEl) subtitleEl.innerText = "Laporan akan diabaikan dan stok tidak akan berubah.";
+            if (actionBadge) {
+                actionBadge.innerText = "Ditolak (Reject)";
+                actionBadge.className = "text-xs font-black px-2.5 py-0.5 rounded-md border shadow-2xs uppercase tracking-wider bg-rose-50 text-rose-700 border-rose-200";
+            }
+            if (warningBox) {
+                warningBox.className = "bg-rose-50 border border-rose-200/80 rounded-xl p-3 text-left flex items-start gap-2.5 mb-6";
+                if (warningIcon) warningIcon.className = "fas fa-triangle-exclamation text-rose-500 text-base mt-0.5 shrink-0";
+                if (warningText) warningText.innerHTML = "Tindakan penolakan akan membuat laporan ditandai sebagai <b>Ditolak</b> dan stok komputer di cabang tetap berada pada angka semula.";
+            }
+            if (btnExecute) {
+                btnExecute.className = "w-full py-3.5 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-black text-xs md:text-sm rounded-xl shadow-lg shadow-rose-500/25 transition active:scale-95 flex items-center justify-center gap-2";
+                btnExecute.innerHTML = `<i class="fas fa-ban text-xs"></i> Ya, Tolak Semua`;
+            }
+        }
+
+        // Hubungkan eksekusi ke tombol
+        if (btnExecute) {
+            btnExecute.onclick = () => this.executeBulkApproval(status, opCbs, trCbs);
+        }
+
+        this.openModal('modal-confirm-bulk');
+    },
+
+    // =========================================================
+    // 🚀 3. PELAKSANA EKSEKUSI API SECARA MASAL
+    // =========================================================
+    executeBulkApproval: async function(status, opCbs, trCbs) {
+        if (this.isProcessing) return;
+        this.closeModal('modal-confirm-bulk');
+
+        setTimeout(async () => {
+            this.setLoading(true, `Memproses Masal (${status})...`);
+
+            try {
+                if (opCbs.length > 0) {
+                    let items = Array.from(opCbs).map(cb => { 
+                        let p = cb.value.split('|'); 
+                        return { waktu: p[0], sku: p[1], outlet: p[2], fisik: parseInt(p[3]) }; 
+                    });
+                    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_opname', items: items, status_app: status }) });
+                }
+                if (trCbs.length > 0) {
+                    let items = Array.from(trCbs).map(cb => cb.value);
+                    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_mutasi', items: items, status_app: status }) });
+                }
+                
+                this.showToast(`Proses Masal (${status}) Berhasil!`, "success");
+                const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                this.db = await res.json(); 
+                this.refreshData();
+            } catch (e) { 
+                console.error(e);
+                this.showToast("Gagal memproses persetujuan masal", "error"); 
+            }
+            
+            this.setLoading(false);
+        }, 200);
     },
 
     // TRANSFER OWNER
@@ -5096,27 +5597,31 @@ executeVoidTrx: async function(trxId) {
         reader.readAsDataURL(file);
     },
     
-    renderGudang: function() {
+  renderGudang: function() {
         const gBodyUtama = document.getElementById('gudang-tbody-utama');
         const gBodyPendukung = document.getElementById('gudang-tbody-pendukung');
         
-        // 🚀 Wadah tambahan untuk Mobile (Jika belum ada di HTML, tambahkan <div id="gudang-mob-utama"></div>)
-        const gMobUtama = document.getElementById('gudang-mob-utama');
-        const gMobPend = document.getElementById('gudang-mob-pendukung');
+        // 🚀 Wadah untuk Mobile Cards
+        const gMobUtama = document.getElementById('gudang-mob-stok-utama');
+        const gMobPend = document.getElementById('gudang-mob-stok-pendukung');
 
         let htmlUtama = ''; let htmlPendukung = '';
         let mobUtama = ''; let mobPend = '';
+        let countUtama = 0; let countPend = 0;
 
         let sortedMaster = [...(this.db.masterProduk || [])].sort((a,b) => String(a.Nama_Produk||'').localeCompare(String(b.Nama_Produk||'')));
         
+        // 1. RENDER GUDANG PUSAT (DESKTOP TABLE & MOBILE CARDS)
         sortedMaster.forEach(g => {
             let kat = String(g.Kategori||'').toLowerCase();
-            if(kat === 'bahan' || kat === 'pendukung') {
+            
+            // Filter Fleksibel: Menangkap barang mentah maupun pendukung
+            if(kat === 'bahan' || kat === 'pendukung' || kat.includes('bahan') || kat.includes('pendukung') || (!kat.includes('menu') && !g.Harga_Jual)) {
                 let stok = (this.db.stokGudang || []).find(x => x.SKU === g.SKU)?.Stok_Pusat || 0;
                 let isKritis = stok <= 5;
-                let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                let stokBadge = isKritis ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-[0_0_10px_rgba(225,29,72,0.15)] animate-pulse' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm';
                 
-                // BARIS TABEL DESKTOP
+                // --- BARIS TABEL DESKTOP ---
                 let row = `
                 <tr class="table-row-3d border-b border-slate-50 hover:bg-slate-50 transition-all group">
                     <td class="py-4 px-5 whitespace-normal">
@@ -5128,36 +5633,50 @@ executeVoidTrx: async function(trxId) {
                     </td>
                     <td class="py-4 px-5 text-center">
                         <div class="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition-all active:scale-90"><i class="fas fa-edit"></i></button>
-                            <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90"><i class="fas fa-trash"></i></button>
+                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition-all active:scale-90" title="Edit Bahan"><i class="fas fa-edit"></i></button>
+                            <button onclick="superApp.deleteCrud('Master_Produk', '${g.SKU}')" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90" title="Hapus Bahan"><i class="fas fa-trash"></i></button>
                         </div>
                     </td>
                 </tr>`;
 
-                // KARTU MOBILE (Hanya muncul di HP)
+                // --- KARTU MOBILE KHUSUS HP ---
                 let mobCard = `
-                <div class="md:hidden bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center">
-                    <div>
-                        <div class="font-black text-sm text-slate-800">${g.Nama_Produk}</div>
-                        <div class="text-[9px] text-slate-400 font-bold uppercase mt-1">SKU: ${g.SKU}</div>
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex justify-between items-center gap-3 group">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-extrabold text-sm text-slate-800 leading-snug truncate">${g.Nama_Produk}</div>
+                        <div class="inline-flex mt-1 px-1.5 py-0.5 rounded bg-slate-50 border border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">SKU: ${g.SKU}</div>
                     </div>
-                    <div class="text-right">
-                        <div class="text-[9px] font-black text-slate-400 uppercase">Sisa</div>
-                        <div class="font-black text-lg ${isKritis ? 'text-rose-600' : 'text-emerald-600'}">${stok}</div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <div class="text-right">
+                            <span class="text-[8px] text-slate-400 font-black uppercase tracking-wider block">Sisa Pusat</span>
+                            <span class="font-black text-lg leading-none ${isKritis ? 'text-rose-600 animate-pulse' : 'text-emerald-600'}">${stok}</span>
+                        </div>
+                        <div class="flex items-center border-l border-slate-100 pl-2.5">
+                            <button onclick="superApp.openCrudBahan('edit', '${g.SKU}')" class="w-8 h-8 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold flex items-center justify-center active:scale-90"><i class="fas fa-edit text-xs"></i></button>
+                        </div>
                     </div>
                 </div>`;
 
-                if(kat === 'bahan') { htmlUtama += row; mobUtama += mobCard; } 
-                else { htmlPendukung += row; mobPend += mobCard; }
+                if(kat === 'bahan' || kat.includes('bahan') || (!kat.includes('pendukung') && !kat.includes('kemasan'))) { 
+                    htmlUtama += row; mobUtama += mobCard; countUtama++;
+                } else { 
+                    htmlPendukung += row; mobPend += mobCard; countPend++;
+                }
             }
         });
         
-        // Update DOM
-        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Kosong</td></tr>`;
-        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Kosong</td></tr>`;
-        if(gMobUtama) gMobUtama.innerHTML = mobUtama || '<div class="p-4 text-center text-slate-400 text-xs">Kosong</div>';
-        if(gMobPend) gMobPend.innerHTML = mobPend || '<div class="p-4 text-center text-slate-400 text-xs">Kosong</div>';
+        // Update DOM Stok Pusat (Desktop & Mobile)
+        if(gBodyUtama) gBodyUtama.innerHTML = htmlUtama || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Belum ada bahan utama</td></tr>`;
+        if(gBodyPendukung) gBodyPendukung.innerHTML = htmlPendukung || `<tr><td colspan="3" class="text-center py-10 text-slate-400 font-bold text-xs">Belum ada barang pendukung</td></tr>`;
+        if(gMobUtama) gMobUtama.innerHTML = mobUtama || '<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada bahan utama</div>';
+        if(gMobPend) gMobPend.innerHTML = mobPend || '<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada barang pendukung</div>';
        
+        // 🚀 Update Lencana Angka (Badge) di Tombol Sub-Tab
+        const badgeUtama = document.getElementById('count-gstok-utama');
+        const badgePendukung = document.getElementById('count-gstok-pendukung');
+        if(badgeUtama) badgeUtama.innerText = countUtama;
+        if(badgePendukung) badgePendukung.innerText = countPend;
+
         // 2. RENDER MASTER PRODUK (MENU POS)
         const masterBody = document.getElementById('master-tbody');
         if(masterBody) {
@@ -5875,69 +6394,126 @@ selectOutlet: function(id) {
     superApp.closeModal('modal-outlet-selector');
 },
 
-    renderGlobalStockMatrix: function() {
+   renderGlobalStockMatrix: function() {
         if (!this.db || !this.db.masterProduk || !this.db.outlets) return;
 
         let outlets = this.db.outlets || [];
         
-        // 1. BUAT HEADER TABEL SECARA DINAMIS
+        // 1. BUAT HEADER TABEL DESKTOP SECARA DINAMIS
         let thHtml = `<tr>
-            <th class="py-4 px-4 sticky left-0 bg-white z-20 shadow-[2px_0_10px_rgba(0,0,0,0.05)] font-black uppercase tracking-widest text-[10px] text-slate-400">Nama Bahan Baku</th>
-            <th class="py-4 px-4 text-center font-black uppercase tracking-widest text-[10px] bg-blue-50/50 text-blue-600 border-l border-r border-blue-100/50">Gudang Pusat</th>`;
+            <th class="py-3.5 px-4 sticky left-0 bg-slate-50/95 backdrop-blur-md z-20 border-b border-r border-slate-200/80 font-black uppercase tracking-widest text-[10px] text-slate-500 min-w-[200px]">Nama Bahan Baku</th>
+            <th class="py-3.5 px-4 text-center font-black uppercase tracking-widest text-[10px] bg-blue-50/90 text-blue-600 border-b border-l border-r border-blue-100 min-w-[130px]">Gudang Pusat</th>`;
         
-        // Looping nama outlet ke samping
         outlets.forEach(o => {
-            thHtml += `<th class="py-4 px-4 text-center font-black uppercase tracking-widest text-[10px]">${o.Nama_Outlet}</th>`;
+            thHtml += `<th class="py-3.5 px-4 text-center font-black uppercase tracking-widest text-[10px] border-b border-slate-100 min-w-[120px] text-slate-600">${o.Nama_Outlet}</th>`;
         });
         thHtml += `</tr>`;
         
         const thead = document.getElementById('heatmap-thead');
-        if (thead) {
-            // Karena ini efek sticky ke kiri, kita atur z-index manual pada kolom pertama
-            thead.innerHTML = thHtml;
-        }
+        if (thead) thead.innerHTML = thHtml;
 
-        // 2. BUAT BARIS DATA (PRODUK & STOK)
-        let trHtml = '';
-        
-        // Tambahkan || [] agar tidak terjadi crash 'not iterable' jika data lambat dimuat
+        // 2. LOGIKA FILTER BAHAN (Menangkap semua bahan baku & barang pendukung)
         let sortedBahan = [...(this.db.masterProduk || [])]
-            .filter(m => String(m.Kategori).toLowerCase() === 'bahan' || String(m.Kategori).toLowerCase() === 'pendukung')
+            .filter(m => {
+                let kat = String(m.Kategori || '').toLowerCase();
+                return kat === 'bahan' || kat === 'pendukung' || kat.includes('bahan') || kat.includes('pendukung') || (!kat.includes('menu') && !m.Harga_Jual);
+            })
             .sort((a,b) => String(a.Nama_Produk).localeCompare(String(b.Nama_Produk)));
 
+        let trHtml = '';
+        let mobCardsHtml = '';
+
         sortedBahan.forEach(m => {
+            let katName = String(m.Kategori || 'Bahan').toUpperCase();
+            
+            // --- A. STOK GUDANG PUSAT ---
+            let stokPusat = (this.db.stokGudang || []).find(x => x.SKU === m.SKU)?.Stok_Pusat || 0;
+            let isPusatKritis = Number(stokPusat) <= 5;
+            let badgePusatDesk = isPusatKritis ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse font-black' : 'bg-blue-50 text-blue-600 border-blue-200 font-extrabold';
+
+            // --- B. BARIS TABEL DESKTOP ---
             let rowHtml = `
-                <td class="py-3 px-4 font-bold text-slate-800 text-sm sticky left-0 bg-white z-10 shadow-[2px_0_10px_rgba(0,0,0,0.03)] border-r border-slate-50">
-                    ${m.Nama_Produk} <br>
-                    <span class="text-[9px] font-black uppercase text-slate-400 tracking-widest">${m.Kategori}</span>
+                <td class="py-3 px-4 sticky left-0 bg-white/95 backdrop-blur-md z-10 border-r border-slate-100 group-hover:bg-slate-50 transition-colors">
+                    <div class="font-extrabold text-slate-800 text-sm leading-snug">${m.Nama_Produk}</div>
+                    <span class="inline-block mt-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 tracking-widest">SKU: ${m.SKU}</span>
+                </td>
+                <td class="py-3 px-4 text-center bg-blue-50/20 border-r border-blue-50">
+                    <span class="inline-flex w-16 h-8 items-center justify-center rounded-xl border text-sm shadow-2xs ${badgePusatDesk}">${stokPusat}</span>
                 </td>`;
 
-            // Data Stok Gudang Pusat
-            let stokPusat = (this.db.stokGudang || []).find(x => x.SKU === m.SKU)?.Stok_Pusat || 0;
-            rowHtml += `<td class="py-3 px-4 text-center font-black text-blue-600 bg-blue-50/30 text-base border-l border-r border-blue-50">${stokPusat}</td>`;
+            // --- C. LOOPING STOK CABANG ---
+            let mobOutletsList = '';
 
-            // Data Stok Tiap Outlet
             outlets.forEach(o => {
                 let stokToko = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === o.ID_Outlet)?.Stok_Toko || 0;
+                let isKritis = Number(stokToko) <= 5;
                 
-                // Indikator Warna Heatmap
                 let badgeClass = '';
-                if (stokToko <= 5) badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.2)]';
-                else if (stokToko <= 15) badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
-                else badgeClass = 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                if (isKritis) badgeClass = 'bg-rose-50 text-rose-600 border-rose-200 font-black shadow-[0_0_10px_rgba(225,29,72,0.15)] animate-pulse';
+                else if (stokToko <= 15) badgeClass = 'bg-amber-50 text-amber-700 border-amber-200 font-extrabold';
+                else badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
 
-                rowHtml += `<td class="py-3 px-4 text-center">
-                    <span class="inline-flex w-12 h-8 items-center justify-center rounded-lg border font-black text-sm ${badgeClass} transition-transform hover:scale-110 cursor-default">
-                        ${stokToko}
+                // Tambah sel ke Tabel PC
+                rowHtml += `
+                <td class="py-3 px-4 text-center">
+                    <span class="inline-flex min-w-[3.5rem] h-8 px-2 items-center justify-center rounded-xl border text-xs ${badgeClass} transition-transform hover:scale-110 cursor-default shadow-2xs">
+                        ${stokToko} Pcs
                     </span>
                 </td>`;
+
+                // 🚀 DESAIN BARIS CABANG UNTUK HP (Penuh 1 baris agar sangat lega)
+                mobOutletsList += `
+                <div class="flex items-center justify-between p-2.5 rounded-xl border ${isKritis ? 'bg-rose-50/70 border-rose-200' : 'bg-slate-50 border-slate-100'}">
+                    <div class="flex items-center gap-2 min-w-0 pr-2">
+                        <i class="fas fa-store text-xs ${isKritis ? 'text-rose-500' : 'text-slate-400'} shrink-0"></i>
+                        <span class="text-xs font-extrabold text-slate-700 truncate">${o.Nama_Outlet}</span>
+                    </div>
+                    <span class="inline-flex min-w-[3rem] h-7 px-2 items-center justify-center rounded-lg border text-xs shrink-0 ${badgeClass}">
+                        ${stokToko} Pcs
+                    </span>
+                </div>`;
             });
 
-            trHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">${rowHtml}</tr>`;
+            trHtml += `<tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group">${rowHtml}</tr>`;
+
+            // --- D. RENDER KARTU MOBILE KHUSUS HP ---
+            mobCardsHtml += `
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs flex flex-col gap-3">
+                
+                <!-- Bagian Atas Kartu: Nama Produk & Stok Pusat -->
+                <div class="flex justify-between items-start gap-3 pb-3 border-b border-slate-100">
+                    <div class="min-w-0 flex-1">
+                        <h4 class="font-extrabold text-sm md:text-base text-slate-800 leading-snug">${m.Nama_Produk}</h4>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span class="text-[9px] font-black uppercase text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 tracking-wider">SKU: ${m.SKU}</span>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0 bg-blue-50/50 p-2 rounded-xl border border-blue-100/80">
+                        <span class="text-[8px] font-black text-blue-600 uppercase tracking-widest block">Gudang Pusat</span>
+                        <span class="font-black text-base text-blue-700 mt-0.5 block">${stokPusat} <span class="text-[10px] font-normal text-blue-500">Pcs</span></span>
+                    </div>
+                </div>
+                
+                <!-- Bagian Bawah Kartu: Daftar Cabang (Lega & Rapi) -->
+                <div>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sebaran Stok Cabang:</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        ${mobOutletsList}
+                    </div>
+                </div>
+                
+            </div>`;
         });
 
+        // 3. SUNTIKKAN KE TABEL DESKTOP
         const tbody = document.getElementById('heatmap-tbody');
-        if (tbody) tbody.innerHTML = trHtml || `<tr><td colspan="${outlets.length + 2}" class="text-center py-8 text-slate-400">Belum ada data bahan baku</td></tr>`;
+        if (tbody) tbody.innerHTML = trHtml || `<tr><td colspan="${outlets.length + 2}" class="text-center py-12 text-slate-400 font-bold text-xs">Belum ada data bahan baku</td></tr>`;
+
+        // 4. SUNTIKKAN KE KARTU MOBILE
+        const mobContainer = document.getElementById('heatmap-mobile-container');
+        if (mobContainer) {
+            mobContainer.innerHTML = mobCardsHtml || '<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada data bahan baku</div>';
+        }
     },
 
     // 🚀 AUTO-SYNC BACKGROUND PROCESS (Setiap 3 Menit)
@@ -6317,3 +6893,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
