@@ -13,6 +13,22 @@
         --brand-600: #ea580c;
       }
 
+    
+#calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    min-height: 200px; /* Tambahkan ini agar tidak gepeng */
+    gap: 8px;
+}
+    
+.calendar-day {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
 #view-ai-content table {
     width: 100%;
     border-collapse: collapse;
@@ -281,6 +297,11 @@
         <button onclick="superApp.switchMenu('report')" id="nav-report" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-2xl text-slate-500 hover:bg-slate-50 transition-all duration-300 group shrink-0">
             <div class="w-7 flex justify-center"><i class="fas fa-chart-pie group-hover:scale-110 transition-transform duration-300 text-lg"></i></div>
             <span class="font-extrabold text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Riwayat & Rekap</span>
+        </button>
+
+        <button onclick="superApp.switchMenu('laporan-harian')" id="nav-laporan-harian" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-2xl text-slate-500 hover:bg-slate-50 transition-all duration-300 group">
+                <div class="w-7 flex justify-center"><i class="fas fa-file-invoice-dollar group-hover:scale-110 transition-transform duration-300 text-lg"></i></div>
+                <span class="font-extrabold text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Laporan Ai-CHA</span>
         </button>
         
         <div id="admin-menus" class="hidden flex-col gap-1 shrink-0">
@@ -713,6 +734,374 @@
     </div>
 </div>
 
+
+<div id="view-laporan-harian" class="app-view hidden flex-col h-full pb-28 lg:pb-6 transition-all duration-300">
+    <div class="bg-[#f4f7f9] rounded-[2rem] lg:rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col h-full min-h-0 overflow-hidden relative">
+
+        <div id="lapharian-owner-outlet-bar" class="hidden bg-slate-900 px-4 py-2 md:px-8 shrink-0 flex items-center justify-between border-b border-slate-800 z-30">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-widest">Filter Cabang:</span>
+            </div>
+            <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
+                <button type="button" onclick="superApp.filterLaporanByOutlet('Semua')" id="btn-lap-outlet-Semua" class="btn-lap-outlet px-3 py-1 rounded-lg text-xs font-black bg-rose-500 text-white shadow-2xs transition active:scale-95 flex items-center gap-1 shrink-0">
+                    <i class="fas fa-layer-group text-[10px]"></i> Semua Cabang
+                </button>
+                <div id="lapharian-dynamic-outlets" class="flex items-center gap-1.5 shrink-0"></div>
+            </div>
+        </div>
+      
+        <div class="bg-white py-3 lg:py-4 px-4 lg:px-8 rounded-b-[1.5rem] lg:rounded-b-[1.75rem] shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] relative z-20 shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 lg:w-11 lg:h-11 bg-gradient-to-br from-rose-500 via-red-500 to-amber-500 rounded-xl flex items-center justify-center text-white text-base lg:text-lg shadow-md shadow-rose-500/20 shrink-0">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div>
+                    <h2 class="font-black text-base lg:text-xl text-slate-800 tracking-tight leading-none">Laporan Harian Ai-CHA</h2>
+                    <p class="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">Sistem Pembukuan & Analisis Performa</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                <span id="daily-weather-badge" class="bg-amber-50 border border-amber-200/80 text-amber-700 font-black text-[11px] px-3 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 shrink-0">
+                    <i class="fas fa-cloud-sun text-amber-500"></i> 31°C
+                </span>
+            </div>
+
+            <div class="flex sm:hidden w-full pt-2 border-t border-slate-100 gap-2">
+                <button type="button" id="subtab-lapharian-input" onclick="superApp.switchLapHarianSubTab('input')" class="flex-1 py-2 px-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 active:scale-[0.98]">
+                    <i class="fas fa-pen"></i> Input
+                </button>
+                <button type="button" id="subtab-lapharian-riwayat" onclick="superApp.switchLapHarianSubTab('riwayat')" class="flex-1 py-2 px-3 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98]">
+                    <i class="fas fa-chart-column"></i> Riwayat & Analisis
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scroll p-3 lg:p-6 pt-3 lg:pt-5 relative z-10 w-full flex flex-col min-h-0">
+            
+            <div id="lapharian-executive-dashboard" class="hidden mb-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-5 lg:p-6 rounded-[1.75rem] lg:rounded-[2rem] text-white shadow-xl relative overflow-hidden border border-slate-700/60 w-full shrink-0">
+                <div class="absolute -right-16 -top-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute right-1/3 -bottom-16 w-48 h-48 bg-rose-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center pb-4 mb-4 border-b border-slate-700/80 gap-3 relative z-10">
+                    <div>
+                        <span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-[9px] lg:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 w-max">
+                            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span> Analisis Konsolidasi Eksekutif
+                        </span>
+                        <h3 class="font-black text-lg lg:text-2xl mt-1.5 text-white tracking-tight" id="exec-dash-title">Performa Seluruh Outlet</h3>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2 bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700 w-full xl:w-auto">
+                        <div class="flex items-center gap-1 text-xs font-bold text-slate-300 px-2">
+                            <i class="fas fa-calendar-day text-rose-400"></i>
+                            <span class="hidden sm:inline">Periode:</span>
+                        </div>
+                        <input type="date" id="exec-filter-start" onchange="superApp.renderExecutiveDashboard()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold outline-none focus:border-rose-500 flex-1 sm:flex-initial cursor-pointer">
+                        <span class="text-slate-400 text-xs font-black">s/d</span>
+                        <input type="date" id="exec-filter-end" onchange="superApp.renderExecutiveDashboard()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold outline-none focus:border-rose-500 flex-1 sm:flex-initial cursor-pointer">
+                        <button type="button" onclick="superApp.resetExecDateRange()" class="bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white px-2.5 py-1 rounded-xl text-xs font-black transition active:scale-95 shrink-0">
+                            <i class="fas fa-rotate-left mr-1"></i>Bulan Ini
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/70 backdrop-blur-md p-4 rounded-2xl border border-slate-700/80 mb-4 relative z-10">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm"></span>
+                            <span class="text-xs font-black text-slate-200 uppercase tracking-wider">Akumulasi Omset Periode Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <div>Total Tercapai: <span class="font-black text-rose-400 text-sm md:text-base" id="accum-net-sales">Rp 0</span></div>
+                            <div class="border-l border-slate-700 pl-3">Target: <span class="font-black text-amber-400 text-sm md:text-base cursor-pointer underline decoration-dashed" onclick="superApp.setTargetBulanan()" id="accum-target" title="Klik untuk ubah target">Rp 180.000.000</span></div>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                        <div id="accum-progress-bar" class="bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-400 h-full rounded-full transition-all duration-700 w-0"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-extrabold text-slate-400 mt-1.5">
+                        <span id="accum-percent">Progress: 0%</span>
+                        <span id="accum-remaining">Kurang: Rp 0</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3.5 relative z-10 mb-5">
+                    <div class="bg-slate-800/50 backdrop-blur-md p-3 lg:p-3.5 rounded-2xl border border-slate-700/60">
+                        <span class="text-[9px] lg:text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Net Sales Bersih</span>
+                        <span class="font-black text-base lg:text-xl text-rose-400 mt-0.5 block truncate" id="exec-total-sales">Rp 0</span>
+                    </div>
+                    <div class="bg-slate-800/50 backdrop-blur-md p-3 lg:p-3.5 rounded-2xl border border-slate-700/60">
+                        <span class="text-[9px] lg:text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Total Cash Laci</span>
+                        <span class="font-black text-base lg:text-xl text-emerald-400 mt-0.5 block truncate" id="exec-total-cash">Rp 0</span>
+                    </div>
+                    <div class="bg-slate-800/50 backdrop-blur-md p-3 lg:p-3.5 rounded-2xl border border-slate-700/60">
+                        <span class="text-[9px] lg:text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Total Masuk QRIS</span>
+                        <span class="font-black text-base lg:text-xl text-blue-400 mt-0.5 block truncate" id="exec-total-qris">Rp 0</span>
+                    </div>
+                    <div class="bg-slate-800/50 backdrop-blur-md p-3 lg:p-3.5 rounded-2xl border border-slate-700/60">
+                        <span class="text-[9px] lg:text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Total Biaya Operasional</span>
+                        <span class="font-black text-base lg:text-xl text-amber-400 mt-0.5 block truncate" id="exec-total-expense">Rp 0</span>
+                    </div>
+                </div>
+
+                <div class="relative z-10 mb-4">
+                    <div class="flex justify-between items-center mb-2.5">
+                        <h4 class="font-black text-xs lg:text-sm text-slate-300 flex items-center gap-2">
+                            <i class="fas fa-store text-indigo-400"></i> Performa Per Outlet <span class="text-[10px] text-slate-400 font-normal">(Klik kartu untuk lihat analisis mendalam)</span>
+                        </h4>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="exec-outlet-cards-grid"></div>
+                </div>
+
+                <div class="bg-slate-900/60 rounded-2xl border border-slate-700/50 relative z-10 overflow-hidden transition-all">
+                    <button type="button" onclick="superApp.toggleExecExpenseBreakdown()" class="w-full p-3 text-left flex justify-between items-center hover:bg-slate-800/50 transition">
+                        <span class="font-black text-xs lg:text-sm text-amber-400 flex items-center gap-2">
+                            <i class="fas fa-receipt"></i> Breakdown Pengeluaran Gabungan Per Item
+                        </span>
+                        <span id="btn-toggle-exp-text" class="text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-xl flex items-center gap-1.5">
+                            <span>Lihat Rincian</span> <i class="fas fa-chevron-down transition-transform duration-300" id="icon-toggle-exp"></i>
+                        </span>
+                    </button>
+                    <div id="exec-expense-dropdown-box" class="hidden p-4 pt-1 border-t border-slate-800 space-y-2 max-h-56 overflow-y-auto custom-scroll">
+                        <div id="exec-expense-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 w-full items-stretch">
+                
+                <div id="lapharian-sec-input" class="w-full lg:w-[450px] xl:w-[500px] bg-white p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] shadow-sm border border-slate-100 flex flex-col shrink-0 relative">
+                    
+                    <div class="flex justify-between items-start pb-3 mb-3 border-b border-slate-100 shrink-0">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="form-title-mode" class="font-black text-sm lg:text-base text-slate-800 tracking-tight">Input Data Hari Ini</h3>
+                                <button type="button" id="btn-cancel-edit" onclick="superApp.resetDailyForm()" class="hidden text-[9px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-md font-black uppercase">
+                                    <i class="fas fa-xmark mr-1"></i>Batal Edit
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-2 mt-1 relative">
+                                <span id="daily-form-date" class="text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition cursor-pointer border border-slate-200/80 flex items-center gap-1.5" onclick="superApp.openInputDatepickerModal()">
+                                    <i class="fas fa-calendar-day text-rose-500"></i> <span>Senin, 06-07-2026</span> <i class="fas fa-chevron-down text-[9px] text-slate-400 ml-1"></i>
+                                </span>
+                                <input type="date" id="hidden-date-picker" class="hidden" onchange="superApp.applyBackdate(this.value)">
+                            </div>
+                        </div>
+
+                        <button type="button" onclick="superApp.resetDailyForm()" class="text-xs font-bold text-slate-400 hover:text-rose-500 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                            <i class="fas fa-rotate-left mr-1"></i> Reset
+                        </button>
+                    </div>
+
+                    <div class="space-y-3 flex-1">
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">1. Cash Diterima (Rp)</label>
+                                <input type="text" inputmode="numeric" id="daily-cash" oninput="superApp.formatRupiahInput(this); superApp.calcDailyReportLive();" class="w-full h-11 bg-slate-50 border-2 border-slate-200 focus:border-rose-500 rounded-xl px-3 font-black text-sm text-slate-800 outline-none transition shadow-inner" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">2. QRIS Diterima (Rp)</label>
+                                <input type="text" inputmode="numeric" id="daily-qris" oninput="superApp.formatRupiahInput(this); superApp.calcDailyReportLive();" class="w-full h-11 bg-slate-50 border-2 border-slate-200 focus:border-rose-500 rounded-xl px-3 font-black text-sm text-blue-600 outline-none transition shadow-inner" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">4. Jumlah Bill/Tamu</label>
+                                <input type="number" inputmode="numeric" id="daily-bill" oninput="superApp.calcDailyReportLive();" class="w-full h-11 bg-slate-50 border-2 border-slate-200 focus:border-rose-500 rounded-xl px-3 font-black text-sm text-slate-800 outline-none transition shadow-inner text-center" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">5. Produk Terjual (Pcs)</label>
+                                <input type="number" inputmode="numeric" id="daily-pcs" oninput="superApp.calcDailyReportLive();" class="w-full h-11 bg-slate-50 border-2 border-slate-200 focus:border-rose-500 rounded-xl px-3 font-black text-sm text-emerald-600 outline-none transition shadow-inner text-center" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-[9px] font-black text-rose-500 uppercase tracking-widest">3. Pengeluaran (Potong Cash)</label>
+                                <button type="button" onclick="superApp.addDailyExpenseRow()" class="text-[10px] font-black bg-rose-50 text-rose-600 px-2.5 py-1 rounded-lg transition active:scale-95 border border-rose-200/60"><i class="fas fa-plus mr-1"></i> Tambah</button>
+                            </div>
+                            <div id="daily-expenses-list" class="space-y-2 max-h-28 overflow-y-auto custom-scroll pr-1"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 bg-slate-900 text-white p-3.5 rounded-2xl space-y-1.5 shadow-md shrink-0 text-xs">
+                        <div class="flex justify-between font-bold text-slate-400"><span>Net Sales (Cash + QRIS)</span><span id="live-net-sales" class="text-white font-black text-sm">Rp 0</span></div>
+                        <div class="flex justify-between font-bold text-slate-400"><span>Amount Paid (Rata2 / Bill)</span><span id="live-amount-paid" class="text-amber-400 font-black">0</span></div>
+                        <div class="flex justify-between font-bold text-slate-400"><span>Amount Pcs (Rata2 / Pcs)</span><span id="live-amount-pcs" class="text-emerald-400 font-black">0</span></div>
+                        <div class="border-t border-slate-800 pt-1.5 flex justify-between font-bold text-rose-400"><span>Net Cash Bersih di Laci</span><span id="live-net-cash" class="font-black text-sm">Rp 0</span></div>
+                    </div>
+
+                    <button type="button" onclick="superApp.submitLaporanHarian()" class="mt-3 w-full py-3.5 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-black rounded-xl shadow-lg shadow-rose-500/25 transition active:scale-[0.98] text-xs flex items-center justify-center gap-2">
+                        <i class="fab fa-whatsapp text-base"></i> SIMPAN & LAPORKAN KE WA
+                    </button>
+                </div>
+
+                <div id="lapharian-sec-riwayat" class="hidden lg:flex flex-1 flex-col gap-4 min-w-0 w-full transition-all">
+                    
+                    <div class="bg-white rounded-[1.5rem] lg:rounded-[1.75rem] p-4 lg:p-5 shadow-sm border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
+                        <div>
+                            <span class="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Matriks Kedisiplinan Kasir</span>
+                            <div class="flex items-center gap-3 mt-1 text-xs font-bold text-slate-700">
+                                <span id="calendar-summary-month" class="font-black text-slate-900 text-sm">Juli 2026</span>
+                                <span>•</span>
+                                <span class="text-emerald-600 font-black" id="cal-stat-terisi">0 Terisi</span>
+                                <span>•</span>
+                                <span class="text-rose-500 font-black" id="cal-stat-kosong">0 Kosong</span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="superApp.openCalendarModal()" class="w-full sm:w-auto py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs transition active:scale-95 flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-calendar-days text-rose-500"></i> Buka Kalender Laporan
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[1.75rem] shadow-sm border border-slate-100 flex-1 flex flex-col min-h-[420px] relative overflow-hidden">
+                        
+                        <div class="flex justify-between items-center pb-3 border-b border-slate-100 shrink-0">
+                            <h4 class="font-black text-sm lg:text-base text-slate-800 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                Riwayat Laporan
+                            </h4>
+                            <span class="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1 rounded-xl text-xs font-black" id="laporan-harian-count">0 Laporan</span>
+                        </div>
+
+                        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 my-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+                            <div class="flex items-center gap-1.5 text-xs font-bold text-slate-600 px-1">
+                                <i class="fas fa-filter text-rose-500"></i>
+                                <span>Filter Tanggal:</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                                <input type="date" id="filter-lap-start" onchange="superApp.renderLaporanHarianHistory()" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-rose-500 w-full sm:w-auto">
+                                <span class="text-slate-400 font-black text-xs">s/d</span>
+                                <input type="date" id="filter-lap-end" onchange="superApp.renderLaporanHarianHistory()" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-rose-500 w-full sm:w-auto">
+                                <button type="button" onclick="document.getElementById('filter-lap-start').value=''; document.getElementById('filter-lap-end').value=''; superApp.renderLaporanHarianHistory();" class="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2.5 py-1 rounded-lg text-xs font-black transition active:scale-95 shrink-0" title="Reset Filter">
+                                    <i class="fas fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="hidden md:block flex-1 overflow-y-auto custom-scroll pr-1">
+                            <table class="w-full text-left whitespace-nowrap text-xs border-collapse">
+                                <thead class="bg-slate-50/95 backdrop-blur-md text-slate-400 border-b border-slate-100 font-black text-[10px] uppercase sticky top-0 z-10">
+                                    <tr>
+                                        <th class="py-3 px-3">Tanggal & Cuaca</th>
+                                        <th class="py-3 px-3 text-right">Net Sales</th>
+                                        <th class="py-3 px-3 text-right">Cash / QRIS</th>
+                                        <th class="py-3 px-3 text-center">Bill / Pcs</th>
+                                        <th class="py-3 px-3 text-center w-32">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="laporan-harian-tbody" class="divide-y divide-slate-50 font-bold text-slate-700"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="md:hidden flex-1 overflow-y-auto custom-scroll space-y-2.5 pt-1 pb-24 min-h-[40vh]" id="laporan-harian-mobile"></div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="modal-datepicker-input" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-fade-in">
+            <div class="bg-white rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden flex flex-col">
+                <div class="bg-gradient-to-r from-rose-500 to-red-600 p-4 text-white flex items-center justify-between shrink-0">
+                    <span class="font-black text-sm flex items-center gap-2"><i class="fas fa-calendar-alt"></i> Pilih Tanggal Form Input</span>
+                    <button type="button" onclick="superApp.closeInputDatepickerModal()" class="w-7 h-7 rounded-full bg-black/10 text-white flex items-center justify-center text-xs"><i class="fas fa-xmark"></i></button>
+                </div>
+                <div class="p-4 bg-slate-50 flex justify-between items-center border-b border-slate-100">
+                    <button type="button" onclick="superApp.navInputDatepicker(-1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-black shadow-2xs"><i class="fas fa-chevron-left text-xs"></i></button>
+                    <span id="input-datepicker-month-year" class="font-black text-sm text-slate-800">Juli 2026</span>
+                    <button type="button" onclick="superApp.navInputDatepicker(1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 font-black shadow-2xs"><i class="fas fa-chevron-right text-xs"></i></button>
+                </div>
+                <div class="p-4 overflow-y-auto custom-scroll flex-1">
+                    <div id="input-datepicker-grid" class="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-slate-600"></div>
+                </div>
+                <div class="p-3 bg-slate-50 border-t border-slate-100 flex justify-between gap-2">
+                    <button type="button" onclick="superApp.applyBackdate(new Date().toISOString().split('T')[0]); superApp.closeInputDatepickerModal();" class="flex-1 py-2 bg-rose-50 text-rose-600 font-black rounded-xl text-xs border border-rose-200">Hari Ini</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-kalender-laporan" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-fade-in">
+            <div class="bg-white rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden flex flex-col">
+                <div class="bg-slate-900 p-5 text-white flex items-center justify-between shrink-0">
+                    <div>
+                        <span class="text-[10px] font-extrabold text-rose-400 uppercase tracking-widest block">Matriks Kedisiplinan Input</span>
+                        <h3 class="font-black text-lg md:text-xl text-white mt-0.5" id="modal-cal-month-title">Juli 2026</h3>
+                    </div>
+                    <button type="button" onclick="superApp.closeCalendarModal()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition active:scale-90"><i class="fas fa-xmark"></i></button>
+                </div>
+
+                <div class="p-3 bg-slate-100 flex justify-between items-center border-b border-slate-200/80 px-5">
+                    <button type="button" onclick="superApp.navCalendarModal(-1)" class="px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 text-slate-700 font-black text-xs shadow-2xs hover:bg-slate-50 transition flex items-center gap-1">
+                        <i class="fas fa-chevron-left text-[10px]"></i> Bulan Lalu
+                    </button>
+                    <button type="button" onclick="superApp.navCalendarModal(0)" class="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-600 font-black text-[11px]">
+                        Bulan Ini
+                    </button>
+                    <button type="button" onclick="superApp.navCalendarModal(1)" class="px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 text-slate-700 font-black text-xs shadow-2xs hover:bg-slate-50 transition flex items-center gap-1">
+                        Bulan Depan <i class="fas fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+
+                <div class="p-5 overflow-y-auto custom-scroll flex-1">
+                    <div class="flex justify-between items-center mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span class="text-xs font-black text-slate-700 flex items-center gap-1.5"><i class="fas fa-hand-pointer text-amber-500"></i> Klik bulatan tanggal untuk edit:</span>
+                        <div class="flex gap-3 text-[10px] font-extrabold">
+                            <span class="flex items-center gap-1 text-emerald-600"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Terisi</span>
+                            <span class="flex items-center gap-1 text-slate-400"><span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span>Kosong</span>
+                        </div>
+                    </div>
+                    <div id="modal-calendar-grid" class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-600"></div>
+                </div>
+                <div class="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                    <button type="button" onclick="superApp.closeCalendarModal()" class="w-full py-3 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-black rounded-xl text-xs transition active:scale-95">Tutup Kalender</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-detail-outlet-eksekutif" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 backdrop-blur-md p-4 animate-fade-in">
+            <div class="bg-slate-900 text-white rounded-[2rem] shadow-2xl border border-slate-700 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="bg-gradient-to-r from-rose-500 via-red-600 to-amber-600 p-5 text-white flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-xl shadow-inner font-black"><i class="fas fa-store"></i></div>
+                        <div><span class="text-[10px] font-extrabold text-rose-100 uppercase tracking-widest block">Deep-Dive Analisis Cabang</span><h3 class="font-black text-lg md:text-2xl tracking-tight" id="modal-detail-outlet-name">Ai-CHA Penajam</h3></div>
+                    </div>
+                    <button type="button" onclick="superApp.closeDetailOutletModal()" class="w-9 h-9 rounded-full bg-black/20 hover:bg-black/30 text-white flex items-center justify-center transition active:scale-90"><i class="fas fa-xmark"></i></button>
+                </div>
+                <div class="p-5 overflow-y-auto custom-scroll flex-1 space-y-4" id="modal-detail-outlet-content"></div>
+                <div class="p-4 bg-slate-800/80 border-t border-slate-700 flex justify-end shrink-0">
+                    <button type="button" onclick="superApp.closeDetailOutletModal()" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-xs transition active:scale-95 shadow-md">Tutup Analisis</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-wa-laporan-harian" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 animate-fade-in">
+            <div class="bg-white rounded-[2rem] shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shadow-inner"><i class="fab fa-whatsapp"></i></div>
+                        <div><h3 class="font-black text-base md:text-lg leading-tight">Forward ke WhatsApp</h3><p class="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Kirim ke Owner & Grup Cabang</p></div>
+                    </div>
+                    <button type="button" onclick="superApp.closeWaLaporanModal()" class="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 text-white flex items-center justify-center transition active:scale-90"><i class="fas fa-xmark text-sm"></i></button>
+                </div>
+                <div class="p-5 overflow-y-auto custom-scroll flex-1 space-y-3">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Preview Teks Laporan:</label>
+                    <textarea id="wa-laporan-preview-text" readonly class="w-full h-60 bg-slate-50 border-2 border-slate-200 rounded-2xl p-3.5 text-xs font-mono text-slate-700 outline-none resize-none custom-scroll leading-relaxed select-all"></textarea>
+                </div>
+                <div class="p-4 bg-slate-50 border-t border-slate-100 flex gap-2.5 shrink-0">
+                    <button type="button" onclick="superApp.copyWaLaporanText()" id="btn-copy-wa-lap" class="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-black rounded-xl text-xs transition active:scale-95 flex items-center justify-center gap-1.5"><i class="fas fa-copy text-slate-400"></i> Salin Teks</button>
+                    <button type="button" onclick="superApp.sendWaLaporanNow()" class="flex-[1.5] py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-xs shadow-lg shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-base"></i> Kirim Sekarang</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
       
    <!-- ========================================================= -->
 <!-- VIEW: LAPORAN & REKAP (ULTRA-MODERN AI-STYLE REDESIGN)    -->
@@ -2226,7 +2615,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=300"></script>
+  <script src="app.js?v=515"></script>
   
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
