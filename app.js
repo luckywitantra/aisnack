@@ -345,7 +345,6 @@ const superApp = {
         }
     },
     
-    
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
         const container = document.getElementById('toast-container'); if (!container) return;
@@ -900,8 +899,7 @@ const superApp = {
             }
         }
     },
-    
-    // STARTUP & LOGIN
+  
     // STARTUP & LOGIN
     init: async function() {
         // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
@@ -1057,124 +1055,182 @@ const superApp = {
     },
     processLogin: function() {
         if (this.isProcessing) return; this.isProcessing = true;
-        if (!this.db || !this.db.users) { this.showToast('Koneksi ke Database belum siap.', 'error'); this.clearPin(); this.isProcessing = false; return; }
+        if (!this.db || !this.db.users) { 
+            this.showToast('Koneksi ke Database belum siap.', 'error'); 
+            this.clearPin(); this.isProcessing = false; return; 
+        }
 
+        // 🚀 Cek PIN Kasir
         let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
+        
         if (user) {
-            this.currentUser = user; this.outlet = user.Outlet === 'Pusat' ? ((this.db.outlets || [])[0]?.ID_Outlet || 'Penajam') : user.Outlet;
+            this.currentUser = user; 
+            
             const sbRole = document.getElementById('sb-role'); if (sbRole) sbRole.innerText = user.Role;
             const hInit = document.getElementById('header-initial'); if (hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
 
-            // Deteksi Role Admin / Owner
             let roleStr = String(user.Role).toLowerCase();
             let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
-            
-            // =====================================================================
-            // 🚀 PERBAIKAN: SIMPAN IDENTITAS OWNER KE DALAM MEMORI SISTEM
-            // Jika kata 'owner' ada di database, jadikan dia owner. Jika tidak, jadikan kasir/admin.
-            // =====================================================================
             this.userRole = roleStr.includes('owner') ? 'owner' : (roleStr.includes('admin') ? 'admin' : 'kasir');
             
+            // =====================================================================
+            // 🚀 NORMALISASI MUTLAK: BERSIHKAN TEKS CABANG DARI AWALAN "AI-SNACK"
+            // =====================================================================
+            let cleanUserOutlet = String(user.Outlet || 'Penajam').replace(/^Ai\-Snack\s+/i, '').trim();
+
+            if (!isAdmin) {
+                // 🔒 KUNCI MUTLAK KASIR: Paksa sistem hanya menggunakan cabang penugasan kasir
+                this.outlet = cleanUserOutlet;
+            } else {
+                // 👑 OWNER / ADMIN: Gunakan cabang terakhir atau default
+                if (cleanUserOutlet === 'Pusat' || cleanUserOutlet === 'Semua') {
+                    let savedOutlet = localStorage.getItem('aisnack_active_outlet');
+                    this.outlet = savedOutlet || ((this.db.outlets || [])[0]?.ID_Outlet || 'Penajam');
+                } else {
+                    this.outlet = cleanUserOutlet;
+                }
+            }
+
+            // Normalisasi sekali lagi agar tidak ada spasi sisa
+            this.outlet = String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+
+            // Kunci ke memori browser
+            localStorage.setItem('aisnack_active_outlet', this.outlet);
+            localStorage.setItem('aicha_active_outlet', this.outlet);
+
+            // Kontrol Tampilan Menu UI
             const adminMenus = document.getElementById('admin-menus'); 
             const selOut = document.getElementById('select-outlet'); 
             const repOut = document.getElementById('report-outlet-filter');
-
-            // List ID kartu pengaturan premium
-            const premiumCards = [
-                'setting-card-standby', 
-                'setting-card-transaksi', 
-                'setting-card-logo', 
-                'setting-card-struk'
-            ];
+            const premiumCards = ['setting-card-standby', 'setting-card-transaksi', 'setting-card-logo', 'setting-card-struk'];
 
             if (isAdmin) {
-                // AKSES ADMIN/OWNER
                 if (adminMenus) adminMenus.classList.remove('hidden'); 
                 if (selOut) selOut.classList.remove('hidden'); 
                 if (repOut) repOut.classList.remove('hidden');
                 
                 let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
                 (this.db.outlets || []).forEach(o => { 
-                    outOptions += `<option value="${o.ID_Outlet}">📍 ${o.Nama_Outlet}</option>`; 
-                    outFilters += `<option value="${o.ID_Outlet}">Hanya: ${o.Nama_Outlet}</option>`; 
+                    let idClean = String(o.ID_Outlet || o.Nama_Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+                    outOptions += `<option value="${idClean}">📍 Ai-CHA ${idClean}</option>`; 
+                    outFilters += `<option value="${idClean}">Hanya: Ai-CHA ${idClean}</option>`; 
                 });
                 if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
                 if (repOut) repOut.innerHTML = outFilters;
                 
-                // BUKA KUNCI SEMUA MENU PREMIUM
-                premiumCards.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.classList.remove('hidden');
-                });
-
+                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
             } else {
-                // AKSES KASIR BIASA
                 if (adminMenus) adminMenus.classList.add('hidden');
-                if (selOut) { selOut.classList.add('hidden'); selOut.innerHTML = `<option value="${this.outlet}">📍 ${this.outlet}</option>`; selOut.disabled = true; }
+                if (selOut) { 
+                    selOut.classList.add('hidden'); 
+                    selOut.innerHTML = `<option value="${this.outlet}">📍 Ai-CHA ${this.outlet}</option>`; 
+                    selOut.value = this.outlet; selOut.disabled = true; 
+                }
                 if (repOut) repOut.classList.add('hidden');
-                
-                // KUNCI SEMUA MENU PREMIUM
-                premiumCards.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.classList.add('hidden');
-                });
+                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
             }
 
             const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
             const sbar = document.getElementById('sidebar'); if (sbar) sbar.classList.remove('hidden');
             const mainApp = document.getElementById('main-app'); if (mainApp) mainApp.classList.remove('hidden');
 
-            this.updateNetworkUI(); this.syncOfflineQueue(); this.refreshData(); this.checkShiftStatus(); this.showToast(`Selamat datang, ${user.Username}!`);
+            // 🚀 PERBAIKAN KRITIS: Panggil refreshData() langsung agar Produk & Header 100% tersinkronisasi!
+            this.refreshData(); 
+            this.updateNetworkUI(); 
+            this.syncOfflineQueue(); 
+            this.checkShiftStatus(); 
             
-            localStorage.setItem('aisnack_active_outlet', this.outlet);
+            this.showToast(`Selamat datang, ${user.Username}! (Cabang: ${this.outlet})`);
+            
             this.updateCFDGreeting(); 
             if (!this.cfdTimer) {
                 this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
             }
-
             this.autoConnectPrinter();
 
         } else { 
             this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
         }
+
+        // 🚀 RADAR OTOMATIS TUTUP SHIFT JAM 12 MALAM (00:00)
+            if (!this.midnightTimer) {
+                this.midnightTimer = setInterval(() => {
+                    let now = new Date();
+                    // Jika tepat jam 00:00 malam (antara 00:00 s/d 00:01)
+                    if (now.getHours() === 0 && now.getMinutes() === 0) {
+                        if (this.activeShiftId) {
+                            console.log("⏰ Jam 12 Malam tiba! Memicu Auto-Close Shift...");
+                            this.checkShiftStatus();
+                        }
+                    }
+                }, 45000); // Cek setiap 45 detik
+            }
         this.isProcessing = false;
     },
+
+    updateHeaderOutletName: function() {
+        const outletNameEl = document.getElementById('header-outlet-name');
+        if (outletNameEl) {
+            // Bersihkan variabel outlet aktif dari awalan
+            let cleanCurrent = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let outletData = (this.db.outlets || []).find(o => {
+                let idClean = String(o.ID_Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+                let nmClean = String(o.Nama_Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+                return idClean === cleanCurrent || nmClean === cleanCurrent;
+            });
+            
+            // Selalu cetak dengan format standar yang rapi
+            outletNameEl.innerText = outletData ? `Ai-CHA ${cleanCurrent}` : `Ai-CHA ${cleanCurrent}`;
+        }
+    },
     
+  
+    // =========================================================
+    // 🚀 LOGOUT AMAN & KEMBALI KE LAYAR PIN
+    // =========================================================
     logout: function() {
-        // Minta konfirmasi agar tidak tidak sengaja terpencet
-        if (!confirm("Yakin ingin keluar dari akun ini? Anda harus memasukkan PIN lagi untuk masuk.")) return;
+        // 1. Bersihkan seluruh memori sesi aktif di objek aplikasi
+        this.currentUser = null;
+        this.userRole = null;
+        this.outlet = null;
+        this.cart = [];
+        this.dailyExpensesList = [];
+
+        // 2. Hapus jejak sesi dari LocalStorage browser
+        localStorage.removeItem('aicha_current_user');
+        localStorage.removeItem('aisnack_current_user');
+        localStorage.removeItem('aicha_active_outlet');
+        localStorage.removeItem('aisnack_active_outlet');
+
+        // 🚀 3. BALIKKAN TAMPILAN LAYAR PERSIS SEPERTI SEBELUM LOGIN
+        const sbar = document.getElementById('sidebar'); 
+        if (sbar) sbar.classList.add('hidden');
         
-        this.setLoading(true, "Keluar dari sistem...");
+        const mainApp = document.getElementById('main-app'); 
+        if (mainApp) mainApp.classList.add('hidden');
 
-        setTimeout(() => {
-            // 1. Bersihkan Data Sesi Kasir Saat Ini
-            this.currentUser = null;
-            this.activeShiftId = null; 
-            this.activeStaffTeam = [];
-            this.clearPin(); // Kosongkan bulatan PIN di layar awal
+        // Sembunyikan juga semua sub-view yang mungkin sedang terbuka
+        document.querySelectorAll('.app-view').forEach(v => v.classList.add('hidden'));
 
-            // 2. Transisi UI Balik ke Layar Login
-            const ls = document.getElementById('login-screen');
-            const sbar = document.getElementById('sidebar');
-            const mainApp = document.getElementById('main-app');
+        // Munculkan kembali layar PIN utama
+        const loginScreen = document.getElementById('login-screen'); 
+        if (loginScreen) {
+            loginScreen.classList.remove('hidden');
+        } else {
+            // Fallback keamanan jika ID di HTML Anda bernama view-login
+            const viewLogin = document.getElementById('view-login');
+            if (viewLogin) viewLogin.classList.remove('hidden');
+        }
 
-            if (ls) ls.classList.remove('hidden');
-            if (sbar) sbar.classList.add('hidden');
-            if (mainApp) mainApp.classList.add('hidden');
+        // 4. Bersihkan sisa ketikan bulatan PIN sebelumnya
+        if (typeof this.clearPin === 'function') {
+            this.clearPin();
+        } else {
+            this.pinBuffer = '';
+            document.querySelectorAll('.pin-dot').forEach(dot => dot.classList.remove('active'));
+        }
 
-            // 3. Pastikan Menu Sidebar Mobile tertutup rapat
-            const mobileOverlay = document.getElementById('mobile-overlay');
-            if (mobileOverlay) mobileOverlay.classList.add('hidden');
-            if (sbar && !sbar.classList.contains('-translate-x-full')) {
-                sbar.classList.add('-translate-x-full');
-            }
-
-            // 4. Kembali ke halaman utama (POS) agar saat login lagi layarnya rapi
-            this.switchMenu('pos');
-
-            this.setLoading(false);
-            this.showToast("Berhasil keluar dengan aman.", "success");
-        }, 500); // Beri sedikit delay agar terlihat proses loading
+        this.showToast("Berhasil keluar. Silakan masukkan PIN kembali.", "info");
     },
 
    // ==========================================
@@ -1554,6 +1610,1788 @@ const superApp = {
     },
 
 
+// =========================================================
+    // 🚀 MODUL LAPORAN HARIAN USAHA AI-CHA (NEW ENGINE)
+    // =========================================================
+    dailyExpensesList: [], // Memori daftar pengeluaran hari ini
+    targetBulanan: 180000000, // Default target Rp 180 Juta
+
+    // 1. Inisialisasi & Ambil Perkiraan Cuaca Otomatis
+    initLaporanHarian: function() {
+        if (!this.db) return;
+
+        // 🚀 0. RENDER BAR PEMILIH CABANG KHUSUS OWNER/SPV (SINKRON RIWAYAT)
+        if (typeof this.renderLaporanOutletButtons === 'function') {
+            this.renderLaporanOutletButtons();
+        }
+
+        // A. Pastikan Saat Dibuka di HP Selalu Masuk ke Tab "Input Jualan"
+        if (typeof this.switchLapHarianSubTab === 'function') {
+            this.switchLapHarianSubTab('input');
+        }
+
+        // B. Muat Target Bulanan Khusus Cabang Ini (Fallback ke Rp 180 Juta)
+        let savedTarget = localStorage.getItem('aicha_target_bulanan_' + (this.outlet || 'Penajam'));
+        if (savedTarget && !isNaN(savedTarget)) {
+            this.targetBulanan = Number(savedTarget);
+        } else {
+            this.targetBulanan = 180000000;
+        }
+
+        // C. Set Tanggal Form Hari Ini (Format Indonesia)
+        let d = new Date();
+        let days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        let pad = n => n < 10 ? '0' + n : n;
+        let tglStr = `${days[d.getDay()]}, ${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+        const dateEl = document.getElementById('daily-form-date');
+        if (dateEl) dateEl.innerText = tglStr;
+
+        // D. Set Cuaca Instan (Simulasi Pintar Sebagai Nilai Awal)
+        let jam = d.getHours();
+        let cuacaSimulasi = "31°C Cerah Berawan";
+        if (jam < 10) cuacaSimulasi = "28°C Cerah Pagi";
+        else if (jam >= 11 && jam <= 15) cuacaSimulasi = "32°C Cerah Terik";
+        else if (jam > 15 && jam <= 18) cuacaSimulasi = "29°C Sore Berawan";
+        else cuacaSimulasi = "27°C Malam Cerah";
+        
+        this.currentDailyWeather = cuacaSimulasi;
+        this.updateWeatherBadgeUI(cuacaSimulasi, false);
+
+        // E. TARIK CUACA REAL-TIME DARI API (Tanpa Memblokir Layar Kasir)
+        this.fetchRealtimeWeather();
+
+        // F. Siapkan 1 Baris Pengeluaran Kosong Jika Belum Ada
+        if (!this.dailyExpensesList || this.dailyExpensesList.length === 0) {
+            this.dailyExpensesList = [];
+            this.addDailyExpenseRow(); 
+        }
+
+        this.fetchMasterPengeluaran();
+        this.calcDailyReportLive();
+        this.renderLaporanHarianHistory();
+        
+        // G. Eksekusi Kalender Interaktif
+        if (typeof this.renderCalendar === 'function') {
+            this.renderCalendar();
+        }
+
+        // 🚀 H. EKSEKUSI DASHBOARD EKSEKUTIF OWNER (KONSOLIDASI & BREAKDOWN)
+        if (typeof this.renderExecutiveDashboard === 'function') {
+            this.renderExecutiveDashboard();
+        }
+    },
+
+   // =========================================================
+    // 🚀 ENGINE FILTER OUTLET LAPORAN HARIAN (SINKRON UTAMA)
+    // =========================================================
+    filterLaporanByOutlet: function(targetOutlet) {
+        // 1. Ubah outlet aktif di memori global aplikasi
+        this.outlet = targetOutlet;
+        localStorage.setItem('aicha_active_outlet', targetOutlet);
+
+        // 2. Perbarui tampilan aktif pada tombol bar pemilih
+        document.querySelectorAll('.btn-lap-outlet').forEach(btn => {
+            btn.classList.remove('bg-rose-500', 'text-white', 'shadow-2xs');
+            btn.classList.add('bg-slate-800', 'text-slate-400', 'hover:bg-slate-700', 'hover:text-white');
+        });
+
+        let activeBtn = document.getElementById(`btn-lap-outlet-${targetOutlet}`);
+        if (activeBtn) {
+            activeBtn.classList.remove('bg-slate-800', 'text-slate-400', 'hover:bg-slate-700');
+            activeBtn.classList.add('bg-rose-500', 'text-white', 'shadow-2xs');
+        }
+
+        // 3. Perbarui teks nama outlet di Header Utama aplikasi
+        if (typeof this.updateHeaderOutletName === 'function') {
+            this.updateHeaderOutletName();
+        }
+
+        this.showToast(`Memuat Laporan Cabang: ${targetOutlet === 'Semua' ? 'Konsolidasi Seluruh Cabang' : targetOutlet}`);
+
+        // 🚀 4. KUNCI PERBAIKAN: Panggil initLaporanHarian() secara utuh!
+        // Ini akan merefresh otomatis Target Bulanan, Dashboard Eksekutif, Kalender, dan Tabel Riwayat.
+        this.initLaporanHarian();
+    },
+
+    
+    renderLaporanOutletButtons: function() {
+        const bar = document.getElementById('lapharian-owner-outlet-bar');
+        const cont = document.getElementById('lapharian-dynamic-outlets');
+        if (!bar || !cont) return;
+
+        // Cek Role: Hanya Owner/Supervisor yang bisa melihat bar pemilih cabang ini
+        let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
+        if (!isOwner) {
+            bar.classList.add('hidden');
+            return;
+        }
+        bar.classList.remove('hidden');
+
+        // Ambil daftar outlet dari database dan buang 'Pusat' / 'Semua' agar tidak duplikat
+        let outlets = (this.db.outlets || []).filter(o => o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua');
+        
+        let html = outlets.map(o => {
+            let isActive = (this.outlet === o.Nama_Outlet);
+            let activeClass = isActive 
+                ? 'bg-rose-500 text-white shadow-2xs' 
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white';
+            
+            return `
+            <button type="button" onclick="superApp.filterLaporanByOutlet('${o.Nama_Outlet}')" id="btn-lap-outlet-${o.Nama_Outlet}" class="btn-lap-outlet px-3 py-1 rounded-lg text-xs font-black transition active:scale-95 shrink-0 ${activeClass}">
+                ${o.Nama_Outlet}
+            </button>`;
+        }).join('');
+
+        cont.innerHTML = html;
+        
+        // Pastikan status tombol aktif tersinkronisasi saat halaman dimuat
+        let currentActive = this.outlet || 'Semua';
+        let activeBtn = document.getElementById(`btn-lap-outlet-${currentActive}`);
+        if (activeBtn) {
+            document.querySelectorAll('.btn-lap-outlet').forEach(b => b.classList.remove('bg-rose-500', 'text-white'));
+            activeBtn.classList.add('bg-rose-500', 'text-white');
+        }
+    },
+
+    // Helper 1: Memperbarui UI Lencana Cuaca
+    updateWeatherBadgeUI: function(cuacaText, isLive = false) {
+        const wBadge = document.getElementById('daily-weather-badge');
+        if (!wBadge) return;
+
+        let icon = 'fa-cloud-sun';
+        let color = 'text-amber-500';
+        
+        let lower = cuacaText.toLowerCase();
+        if (lower.includes('hujan') || lower.includes('gerimis')) { 
+            icon = 'fa-cloud-showers-heavy'; color = 'text-blue-500'; 
+        } else if (lower.includes('malam')) { 
+            icon = 'fa-moon'; color = 'text-indigo-400'; 
+        } else if (lower.includes('terik') || lower.includes('cerah')) { 
+            icon = 'fa-sun'; color = 'text-amber-500'; 
+        }
+
+        let liveDot = isLive ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-1.5" title="Suhu Real-Time Satelit"></span>` : '';
+        wBadge.innerHTML = `${liveDot}<i class="fas ${icon} ${color}"></i> Cuaca: ${cuacaText}`;
+    },
+
+   // =========================================================
+    // 🚀 ENGINE CUACA REAL-TIME BERBASIS GPS DEVICE (MODERN)
+    // =========================================================
+    fetchRealtimeWeather: async function() {
+        const weatherBadge = document.getElementById('daily-weather-badge');
+        
+        // 1. Tampilkan Efek Animasi "Mendeteksi Lokasi" yang Elegan
+        if (weatherBadge) {
+            weatherBadge.className = "bg-slate-100 border border-slate-200 text-slate-500 font-black text-[11px] px-3.5 py-1.5 rounded-xl shadow-inner flex items-center gap-2 shrink-0 transition-all duration-300";
+            weatherBadge.innerHTML = `<i class="fas fa-location-crosshairs fa-spin text-rose-400"></i> Memindai Lokasi...`;
+        }
+
+        // Fallback (Cadangan) jika kasir menolak akses GPS / tablet tidak ada GPS
+        const fallbackCoords = {
+            'Penajam': { lat: -1.242, lon: 116.738 },
+            'Babulu': { lat: -1.488, lon: 116.485 },
+            'Batu Kajang': { lat: -1.831, lon: 115.894 },
+            'Sepaku': { lat: -0.923, lon: 116.757 }
+        };
+
+        // Fungsi Eksekutor Penarik Cuaca API
+        const getWeatherData = async (lat, lon, isLiveGPS = false) => {
+            try {
+                let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+                let res = await fetch(url);
+                let data = await res.json();
+
+                if (data && data.current_weather) {
+                    let temp = Math.round(data.current_weather.temperature);
+                    let wmoCode = data.current_weather.weathercode;
+
+                    // Desain UI Cuaca ala Apple/Glassmorphism
+                    let kondisi = "Cerah";
+                    let icon = "fa-sun text-amber-500";
+                    let bgClass = "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 text-amber-700 shadow-amber-500/10";
+
+                    if (wmoCode >= 1 && wmoCode <= 3) {
+                        kondisi = "Berawan"; icon = "fa-cloud-sun text-slate-500"; bgClass = "bg-gradient-to-r from-slate-50 to-gray-100 border-slate-200 text-slate-700 shadow-slate-500/10";
+                    } else if (wmoCode >= 45 && wmoCode <= 67) {
+                        kondisi = "Hujan Ringan"; icon = "fa-cloud-rain text-blue-500"; bgClass = "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 text-blue-700 shadow-blue-500/10";
+                    } else if (wmoCode >= 80 && wmoCode <= 82) {
+                        kondisi = "Hujan Deras"; icon = "fa-cloud-showers-heavy text-indigo-500"; bgClass = "bg-gradient-to-r from-indigo-50 to-blue-100 border-indigo-200 text-indigo-800 shadow-indigo-500/10";
+                    } else if (wmoCode >= 95) {
+                        kondisi = "Badai Petir"; icon = "fa-bolt text-purple-600"; bgClass = "bg-gradient-to-r from-purple-50 to-fuchsia-50 border-purple-200 text-purple-800 shadow-purple-500/10";
+                    }
+
+                    // Tanda titik (dot) elegan jika menggunakan Live GPS asli
+                    let locIcon = isLiveGPS ? `<span class="relative flex h-2 w-2 ml-1" title="Akurat via GPS"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>` : '';
+
+                    this.currentDailyWeather = `${temp}°C ${kondisi}`;
+
+                    if (weatherBadge) {
+                        weatherBadge.className = `font-black text-[11px] px-3.5 py-1.5 rounded-xl shadow-md border flex items-center gap-1.5 shrink-0 transition-all duration-500 ${bgClass}`;
+                        weatherBadge.innerHTML = `<i class="fas ${icon}"></i> ${this.currentDailyWeather} ${locIcon}`;
+                    }
+                }
+            } catch (err) {
+                console.log("API Cuaca Gagal:", err);
+                if (weatherBadge) {
+                    weatherBadge.innerHTML = `<i class="fas fa-cloud text-slate-400"></i> Cuaca Lokal`;
+                    weatherBadge.className = "bg-slate-50 border border-slate-200 text-slate-500 font-black text-[11px] px-3 py-1.5 rounded-xl";
+                }
+                this.currentDailyWeather = "31°C Berawan (Manual)";
+            }
+        };
+
+        // 2. Minta Izin GPS Browser secara Modern
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                // 📍 Jika Diizinkan (Sukses)
+                (position) => {
+                    getWeatherData(position.coords.latitude, position.coords.longitude, true);
+                },
+                // 🚫 Jika Ditolak Kasir atau Error
+                (error) => {
+                    console.log("GPS ditolak/gagal, menggunakan titik cabang default.");
+                    let cleanName = String(this.outlet || 'Penajam').replace(/^Ai\-Snack\s+/i, '').trim();
+                    let coords = fallbackCoords[cleanName] || fallbackCoords['Penajam'];
+                    getWeatherData(coords.lat, coords.lon, false);
+                },
+                // Opsi Presisi & Kecepatan
+                { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+            );
+        } else {
+            // Browser usang tidak dukung GPS
+            let cleanName = String(this.outlet || 'Penajam').replace(/^Ai\-Snack\s+/i, '').trim();
+            let coords = fallbackCoords[cleanName] || fallbackCoords['Penajam'];
+            getWeatherData(coords.lat, coords.lon, false);
+        }
+    },
+
+    // 2. Baris Pengeluaran Dinamis
+    addDailyExpenseRow: function(nama = '', nominal = '') {
+        let id = Date.now() + Math.random().toString(36).substr(2, 4);
+        this.dailyExpensesList.push({ id, nama: nama.toUpperCase(), nominal });
+        this.renderDailyExpenseRows();
+    },
+    
+    removeDailyExpenseRow: function(id) {
+        this.dailyExpensesList = this.dailyExpensesList.filter(x => x.id !== id);
+        this.renderDailyExpenseRows();
+        this.calcDailyReportLive();
+    },
+
+    renderDailyExpenseRows: function() {
+        const cont = document.getElementById('daily-expenses-list');
+        if (!cont) return;
+
+        let daftarPengeluaran = [...new Set((this.db.masterPengeluaran || []).map(x => (x.Nama || x.NAMA_PENGELUARAN || '').toUpperCase()).filter(Boolean))];
+
+        cont.innerHTML = this.dailyExpensesList.map(item => `
+            <div class="flex items-center gap-2">
+                <input type="text" list="exp-datalist" value="${item.nama}" 
+                       oninput="superApp.updateDailyExpName('${item.id}', this.value)" 
+                       placeholder="Nama pengeluaran..." 
+                       class="flex-1 h-9 bg-slate-50 border border-slate-200 focus:border-rose-500 rounded-xl px-3 text-xs font-black text-slate-700 outline-none uppercase shadow-inner">
+                
+                <input type="text" inputmode="numeric" value="${item.nominal ? Number(item.nominal).toLocaleString('id-ID') : ''}" 
+                       oninput="superApp.formatRupiahInput(this); superApp.updateDailyExpNominal('${item.id}', this.value);" 
+                       placeholder="Rp 0" 
+                       class="w-28 h-9 bg-slate-50 border border-slate-200 focus:border-rose-500 rounded-xl px-2.5 text-xs font-black text-rose-600 text-right outline-none shadow-inner">
+                
+                <button type="button" onclick="superApp.removeDailyExpenseRow('${item.id}')" class="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition flex items-center justify-center shrink-0">
+                    <i class="fas fa-trash text-xs"></i>
+                </button>
+            </div>
+        `).join('') + `
+        <datalist id="exp-datalist">
+            ${daftarPengeluaran.map(n => `<option value="${n}">`).join('')}
+        </datalist>`;
+    },
+    
+    updateDailyExpName: function(id, val) {
+        let item = this.dailyExpensesList.find(x => x.id === id);
+        if (item) {
+            item.nama = val.toUpperCase();
+        }
+    },
+    
+    updateDailyExpNominal: function(id, val) {
+        let item = this.dailyExpensesList.find(x => x.id === id);
+        if (item) {
+            item.nominal = this.getNumericValue(val);
+            this.calcDailyReportLive();
+        }
+    },
+
+    // 3. Mesin Kalkulasi Live (Net Sales, Amount Paid, Amount Pcs, Net Cash)
+    calcDailyReportLive: function() {
+        let cash = this.getNumericValue(document.getElementById('daily-cash')?.value || 0);
+        let qris = this.getNumericValue(document.getElementById('daily-qris')?.value || 0);
+        let bill = Number(document.getElementById('daily-bill')?.value || 0);
+        let pcs = Number(document.getElementById('daily-pcs')?.value || 0);
+
+        let totExp = 0;
+        this.dailyExpensesList.forEach(x => { totExp += Number(x.nominal || 0); });
+
+        let netSales = cash + qris;
+        let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
+        let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
+        let netCashBersih = cash - totExp;
+
+        if (document.getElementById('live-net-sales')) document.getElementById('live-net-sales').innerText = `Rp ${netSales.toLocaleString('id-ID')}`;
+        if (document.getElementById('live-amount-paid')) document.getElementById('live-amount-paid').innerText = amountPaid.toLocaleString('id-ID');
+        if (document.getElementById('live-amount-pcs')) document.getElementById('live-amount-pcs').innerText = amountPcs.toLocaleString('id-ID');
+        if (document.getElementById('live-net-cash')) document.getElementById('live-net-cash').innerText = `Rp ${netCashBersih.toLocaleString('id-ID')}`;
+
+        this.calcMonthlyAccumulation(netSales);
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AKUMULASI PRESISI (BATAS TANGGAL 1 s/d TANGGAL LAPORAN)
+    // =========================================================
+    calcMonthlyAccumulation: function(liveNetSales) {
+        // 1. Ambil tanggal yang sedang aktif di form input (misal: "Senin, 05-07-2026")
+        let tglTeks = document.getElementById('daily-form-date')?.innerText || '';
+        let targetDate = new Date();
+        
+        // Ekstrak Hari, Bulan, dan Tahun dari teks tanggal form
+        let match = tglTeks.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        let targetDay = targetDate.getDate();
+        let targetMonth = targetDate.getMonth() + 1;
+        let targetYear = targetDate.getFullYear();
+
+        if (match) {
+            targetDay = parseInt(match[1], 10);
+            targetMonth = parseInt(match[2], 10);
+            targetYear = parseInt(match[3], 10);
+        }
+
+        let accumPreviousDays = 0;
+        let activeReportId = this.editReportId; // ID laporan jika sedang mode Edit
+
+        // 🚀 2. DETEKSI MODE KONSOLIDASI ('Semua' atau 'Pusat')
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+
+        // 🚀 3. TENTUKAN TARGET BULANAN SECARA AKURAT
+        // Jika sedang lihat 'Semua Cabang', gabungkan seluruh target cabang yang tersimpan
+        let targetPerhitungan = this.targetBulanan || 180000000;
+        if (isConsolidated && this.db && this.db.outlets) {
+            let totalTargetSemua = 0;
+            this.db.outlets.forEach(o => {
+                if (o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua') {
+                    let t = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
+                    totalTargetSemua += (t && !isNaN(t)) ? Number(t) : 180000000;
+                }
+            });
+            if (totalTargetSemua > 0) targetPerhitungan = totalTargetSemua;
+        }
+
+        // 4. Jumlahkan HANYA laporan masa lalu sebelum tanggal target (Tanggal 1 s/d H-1)
+        (this.db.laporanHarian || []).forEach(rep => {
+            // 🚀 Kunci Sinkronisasi: Izinkan masuk jika mode konsolidasi ATAU outletnya cocok
+            if (isConsolidated || rep.Outlet === this.outlet) {
+                
+                // Abaikan laporan yang sedang diedit agar tidak hitung ganda (double-count)
+                if (activeReportId && rep.ID_Laporan === activeReportId) return;
+
+                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
+                let repMatch = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (repMatch) {
+                    let rDay = parseInt(repMatch[1], 10);
+                    let rMonth = parseInt(repMatch[2], 10);
+                    let rYear = parseInt(repMatch[3], 10);
+
+                    // KUNCI PRESISI: Bulan & Tahun sama, DAN Hari lebih kecil dari tanggal laporan
+                    // Abaikan juga laporan jika statusnya 'Ditolak'
+                    if (rYear === targetYear && rMonth === targetMonth && rDay < targetDay) {
+                        if (rep.Status_Approval !== 'Ditolak') {
+                            accumPreviousDays += Number(rep.Net_Sales || 0);
+                        }
+                    }
+                }
+            }
+        });
+
+        // 5. Total Akumulasi = (Jumlah Tanggal 1 s/d H-1) + Omset Hari H di Form
+        let totalAccumUpToDate = accumPreviousDays + Number(liveNetSales || 0);
+        
+        let pct = Math.min(Math.round((totalAccumUpToDate / targetPerhitungan) * 100), 100);
+        let kurang = Math.max(targetPerhitungan - totalAccumUpToDate, 0);
+
+        // Update Radar UI di layar
+        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totalAccumUpToDate.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetPerhitungan.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pct}%`;
+        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pct}%`;
+        if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${kurang.toLocaleString('id-ID')}`;
+
+        this.currentAccumMonth = totalAccumUpToDate;
+        return totalAccumUpToDate;
+    },
+
+    setTargetBulanan: function() {
+        let val = prompt(`Masukkan Target Penjualan Bulanan untuk Cabang ${this.outlet} (Angka saja):`, this.targetBulanan);
+        if (val !== null && !isNaN(val) && Number(val) > 0) {
+            this.targetBulanan = Number(val);
+            localStorage.setItem('aicha_target_bulanan_' + (this.outlet || 'Penajam'), this.targetBulanan);
+            this.calcDailyReportLive();
+            this.showToast("Target bulanan berhasil diperbarui!");
+        }
+    },
+
+    // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
+    // =========================================================
+    // 🚀 SUBMIT LAPORAN (DILENGKAPI POPUP FORWARD WA KONSISTEN)
+    // =========================================================
+    submitLaporanHarian: async function() {
+        if (this.isProcessing) return;
+        let cash = this.getNumericValue(document.getElementById('daily-cash')?.value || 0);
+        let qris = this.getNumericValue(document.getElementById('daily-qris')?.value || 0);
+        let bill = Number(document.getElementById('daily-bill')?.value || 0);
+        let pcs = Number(document.getElementById('daily-pcs')?.value || 0);
+
+        if (cash === 0 && qris === 0) return this.showToast("Isi nominal Cash atau QRIS terlebih dahulu!", "error");
+        if (bill === 0 || pcs === 0) return this.showToast("Jumlah Bill dan Pcs terjual wajib diisi!", "error");
+
+        let netSales = cash + qris;
+        let expValid = this.dailyExpensesList.filter(x => x.nama.trim() !== '' && Number(x.nominal) > 0);
+        let totExp = 0; expValid.forEach(x => totExp += Number(x.nominal));
+
+        let tglTeks = document.getElementById('daily-form-date')?.innerText || "Hari Ini";
+        let cuaca = this.currentDailyWeather || "31°C";
+
+        let isEdit = (this.editReportId !== null);
+        let idRep = isEdit ? this.editReportId : ('REP-' + Date.now());
+        
+        let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
+        let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
+
+        this.setLoading(true, isEdit && !isOwner ? "Mengirim Pengajuan Revisi..." : "Menyimpan Laporan...");
+
+        const payload = {
+            action: isEdit ? 'update_laporan_harian' : 'save_laporan_harian',
+            id_laporan: idRep,
+            outlet: this.outlet,
+            tanggal: tglTeks,
+            cuaca: cuaca,
+            cash: cash,
+            qris: qris,
+            net_sales: netSales,
+            bill: bill,
+            pcs: pcs,
+            pengeluaran_json: JSON.stringify(expValid),
+            total_pengeluaran: totExp,
+            akumulasi_bulan: this.currentAccumMonth || netSales,
+            kasir: (this.currentUser && this.currentUser.Username) ? this.currentUser.Username : 'Kasir',
+            status_approval: statusApp
+        };
+
+        if (!this.db.laporanHarian) this.db.laporanHarian = [];
+        let idx = this.db.laporanHarian.findIndex(x => x.ID_Laporan === idRep);
+
+        if (isEdit) {
+            if (statusApp === 'Pending Edit' && idx > -1) {
+                // 🚀 STAF EDIT: Taruh di Kotak Revisi (Revisi_JSON)
+                this.db.laporanHarian[idx].Status_Approval = 'Pending Edit';
+                this.db.laporanHarian[idx].Revisi_JSON = JSON.stringify({
+                    cash, qris, net_sales: netSales, bill, pcs, 
+                    pengeluaran_json: JSON.stringify(expValid), total_pengeluaran: totExp,
+                    editor: payload.kasir
+                });
+            } else if (idx > -1) {
+                // 🚀 OWNER EDIT: Langsung timpa angka asli
+                this.db.laporanHarian[idx] = {
+                    ...this.db.laporanHarian[idx],
+                    Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
+                    Pengeluaran_JSON: JSON.stringify(expValid), Total_Pengeluaran: totExp,
+                    Status_Approval: 'Disetujui', Revisi_JSON: ''
+                };
+            }
+        } else {
+            this.db.laporanHarian.push({
+                ID_Laporan: idRep, Outlet: this.outlet, Tanggal: tglTeks, Cuaca: cuaca,
+                Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
+                Pengeluaran_JSON: JSON.stringify(expValid), Status_Approval: 'Disetujui'
+            });
+        }
+        localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+
+        // Kirim ke server di background
+        await this.apiPost(payload);
+        this.setLoading(false);
+        
+        // 🚀 PREVIEW NOTIFIKASI
+        if (statusApp === 'Pending Edit') {
+            alert("⏳ REVISI TERKIRIM KE OWNER\n\nAngka laporan resmi di database belum berubah sebelum disetujui Owner. Namun Anda tetap bisa meneruskan format revisi ini ke WA Grup.");
+        } else {
+            this.showToast("Laporan Berhasil Tersimpan!");
+        }
+        
+        // 🚀 RAKIT TEKS WA & MUNCULKAN POPUP FORWARD KE GRUP
+        let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
+        let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
+        
+        let expText = '-';
+        if (expValid.length > 0) {
+            expText = expValid.map(x => `▪️ ${x.nama}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('\n');
+        }
+
+        let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-CHA*`;
+        
+        // ✨ NORMALISASI NAMA OUTLET (Mencegah duplikasi kata Ai-Snack)
+        let cleanOutletName = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+        
+        // ✨ FORMAT TEKS BARU SESEORANG REQUEST (Tanpa baris Kasir)
+        let waText = `${labelJudul}\n`;
+        waText += `Update Sales Report Outlet: *Ai-CHA ${cleanOutletName}*\n`;
+        waText += `Tanggal: ${tglTeks}\n`;
+        waText += `Cuaca: ${cuaca}\n\n`;
+        waText += `Net Sales: *Rp ${netSales.toLocaleString('id-ID')}*\n`;
+        waText += `Amount Paid: Rp ${amountPaid.toLocaleString('id-ID')}\n`;
+        waText += `Amount Pcs: Rp ${amountPcs.toLocaleString('id-ID')}\n`;
+        waText += `Bill: ${bill.toLocaleString('id-ID')} Bill\n`;
+        waText += `Produk Terjual: ${pcs.toLocaleString('id-ID')} Pcs\n\n`;
+        waText += `Rincian Pembayaran:\n`;
+        waText += `💵 Cash: Rp ${cash.toLocaleString('id-ID')}\n`;
+        waText += `💳 QRIS: Rp ${qris.toLocaleString('id-ID')}\n`;
+        
+        if (totExp > 0) {
+            waText += `\nPengeluaran:\n${expText}\nTotal Pengeluaran: Rp ${totExp.toLocaleString('id-ID')}\n`;
+            waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
+        }
+        
+        waText += `\nAkumulasi Bulanan: Rp ${(this.currentAccumMonth || netSales).toLocaleString('id-ID')}\n`;
+        waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
+
+        // Reset form & perbarui tabel riwayat di latar belakang
+        this.resetDailyForm();
+        this.renderLaporanHarianHistory();
+
+        // 🚀 MUNCULKAN MODAL POPUP WA KHUSUS DI VIEW LAPORAN HARIAN
+        if (typeof this.openWaLaporanModal === 'function') {
+            this.openWaLaporanModal(waText);
+        } else if (typeof this.showWaModal === 'function') {
+            this.showWaModal(waText);
+        } else if (typeof this.resendLaporanHarianWa === 'function') {
+            this.resendLaporanHarianWa(idRep);
+        }
+    },
+
+    // =========================================================
+    // 🚀 EKSEKUSI APPROVAL OWNER (SETUJUI / TOLAK)
+    // =========================================================
+    eksekusiApprovalEdit: async function(idRep, keputusan) {
+        if (!confirm(`Apakah Anda yakin ingin ${keputusan === 'Disetujui' ? 'MENYETUJUI' : 'MENOLAK'} revisi laporan ini?`)) return;
+
+        this.setLoading(true, "Memproses persetujuan...");
+        
+        let idx = (this.db.laporanHarian || []).findIndex(x => x.ID_Laporan === idRep);
+        if (idx > -1) {
+            if (keputusan === 'Disetujui') {
+                // 🚀 JIKA DISETUJUI: Pindahkan angka dari kotak revisi ke angka asli!
+                try {
+                    let rev = JSON.parse(this.db.laporanHarian[idx].Revisi_JSON || '{}');
+                    if (rev.net_sales !== undefined) {
+                        this.db.laporanHarian[idx].Cash = rev.cash;
+                        this.db.laporanHarian[idx].QRIS = rev.qris;
+                        this.db.laporanHarian[idx].Net_Sales = rev.net_sales;
+                        this.db.laporanHarian[idx].Bill = rev.bill;
+                        this.db.laporanHarian[idx].Pcs = rev.pcs;
+                        this.db.laporanHarian[idx].Pengeluaran_JSON = rev.pengeluaran_json;
+                        this.db.laporanHarian[idx].Total_Pengeluaran = rev.total_pengeluaran;
+                    }
+                } catch(e) {}
+            }
+            this.db.laporanHarian[idx].Status_Approval = 'Disetujui';
+            this.db.laporanHarian[idx].Revisi_JSON = '';
+            localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+        }
+
+        await this.apiPost({
+            action: 'approve_edit_laporan',
+            id_laporan: idRep,
+            keputusan: keputusan
+        });
+
+        this.setLoading(false);
+        this.showToast(`Revisi telah ${keputusan}! Angka pembukuan diperbarui.`, 'success');
+        this.renderLaporanHarianHistory();
+    },
+
+   
+    resetDailyForm: function() {
+        // Reset memori edit
+        this.editReportId = null;
+        let titleEl = document.getElementById('form-title-mode');
+        let btnCancel = document.getElementById('btn-cancel-edit');
+        if (titleEl) titleEl.innerText = "Input Data Hari Ini";
+        if (btnCancel) btnCancel.classList.add('hidden');
+
+        // Kembali ke tanggal hari ini
+        let d = new Date();
+        let days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        let pad = n => String(n).padStart(2, '0');
+        let dateEl = document.getElementById('daily-form-date');
+        if (dateEl) dateEl.innerText = `${days[d.getDay()]}, ${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+
+        // Kosongkan input
+        ['daily-cash', 'daily-qris', 'daily-bill', 'daily-pcs'].forEach(id => {
+            let el = document.getElementById(id); if (el) el.value = '';
+        });
+        this.dailyExpensesList = [];
+        this.addDailyExpenseRow();
+        this.calcDailyReportLive();
+    },
+
+    // =========================================================
+    // 🚀 2. RIWAYAT LAPORAN HARIAN (DEFAULT RANGE BULAN BERJALAN)
+    // =========================================================
+    renderLaporanHarianHistory: function() {
+        const tbody = document.getElementById('laporan-harian-tbody');
+        const mobCont = document.getElementById('laporan-harian-mobile');
+        if (!tbody && !mobCont) return;
+
+        let deskHtml = ''; let mobHtml = ''; let count = 0;
+        let now = new Date();
+
+        // Ambil input elemen filter tanggal awal & akhir
+        const startInput = document.getElementById('filter-lap-start');
+        const endInput = document.getElementById('filter-lap-end');
+
+        // ✨ ATUR DEFAULT RANGE BULAN BERJALAN JIKA KOSONG
+        if (startInput && !startInput.value) {
+            let pad = n => String(n).padStart(2, '0');
+            startInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`; // Tanggal 1 bulan ini
+        }
+        if (endInput && !endInput.value) {
+            let pad = n => String(n).padStart(2, '0');
+            endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`; // Hari ini
+        }
+
+        let startObj = startInput?.value ? new Date(startInput.value) : null;
+        if (startObj) startObj.setHours(0, 0, 0, 0);
+
+        let endObj = endInput?.value ? new Date(endInput.value) : null;
+        if (endObj) endObj.setHours(23, 59, 59, 999);
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        let list = [...(this.db.laporanHarian || [])].filter(x => {
+            let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let cocokOutlet = isConsolidated || (repOutlet === currOutletClean);
+            if (!cocokOutlet) return false;
+
+            if (startObj || endObj) {
+                let cleanStr = (x.Tanggal || '').split(',').pop().trim();
+                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    let repDateObj = new Date(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10));
+                    if (startObj && repDateObj < startObj) return false;
+                    if (endObj && repDateObj > endObj) return false;
+                } else {
+                    return false;
+                }
+            }
+            return true;
+        }).reverse();
+
+        list.forEach(item => {
+            count++;
+            let net = Number(item.Net_Sales || 0);
+            let cash = Number(item.Cash || 0);
+            let qris = Number(item.QRIS || 0);
+            let status = item.Status_Approval || 'Disetujui';
+            let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
+
+            let badgeStatus = '';
+            if (status === 'Pending Edit') {
+                badgeStatus = `<span class="mt-1 inline-block bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded-md text-[9px] font-black animate-pulse"><i class="fas fa-clock mr-1"></i>Revisi Pending</span>`;
+            } else if (status === 'Ditolak') {
+                badgeStatus = `<span class="mt-1 inline-block bg-rose-100 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] font-black"><i class="fas fa-xmark mr-1"></i>Revisi Ditolak</span>`;
+            }
+
+            let infoRevisi = '';
+            if (status === 'Pending Edit') {
+                try {
+                    let rev = JSON.parse(item.Revisi_JSON || '{}');
+                    if (rev.net_sales !== undefined) {
+                        infoRevisi = `
+                        <div class="mt-1.5 p-2 bg-amber-100/90 border border-amber-300 rounded-lg text-[10px] text-amber-900 leading-tight">
+                            <b>📌 Ajuan Revisi (${rev.editor || 'Staf'}):</b><br>
+                            Sales Baru: <b class="text-rose-600">Rp ${Number(rev.net_sales).toLocaleString('id-ID')}</b><br>
+                            C: Rp ${Number(rev.cash||0).toLocaleString('id-ID')} | Q: Rp ${Number(rev.qris||0).toLocaleString('id-ID')}
+                        </div>`;
+                    }
+                } catch(e){}
+            }
+
+            let tombolOwnerDesk = (status === 'Pending Edit' && isOwner) ? `
+                <div class="flex gap-1 mt-1.5 pt-1.5 border-t border-slate-200">
+                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Disetujui')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1 rounded text-[10px] font-black shadow-2xs">✔ Setuju</button>
+                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Ditolak')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-1 rounded text-[10px] font-black shadow-2xs">✖ Tolak</button>
+                </div>
+            ` : '';
+
+            let tombolOwnerMob = (status === 'Pending Edit' && isOwner) ? `
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Disetujui')" class="bg-emerald-500 text-white py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"><i class="fas fa-check"></i> Setujui</button>
+                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Ditolak')" class="bg-rose-500 text-white py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"><i class="fas fa-xmark"></i> Tolak</button>
+                </div>
+            ` : '';
+
+            deskHtml += `
+            <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition text-xs font-bold text-slate-700">
+                <td class="py-3 px-3">
+                    <span class="font-extrabold text-slate-900">${item.Tanggal}</span><br>
+                    <span class="text-[10px] text-amber-600 font-bold">${item.Cuaca || '-'}</span>
+                    <div>${badgeStatus}</div>
+                    ${infoRevisi}
+                </td>
+                <td class="py-3 px-3 text-right font-black text-rose-600 text-sm align-top">Rp ${net.toLocaleString('id-ID')}</td>
+                <td class="py-3 px-3 text-right text-[11px] align-top"><span class="text-slate-600">C: Rp ${cash.toLocaleString('id-ID')}</span><br><span class="text-blue-600">Q: Rp ${qris.toLocaleString('id-ID')}</span></td>
+                <td class="py-3 px-3 text-center text-[11px] align-top text-slate-500">${item.Bill} / ${item.Pcs}</td>
+                <td class="py-3 px-3 text-center align-top">
+                    <div class="flex items-center justify-center gap-1">
+                        <button type="button" onclick="superApp.editLaporanHarian('${item.ID_Laporan}')" class="bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white p-1.5 rounded-lg text-xs transition" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button type="button" onclick="superApp.resendLaporanHarianWa('${item.ID_Laporan}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-black shadow-2xs flex items-center gap-1 transition"><i class="fab fa-whatsapp"></i> WA</button>
+                    </div>
+                    ${tombolOwnerDesk}
+                </td>
+            </tr>`;
+
+            mobHtml += `
+            <div class="bg-white p-3.5 rounded-2xl border ${status === 'Pending Edit' ? 'border-amber-300 bg-amber-50/10' : 'border-slate-100'} shadow-2xs flex flex-col gap-2 relative">
+                <div class="flex justify-between items-start pb-1.5 border-b border-slate-100">
+                    <div>
+                        <h4 class="font-extrabold text-xs text-slate-800">${item.Tanggal}</h4>
+                        <span class="text-[10px] font-bold text-amber-600">${item.Cuaca || '-'}</span>
+                        <div>${badgeStatus}</div>
+                    </div>
+                    <div class="text-right"><span class="font-black text-rose-600 text-sm">Rp ${net.toLocaleString('id-ID')}</span></div>
+                </div>
+                ${infoRevisi}
+                <div class="grid grid-cols-2 gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-200/40">
+                    <div>Cash: <span class="text-slate-800 font-black">Rp ${cash.toLocaleString('id-ID')}</span></div>
+                    <div>QRIS: <span class="text-blue-600 font-black">Rp ${qris.toLocaleString('id-ID')}</span></div>
+                    <div class="col-span-2 text-center pt-1 border-t border-slate-200/60 font-black text-slate-400 text-[10px] uppercase">${item.Bill} Bill | ${item.Pcs} Pcs Terjual</div>
+                </div>
+                <div class="flex gap-1.5 pt-0.5">
+                    <button type="button" onclick="superApp.editLaporanHarian('${item.ID_Laporan}')" class="w-10 bg-amber-50 text-amber-600 rounded-xl text-xs font-black flex items-center justify-center active:scale-95"><i class="fas fa-pen"></i></button>
+                    <button type="button" onclick="superApp.resendLaporanHarianWa('${item.ID_Laporan}')" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-black shadow-2xs flex items-center justify-center gap-1 active:scale-95"><i class="fab fa-whatsapp"></i> Forward ke WA Grup</button>
+                </div>
+                ${tombolOwnerMob}
+            </div>`;
+        });
+
+        if (tbody) tbody.innerHTML = deskHtml || `<tr><td colspan="5" class="py-10 text-center text-slate-400 font-bold text-xs">Belum ada riwayat laporan pada rentang tanggal ini</td></tr>`;
+        if (mobCont) mobCont.innerHTML = mobHtml || `<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada riwayat laporan pada rentang tanggal ini</div>`;
+        if (document.getElementById('laporan-harian-count')) document.getElementById('laporan-harian-count').innerText = `${count} Laporan`;
+    },
+
+    
+    // =========================================================
+    // 🚀 KIRIM ULANG WA DENGAN KALKULASI AKUMULASI DINAMIS
+    // =========================================================
+    resendLaporanHarianWa: function(id) {
+        let rep = (this.db.laporanHarian || []).find(x => x.ID_Laporan === id);
+        if (!rep) return this.showToast("Data laporan tidak ditemukan!", "error");
+
+        let net = Number(rep.Net_Sales || 0);
+        let bill = Number(rep.Bill || 0);
+        let pcs = Number(rep.Pcs || 0);
+        let cash = Number(rep.Cash || 0);
+        let qris = Number(rep.QRIS || 0);
+        
+        let amountPaid = bill > 0 ? Math.round(net / bill) : 0;
+        let amountPcs = pcs > 0 ? Math.round(net / pcs) : 0;
+
+        // 🚀 Hitung Akumulasi Dinamis
+        let exactAccumulation = net;
+        let match = (rep.Tanggal || '').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (match) {
+            let targetDay = parseInt(match[1], 10);
+            let targetMonth = parseInt(match[2], 10);
+            let targetYear = parseInt(match[3], 10);
+            let sumPast = 0;
+
+            (this.db.laporanHarian || []).forEach(item => {
+                if ((item.Outlet === rep.Outlet) && item.ID_Laporan !== rep.ID_Laporan) {
+                    let rMatch = (item.Tanggal || '').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                    if (rMatch) {
+                        let rDay = parseInt(rMatch[1], 10);
+                        let rMonth = parseInt(rMatch[2], 10);
+                        let rYear = parseInt(rMatch[3], 10);
+                        if (rYear === targetYear && rMonth === targetMonth && rDay < targetDay && item.Status_Approval !== 'Ditolak') {
+                            sumPast += Number(item.Net_Sales || 0);
+                        }
+                    }
+                }
+            });
+            exactAccumulation = sumPast + net;
+        }
+
+        let expText = '-'; let totExp = 0;
+        try {
+            let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+            if (expArr.length > 0) {
+                expText = expArr.map(x => `▪️ ${x.nama}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('\n');
+                expArr.forEach(x => totExp += Number(x.nominal));
+            }
+        } catch(e){}
+
+        // ✨ Normalisasi Nama Outlet (Hapus awalan Ai-Snack)
+        let cleanOutlet = String(rep.Outlet || this.outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+
+        // ✨ FORMAT TEKS BARU (Sesuai permintaan Anda)
+        let waText = `*Laporan Harian Ai-CHA*\n`;
+        waText += `Update Sales Report Outlet: *Ai-CHA ${cleanOutlet}*\n`;
+        waText += `Tanggal: ${rep.Tanggal || '-'}\n`;
+        waText += `Cuaca: ${rep.Cuaca || '31°C'}\n\n`;
+        waText += `Net Sales: *Rp ${net.toLocaleString('id-ID')}*\n`;
+        waText += `Amount Paid: Rp ${amountPaid.toLocaleString('id-ID')}\n`;
+        waText += `Amount Pcs: Rp ${amountPcs.toLocaleString('id-ID')}\n`;
+        waText += `Bill: ${bill.toLocaleString('id-ID')} Bill\n`;
+        waText += `Produk Terjual: ${pcs.toLocaleString('id-ID')} Pcs\n\n`;
+        waText += `Rincian Pembayaran:\n`;
+        waText += `💵 Cash: Rp ${cash.toLocaleString('id-ID')}\n`;
+        waText += `💳 QRIS: Rp ${qris.toLocaleString('id-ID')}\n`;
+        
+        if (totExp > 0) {
+            waText += `\nPengeluaran:\n${expText}\nTotal Pengeluaran: Rp ${totExp.toLocaleString('id-ID')}\n`;
+            waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
+        }
+        
+        waText += `\nAkumulasi Bulanan: Rp ${exactAccumulation.toLocaleString('id-ID')}\n`;
+        waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
+
+        // 🚀 Panggil Modal Popup Modern (Ganti openWaLaporanModal jika Anda sudah mengimplementasikannya)
+        if (typeof this.openWaLaporanModal === 'function') {
+            this.openWaLaporanModal(waText);
+        } else {
+            this.showWaModal(waText);
+        }
+    },
+
+    // =========================================================
+    // 🚀 SWITCHER SUB-TAB LAPORAN HARIAN (RESPONSIVE FULL HEIGHT)
+    // =========================================================
+    switchLapHarianSubTab: function(tab) {
+        const secInput = document.getElementById('lapharian-sec-input');
+        const secRiwayat = document.getElementById('lapharian-sec-riwayat');
+        const btnInput = document.getElementById('subtab-lapharian-input');
+        const btnRiwayat = document.getElementById('subtab-lapharian-riwayat');
+
+        const activeClass = 'flex-1 py-2.5 px-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-black shadow-2xs flex items-center justify-center gap-1.5 transition active:scale-95';
+        const inactiveClass = 'flex-1 py-2.5 px-3 bg-slate-50 border border-slate-200/80 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95';
+
+        if (tab === 'input') {
+            if (secInput) secInput.className = "w-full lg:w-[480px] xl:w-[540px] bg-white p-4 md:p-7 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 flex flex-col shrink-0";
+            if (secRiwayat) secRiwayat.className = "hidden lg:flex flex-1 flex-col gap-4 md:gap-6 min-w-0 w-full lg:h-full";
+            if (btnInput) btnInput.className = activeClass;
+            if (btnRiwayat) btnRiwayat.className = inactiveClass;
+        } else {
+            if (secInput) secInput.className = "hidden lg:flex lg:w-[480px] xl:w-[540px] bg-white p-4 md:p-7 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-slate-100 flex-col shrink-0";
+            if (secRiwayat) secRiwayat.className = "flex flex-1 flex-col gap-4 md:gap-6 min-w-0 w-full min-h-[75vh]";
+            if (btnInput) btnInput.className = inactiveClass;
+            if (btnRiwayat) btnRiwayat.className = activeClass;
+            if (typeof this.renderCalendar === 'function') this.renderCalendar();
+        }
+    },
+
+    fetchMasterPengeluaran: function() {
+        if (!typeof API_URL !== 'undefined' && !this.webAppUrl) return;
+        let targetUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+        fetch(targetUrl + "?action=get_master_data")
+        .then(r => r.json())
+        .then(data => {
+            this.db.masterPengeluaran = data; 
+            if (typeof this.renderDailyExpenseRows === 'function') {
+                this.renderDailyExpenseRows();
+            }
+        })
+        .catch(e => console.error("Gagal ambil master pengeluaran:", e));
+    },
+
+
+
+    filterRiwayatByDate: function(d, m, y) {
+        let pad = n => String(n).padStart(2, '0');
+        let targetPattern = `${pad(d)}-${pad(m)}-${y}`;
+        let targetPatternSlash = `${pad(d)}/${pad(m)}/${y}`;
+        
+        this.showToast(`Memperlihatkan riwayat tanggal ${pad(d)}-${pad(m)}-${y}`);
+        
+        // Filter Tabel PC
+        document.querySelectorAll('.report-row').forEach(row => {
+            let dateVal = row.getAttribute('data-date') || '';
+            row.style.display = (dateVal.includes(targetPattern) || dateVal.includes(targetPatternSlash)) ? "" : "none";
+        });
+
+        // Filter Kartu Mobile HP
+        document.querySelectorAll('.report-mob-card').forEach(card => {
+            let dateVal = card.getAttribute('data-date') || '';
+            card.style.display = (dateVal.includes(targetPattern) || dateVal.includes(targetPatternSlash)) ? "" : "none";
+        });
+    },
+
+   editReportId: null, // Memori menyimpan ID laporan jika sedang mode Edit
+
+    // =========================================================
+    // 🚀 HELPER STANDARISASI TANGGAL (ANTI-MELESET)
+    // =========================================================
+    normalizeDateObj: function(dateInput) {
+        if (!dateInput) return new Date();
+        if (dateInput instanceof Date) return dateInput;
+        
+        // Bersihkan string tanggal
+        let str = String(dateInput).split(',').pop().trim();
+        let match = str.match(/(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
+        
+        if (match) {
+            let p1 = parseInt(match[1], 10);
+            let p2 = parseInt(match[2], 10);
+            let p3 = parseInt(match[3], 10);
+            
+            // Cek format YYYY-MM-DD vs DD-MM-YYYY
+            if (p1 > 1000) {
+                return new Date(p1, p2 - 1, p3); // YYYY-MM-DD
+            } else {
+                return new Date(p3, p2 - 1, p1); // DD-MM-YYYY
+            }
+        }
+        let d = new Date(dateInput);
+        return isNaN(d.getTime()) ? new Date() : d;
+    },
+
+    formatToIndoDate: function(dateObj) {
+        let d = this.normalizeDateObj(dateObj);
+        let days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        let pad = n => String(n).padStart(2, '0');
+        return `${days[d.getDay()]}, ${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+    },
+
+    formatToInputDate: function(dateObj) {
+        let d = this.normalizeDateObj(dateObj);
+        let pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
+
+    // =========================================================
+    // 🚀 1. BUKA KALENDER FORM (BEBAS PIN DI AWAL)
+    // =========================================================
+    changeReportDateWithAuth: function() {
+        // Langsung buka kalender tanpa hambatan PIN!
+        let picker = document.getElementById('hidden-date-picker');
+        if (picker) {
+            try {
+                if (typeof picker.showPicker === 'function') picker.showPicker();
+                else picker.click();
+            } catch (e) {
+                picker.click();
+            }
+        }
+    },
+
+    // =========================================================
+    // 🚀 2. ENGINE PEMILIHAN TANGGAL TERPADU (SINKRON DI KEDUA MENU)
+    // =========================================================
+    applyBackdate: function(dateVal) {
+        if (!dateVal) return;
+        let targetDateObj = this.normalizeDateObj(dateVal);
+        let pad = n => String(n).padStart(2, '0');
+        let dateKeySearch = `${pad(targetDateObj.getDate())}-${pad(targetDateObj.getMonth() + 1)}-${targetDateObj.getFullYear()}`;
+        let dateKeySearchSlash = `${pad(targetDateObj.getDate())}/${pad(targetDateObj.getMonth() + 1)}/${targetDateObj.getFullYear()}`;
+
+        // Cari apakah laporan untuk tanggal & outlet ini sudah ada di database
+        let existingReport = (this.db.laporanHarian || []).find(x => 
+            (x.Outlet === this.outlet || this.outlet === 'Pusat') && 
+            (String(x.Tanggal).includes(dateKeySearch) || String(x.Tanggal).includes(dateKeySearchSlash))
+        );
+
+        if (existingReport) {
+            // 🚀 DATA SUDAH ADA -> Masuk ke Mode Edit secara sinkron
+            this.editLaporanHarian(existingReport.ID_Laporan);
+        } else {
+            // 🚀 DATA KOSONG -> Masuk ke Mode Input Baru untuk Tanggal Pilihan
+            this.resetDailyForm(true); // Reset tanpa konfirmasi ulang
+            
+            let indoStr = this.formatToIndoDate(targetDateObj);
+            let inputStr = this.formatToInputDate(targetDateObj);
+
+            let dateEl = document.getElementById('daily-form-date');
+            let picker = document.getElementById('hidden-date-picker');
+            
+            if (dateEl) dateEl.innerText = indoStr;
+            if (picker) picker.value = inputStr;
+
+            this.showToast(`Form siap untuk input tanggal: ${indoStr}`);
+            this.switchLapHarianSubTab('input');
+        }
+    },
+
+    openReportByDate: function(dateStr) {
+        // Teruskan ke mesin applyBackdate agar sinkron 100%
+        this.applyBackdate(dateStr);
+    },
+
+    // =========================================================
+    // 🚀 3. ENGINE EDIT DATA (SINKRONISASI TANGGAL SANGAT PRESISI)
+    // =========================================================
+    editLaporanHarian: function(idRep) {
+        let rep = (this.db.laporanHarian || []).find(x => x.ID_Laporan === idRep);
+        if (!rep) return this.showToast("Data laporan tidak ditemukan!", "error");
+
+        this.editReportId = rep.ID_Laporan;
+        
+        let titleEl = document.getElementById('form-title-mode');
+        let btnCancel = document.getElementById('btn-cancel-edit');
+        let dateEl = document.getElementById('daily-form-date');
+        let picker = document.getElementById('hidden-date-picker');
+
+        if (titleEl) titleEl.innerText = "📝 Ajukan Revisi Laporan";
+        if (btnCancel) btnCancel.classList.remove('hidden');
+
+        // 🚀 STANDARISASI TANGGAL AGAR TETAP BENAR DI FORM & KALENDER
+        let targetDateObj = this.normalizeDateObj(rep.Tanggal);
+        if (dateEl) dateEl.innerText = this.formatToIndoDate(targetDateObj);
+        if (picker) picker.value = this.formatToInputDate(targetDateObj);
+
+        // Isi form dengan angka lama
+        if (document.getElementById('daily-cash')) document.getElementById('daily-cash').value = Number(rep.Cash || 0).toLocaleString('id-ID');
+        if (document.getElementById('daily-qris')) document.getElementById('daily-qris').value = Number(rep.QRIS || 0).toLocaleString('id-ID');
+        if (document.getElementById('daily-bill')) document.getElementById('daily-bill').value = rep.Bill || 0;
+        if (document.getElementById('daily-pcs')) document.getElementById('daily-pcs').value = rep.Pcs || 0;
+
+        // Muat pengeluaran lama
+        this.dailyExpensesList = [];
+        try {
+            let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+            expArr.forEach(x => this.addDailyExpenseRow(x.nama, x.nominal));
+        } catch(e) {}
+        if (this.dailyExpensesList.length === 0) this.addDailyExpenseRow();
+
+        // Kalkulasi ulang & alihkan ke tab Input
+        this.calcDailyReportLive();
+        this.switchLapHarianSubTab('input');
+        this.showToast(`Memuat data tanggal ${this.formatToIndoDate(targetDateObj)} untuk diperbaiki.`);
+    },
+
+    // =========================================================
+    // 🚀 ENGINE DASHBOARD EKSEKUTIF (KONSOLIDASI & BREAKDOWN)
+    // =========================================================
+  
+
+     // Tambahkan fungsi ini agar error hilang meskipun tombol belum diubah
+selectOutlet: function(id) {
+    console.warn("Mengalihkan selectOutlet ke changeOutlet...");
+    this.changeOutlet(id);
+},
+
+// Pastikan fungsi changeOutlet Anda bersih seperti ini
+changeOutlet: function(val) { 
+    this.outlet = val; 
+    this.cart = []; 
+    
+    // Panggil fungsi internal lainnya
+    if(typeof this.renderCart === 'function') this.renderCart();
+    if(typeof this.checkShiftStatus === 'function') this.checkShiftStatus();
+    if(typeof this.updateHeaderOutletName === 'function') this.updateHeaderOutletName();
+    if(typeof this.closeModal === 'function') this.closeModal('modal-outlet-selector');
+
+    // Refresh Data
+    this.refreshData(); 
+
+    // Cek apakah sedang di halaman laporan untuk melakukan re-render
+    const activeView = document.querySelector('.app-view:not(.hidden)');
+    if (activeView && activeView.id === 'view-laporan-harian') {
+        this.initLaporanHarian(); 
+    }
+},
+
+    // =========================================================
+    // 🚀 RESET FILTER DASHBOARD KE BULAN BERJALAN
+    // =========================================================
+    resetExecDateRange: function() {
+        let now = new Date();
+        let firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        let pad = n => String(n).padStart(2, '0');
+        let startStr = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`;
+        let endStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+
+        if (startInput) startInput.value = startStr;
+        if (endInput) endInput.value = endStr;
+
+        this.renderExecutiveDashboard();
+        this.showToast("Menampilkan konsolidasi bulan berjalan");
+    },
+
+
+    // =========================================================
+    // 🚀 CONTROLLER ACCORDION EXPENSE BREAKDOWN EKSEKUTIF
+    // =========================================================
+    toggleExecExpenseBreakdown: function() {
+        const box = document.getElementById('exec-expense-dropdown-box');
+        const icon = document.getElementById('icon-toggle-exp');
+        const btnText = document.getElementById('btn-toggle-exp-text');
+        if (!box) return;
+
+        if (box.classList.contains('hidden')) {
+            box.classList.remove('hidden');
+            if (icon) icon.style.transform = 'rotate(180deg)';
+            if (btnText) btnText.firstElementChild.innerText = 'Tutup Rincian';
+        } else {
+            box.classList.add('hidden');
+            if (icon) icon.style.transform = 'rotate(0deg)';
+            if (btnText) btnText.firstElementChild.innerText = 'Lihat Rincian';
+        }
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER POPUP ANALISIS SUPER DETAIL PER OUTLET
+    // =========================================================
+    openDetailOutletModal: function(outName) {
+        const modal = document.getElementById('modal-detail-outlet-eksekutif');
+        const titleEl = document.getElementById('modal-detail-outlet-name');
+        const contEl = document.getElementById('modal-detail-outlet-content');
+        if (!modal || !contEl) return;
+
+        if (titleEl) titleEl.innerText = `Ai-CHA ${outName}`;
+        modal.classList.remove('hidden');
+
+        // 1. Baca filter tanggal eksekutif aktif
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
+        if (startObj) startObj.setHours(0, 0, 0, 0);
+        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
+        if (endObj) endObj.setHours(23, 59, 59, 999);
+
+        // 2. Kumpulkan metrik khusus cabang ini
+        let totSales = 0, totCash = 0, totQris = 0, totExp = 0, totBill = 0, totPcs = 0;
+        let expItemMap = {};
+        let repCount = 0;
+
+        (this.db.laporanHarian || []).forEach(rep => {
+            if (rep.Status_Approval === 'Ditolak') return;
+            let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (repOutlet !== outName) return;
+
+            if (startObj || endObj) {
+                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
+                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    let repDate = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
+                    if (startObj && repDate < startObj) return;
+                    if (endObj && repDate > endObj) return;
+                } else return;
+            }
+
+            repCount++;
+            totSales += Number(rep.Net_Sales || 0);
+            totCash += Number(rep.Cash || 0);
+            totQris += Number(rep.QRIS || 0);
+            totExp += Number(rep.Total_Pengeluaran || 0);
+            totBill += Number(rep.Bill || 0);
+            totPcs += Number(rep.Pcs || 0);
+
+            try {
+                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                expArr.forEach(x => {
+                    let nm = String(x.nama || 'LAINNYA').toUpperCase().trim();
+                    let nmNom = Number(x.nominal || 0);
+                    if (nm !== '' && nmNom > 0) {
+                        if (!expItemMap[nm]) expItemMap[nm] = 0;
+                        expItemMap[nm] += nmNom;
+                    }
+                });
+            } catch(e){}
+        });
+
+        // 3. Kalkulasi Target Cabang & Rata-rata
+        let avgBill = totBill > 0 ? Math.round(totSales / totBill) : 0;
+        let avgPcs = totPcs > 0 ? Math.round(totSales / totPcs) : 0;
+        let netLaci = totCash - totExp;
+
+        let targetCabang = 180000000;
+        let savedT = localStorage.getItem('aicha_target_bulanan_' + outName);
+        if (savedT && !isNaN(savedT)) targetCabang = Number(savedT);
+        let pctTarget = Math.min(Math.round((totSales / targetCabang) * 100), 100);
+
+        // Render Rincian Item Biaya Cabang
+        let expKeys = Object.keys(expItemMap).sort((a,b) => expItemMap[b] - expItemMap[a]);
+        let expHtml = expKeys.length === 0 
+            ? `<div class="text-xs text-slate-400 italic py-2">Tidak ada pengeluaran dicatat</div>` 
+            : expKeys.map(k => `
+                <div class="flex justify-between items-center bg-slate-800/80 p-2 rounded-xl text-xs border border-slate-700/50">
+                    <span class="font-extrabold text-slate-300">▪️ ${k}</span>
+                    <span class="font-black text-amber-400">Rp ${expItemMap[k].toLocaleString('id-ID')}</span>
+                </div>`).join('');
+
+        // 4. Rakit HTML Popup Super Lengkap
+        contEl.innerHTML = `
+            <!-- Kartu Progres Target Cabang -->
+            <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700">
+                <div class="flex justify-between text-xs font-bold mb-2">
+                    <span class="text-slate-300">Target Pencapaian Cabang</span>
+                    <span class="font-black text-rose-400">${pctTarget}% (Rp ${totSales.toLocaleString('id-ID')} / Rp ${targetCabang.toLocaleString('id-ID')})</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                    <div class="bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-400 h-full rounded-full transition-all duration-700" style="width: ${pctTarget}%"></div>
+                </div>
+            </div>
+
+            <!-- Matriks Rangkuman KPI -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Net Sales Bersih</span>
+                    <span class="text-base font-black text-rose-400">Rp ${totSales.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Cash Laci</span>
+                    <span class="text-base font-black text-emerald-400">Rp ${totCash.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total QRIS</span>
+                    <span class="text-base font-black text-blue-400">Rp ${totQris.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Pengeluaran</span>
+                    <span class="text-base font-black text-amber-400">Rp ${totExp.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Rata-rata / Bill (${totBill} Bill)</span>
+                    <span class="text-base font-black text-purple-400">Rp ${avgBill.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Rata-rata / Pcs (${totPcs} Pcs)</span>
+                    <span class="text-base font-black text-teal-400">Rp ${avgPcs.toLocaleString('id-ID')}</span>
+                </div>
+            </div>
+
+            <!-- Net Cash Bersih -->
+            <div class="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 p-3.5 rounded-2xl border border-emerald-500/30 flex justify-between items-center">
+                <span class="text-xs font-bold text-emerald-200">💵 Net Cash Bersih Tersedia di Toko (Cash - Biaya):</span>
+                <span class="text-base font-black text-emerald-400">Rp ${netLaci.toLocaleString('id-ID')}</span>
+            </div>
+
+            <!-- Rincian Biaya Khusus Cabang Ini -->
+            <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60 space-y-2">
+                <h5 class="text-xs font-black text-amber-400 flex items-center gap-2">
+                    <i class="fas fa-list"></i> Breakdown Pengeluaran Cabang ${outName}
+                </h5>
+                <div class="space-y-1.5 max-h-36 overflow-y-auto custom-scroll pr-1 mt-2">
+                    ${expHtml}
+                </div>
+            </div>
+        </div>`;
+    },
+
+    closeDetailOutletModal: function() {
+        const modal = document.getElementById('modal-detail-outlet-eksekutif');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    // =========================================================
+    // 🚀 RENDER DASHBOARD EKSEKUTIF DENGAN KARTU MINI INTERAKTIF
+    // =========================================================
+    renderExecutiveDashboard: function() {
+        const dashCont = document.getElementById('lapharian-executive-dashboard');
+        if (!dashCont) return;
+
+        let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
+        if (!isOwner) {
+            dashCont.classList.add('hidden');
+            return;
+        }
+        dashCont.classList.remove('hidden');
+
+        // 1. Ambil & Inisialisasi Tanggal Filter
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+        let now = new Date();
+
+        if (startInput && !startInput.value) {
+            let pad = n => String(n).padStart(2, '0');
+            startInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+        }
+        if (endInput && !endInput.value) {
+            let pad = n => String(n).padStart(2, '0');
+            endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        }
+
+        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
+        if (startObj) startObj.setHours(0, 0, 0, 0);
+        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
+        if (endObj) endObj.setHours(23, 59, 59, 999);
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let titleEl = document.getElementById('exec-dash-title');
+        if (titleEl) {
+            titleEl.innerText = isConsolidated ? "Konsolidasi Seluruh Outlet" : `Analisis Eksekutif: ${this.outlet}`;
+        }
+
+        let totSales = 0, totCash = 0, totQris = 0, totExp = 0;
+        let outletMap = {};
+        let expenseItemMap = {};
+
+        (this.db.laporanHarian || []).forEach(rep => {
+            if (rep.Status_Approval === 'Ditolak') return;
+
+            if (startObj || endObj) {
+                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
+                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    let repDateObj = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
+                    if (startObj && repDateObj < startObj) return;
+                    if (endObj && repDateObj > endObj) return;
+                } else return;
+            }
+
+            let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
+            let currOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+            if (!isConsolidated && repOutlet !== currOutlet) return;
+
+            let net = Number(rep.Net_Sales || 0);
+            let cash = Number(rep.Cash || 0);
+            let qris = Number(rep.QRIS || 0);
+            let exp = Number(rep.Total_Pengeluaran || 0);
+
+            totSales += net;
+            totCash += cash;
+            totQris += qris;
+            totExp += exp;
+
+            if (!outletMap[repOutlet]) outletMap[repOutlet] = { sales: 0, cash: 0, qris: 0, exp: 0 };
+            outletMap[repOutlet].sales += net;
+            outletMap[repOutlet].cash += cash;
+            outletMap[repOutlet].qris += qris;
+            outletMap[repOutlet].exp += exp;
+
+            try {
+                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                expArr.forEach(itemExp => {
+                    let itemName = String(itemExp.nama || 'LAINNYA').toUpperCase().trim();
+                    let itemNom = Number(itemExp.nominal || 0);
+                    if (itemName !== '' && itemNom > 0) {
+                        if (!expenseItemMap[itemName]) expenseItemMap[itemName] = 0;
+                        expenseItemMap[itemName] += itemNom;
+                    }
+                });
+            } catch(e){}
+        });
+
+        // 2. Render 4 KPI Utama
+        if (document.getElementById('exec-total-sales')) document.getElementById('exec-total-sales').innerText = `Rp ${totSales.toLocaleString('id-ID')}`;
+        if (document.getElementById('exec-total-cash')) document.getElementById('exec-total-cash').innerText = `Rp ${totCash.toLocaleString('id-ID')}`;
+        if (document.getElementById('exec-total-qris')) document.getElementById('exec-total-qris').innerText = `Rp ${totQris.toLocaleString('id-ID')}`;
+        if (document.getElementById('exec-total-expense')) document.getElementById('exec-total-expense').innerText = `Rp ${totExp.toLocaleString('id-ID')}`;
+
+        // 3. Update Akumulasi & Target Bulanan yang Terintegrasi
+        let targetTotal = this.targetBulanan || 180000000;
+        if (isConsolidated && this.db && this.db.outlets) {
+            let tCons = 0;
+            this.db.outlets.forEach(o => {
+                if (o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua') {
+                    let st = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
+                    tCons += (st && !isNaN(st)) ? Number(st) : 180000000;
+                }
+            });
+            if (tCons > 0) targetTotal = tCons;
+        }
+
+        let pctExec = Math.min(Math.round((totSales / targetTotal) * 100), 100);
+        let sisaTarget = Math.max(targetTotal - totSales, 0);
+
+        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totSales.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetTotal.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pctExec}%`;
+        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pctExec}%`;
+        if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${sisaTarget.toLocaleString('id-ID')}`;
+
+        // 4. Render Kartu Mini Outlet Interaktif
+        const cardsGrid = document.getElementById('exec-outlet-cards-grid');
+        if (cardsGrid) {
+            let outletKeys = Object.keys(outletMap).sort((a,b) => outletMap[b].sales - outletMap[a].sales);
+            if (outletKeys.length === 0) {
+                cardsGrid.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-700 rounded-2xl">Belum ada transaksi di periode ini</div>`;
+            } else {
+                cardsGrid.innerHTML = outletKeys.map(outName => {
+                    let oData = outletMap[outName];
+                    let pct = totSales > 0 ? Math.round((oData.sales / totSales) * 100) : 0;
+                    return `
+                    <div onclick="superApp.openDetailOutletModal('${outName}')" class="bg-slate-800/80 hover:bg-slate-700/90 p-3.5 rounded-2xl border border-slate-700 hover:border-rose-500/50 cursor-pointer transition-all active:scale-95 shadow-md flex flex-col justify-between group">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-black text-white text-sm group-hover:text-rose-400 transition">Ai-CHA ${outName}</span>
+                            <span class="text-[9px] font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">${pct}% Kontribusi</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block uppercase font-bold">Total Sales Cabang</span>
+                            <span class="font-black text-rose-400 text-base block tracking-tight">Rp ${oData.sales.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-slate-700/70 flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                            <span>💵 C: Rp ${oData.cash.toLocaleString('id-ID')}</span>
+                            <span class="text-indigo-300 group-hover:translate-x-1 transition-transform">Detail <i class="fas fa-arrow-right text-[9px] ml-0.5"></i></span>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // 5. Render Breakdown Pengeluaran Per Item
+        const expCont = document.getElementById('exec-expense-list');
+        if (expCont) {
+            let expKeys = Object.keys(expenseItemMap).sort((a,b) => expenseItemMap[b] - expenseItemMap[a]);
+            if (expKeys.length === 0) {
+                expCont.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic text-center py-4">Belum ada pengeluaran pada periode ini</div>`;
+            } else {
+                expCont.innerHTML = expKeys.map(itemName => {
+                    let nom = expenseItemMap[itemName];
+                    let pctExp = totExp > 0 ? Math.round((nom / totExp) * 100) : 0;
+                    return `
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex justify-between items-center text-xs">
+                        <span class="font-extrabold text-slate-200 block uppercase">▪️ ${itemName}</span>
+                        <div class="text-right">
+                            <span class="font-black text-amber-400 block">Rp ${nom.toLocaleString('id-ID')}</span>
+                            <span class="text-[9px] text-slate-400">${pctExp}% dari biaya</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER DATEPICKER INPUT KUSTOM YANG CANTIK
+    // =========================================================
+    inputDatepickerYear: new Date().getFullYear(),
+    inputDatepickerMonth: new Date().getMonth(),
+    calendarModalYear: new Date().getFullYear(),
+    calendarModalMonth: new Date().getMonth(),
+
+    openInputDatepickerModal: function() {
+        // Cukup periksa apakah user sudah login (sesi valid)
+        if (!this.currentUser) {
+            return this.showToast("Sesi login tidak ditemukan. Silakan login kembali.", "error");
+        }
+
+        // Langsung buka modal tanpa harus memasukkan PIN
+        const modal = document.getElementById('modal-datepicker-input');
+        if (modal) {
+            modal.classList.remove('hidden');
+            
+            // Reset ke tampilan bulan saat ini
+            this.inputDatepickerYear = new Date().getFullYear();
+            this.inputDatepickerMonth = new Date().getMonth();
+            this.renderInputDatepickerGrid();
+        } else {
+            this.showToast("Sistem Datepicker tidak tersedia.", "error");
+        }
+    },
+
+    closeInputDatepickerModal: function() {
+        const modal = document.getElementById('modal-datepicker-input');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    // =========================================================
+    // 🚀 1. DATEPICKER INPUT KUSTOM (SELARAS DENGAN INDIKATOR TERISI)
+    // =========================================================
+    renderInputDatepickerGrid: function() {
+        const grid = document.getElementById('input-datepicker-grid');
+        const title = document.getElementById('input-datepicker-month-year');
+        if (!grid) return;
+
+        let y = this.inputDatepickerYear;
+        let m = this.inputDatepickerMonth;
+        let dDate = new Date(y, m, 1);
+        
+        if (title) title.innerText = dDate.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+
+        const firstDay = dDate.getDay();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+        // Deteksi mode konsolidasi atau outlet spesifik untuk penanda terisi
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        // Ambil daftar tanggal terisi dari database (untuk bulan yang sedang dibuka di datepicker)
+        const terisiDates = (this.db.laporanHarian || []).filter(x => {
+            if (x.Status_Approval === 'Ditolak') return false;
+            let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            return isConsolidated || repOutlet === currOutletClean;
+        }).map(l => {
+            let cleanStr = (l.Tanggal || '').split(',').pop().trim();
+            let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (match) {
+                return `${parseInt(match[3], 10)}-${parseInt(match[2], 10)}-${parseInt(match[1], 10)}`; // YYYY-M-D
+            }
+            return '';
+        });
+
+        grid.innerHTML = `
+            <div class="text-slate-400 py-1 font-black">Sen</div><div class="text-slate-400 py-1 font-black">Sel</div><div class="text-slate-400 py-1 font-black">Rab</div>
+            <div class="text-slate-400 py-1 font-black">Kam</div><div class="text-slate-400 py-1 font-black">Jum</div><div class="text-slate-400 py-1 font-black">Sab</div><div class="text-slate-400 py-1 font-black">Min</div>
+        `;
+
+        let offset = (firstDay === 0) ? 6 : firstDay - 1;
+        for(let i = 0; i < offset; i++) {
+            grid.appendChild(document.createElement('div'));
+        }
+
+        let today = new Date();
+        for(let d = 1; d <= daysInMonth; d++) {
+            let dateKey = `${y}-${m + 1}-${d}`;
+            let isDone = terisiDates.includes(dateKey);
+            let isToday = (d === today.getDate() && m === today.getMonth() && y === today.getFullYear());
+            
+            let div = document.createElement('div');
+            
+            // ✨ INDIKATOR DINAMIS: Selaras dengan master kalender laporan
+            let bgClass = 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/60';
+            if (isDone) {
+                bgClass = 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20';
+            }
+            if (isToday) {
+                bgClass = 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-white';
+            }
+
+            div.className = `aspect-square h-9 mx-auto flex flex-col items-center justify-center rounded-xl text-xs font-black cursor-pointer transition-all active:scale-90 relative ${bgClass}`;
+            
+            // Tambahkan dot indikator terisi jika tanggal hari ini juga sudah terisi data
+            if (isToday && isDone) {
+                div.innerHTML = `${d}<span class="w-1.5 h-1.5 bg-emerald-300 rounded-full absolute bottom-1"></span>`;
+            } else {
+                div.innerText = d;
+            }
+
+            div.onclick = () => {
+                let pad = n => String(n).padStart(2, '0');
+                let tglPilihan = `${y}-${pad(m + 1)}-${pad(d)}`;
+                this.applyBackdate(tglPilihan);
+                this.closeInputDatepickerModal();
+            };
+            grid.appendChild(div);
+        }
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER POPUP MODAL KALENDER LAPORAN (MULTI-BULAN)
+    // =========================================================
+    openCalendarModal: function() {
+        const modal = document.getElementById('modal-kalender-laporan');
+        if (modal) {
+            modal.classList.remove('hidden');
+            let now = new Date();
+            this.calendarModalYear = now.getFullYear();
+            this.calendarModalMonth = now.getMonth();
+            this.renderCalendar();
+        }
+    },
+
+    closeCalendarModal: function() {
+        const modal = document.getElementById('modal-kalender-laporan');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER DATEPICKER INPUT KUSTOM (PERBAIKAN PARAMETER dir)
+    // =========================================================
+    navInputDatepicker: function(dir) {
+        this.inputDatepickerMonth += dir;
+        if (this.inputDatepickerMonth < 0) {
+            this.inputDatepickerMonth = 11;
+            this.inputDatepickerYear--;
+        } else if (this.inputDatepickerMonth > 11) {
+            this.inputDatepickerMonth = 0;
+            this.inputDatepickerYear++;
+        }
+        this.renderInputDatepickerGrid();
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER POPUP MODAL KALENDER LAPORAN (PERBAIKAN PARAMETER dir)
+    // =========================================================
+    navCalendarModal: function(dir) {
+        if (dir === 0) {
+            let now = new Date();
+            this.calendarModalYear = now.getFullYear();
+            this.calendarModalMonth = now.getMonth();
+        } else {
+            this.calendarModalMonth += dir;
+            if (this.calendarModalMonth < 0) {
+                this.calendarModalMonth = 11;
+                this.calendarModalYear--;
+            } else if (this.calendarModalMonth > 11) {
+                this.calendarModalMonth = 0;
+                this.calendarModalYear++;
+            }
+        }
+        this.renderCalendar();
+    },
+
+    // =========================================================
+    // 🚀 3. MASTER KALENDER LAPORAN MODAL (MATRIKS KEDISIPLINAN KASIR LIVE OUTLET)
+    // =========================================================
+    renderCalendar: function() {
+        const year = this.calendarModalYear || new Date().getFullYear();
+        const month = this.calendarModalMonth !== undefined ? this.calendarModalMonth : new Date().getMonth();
+        
+        let now = new Date();
+        let isCurrentMonth = (month === now.getMonth() && year === now.getFullYear());
+        let currentDayLimit = isCurrentMonth ? now.getDate() : new Date(year, month + 1, 0).getDate();
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        // 🚀 KUNCI PERBAIKAN: Ambtil data laporan dinamis mengikuti outlet terpilih
+        const terisiDates = (this.db.laporanHarian || []).filter(x => {
+            if (x.Status_Approval === 'Ditolak') return false;
+            let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            return isConsolidated || repOutlet === currOutletClean;
+        }).map(l => {
+            let cleanStr = (l.Tanggal || '').split(',').pop().trim();
+            let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (match) {
+                return `${parseInt(match[3], 10)}-${parseInt(match[2], 10)}-${parseInt(match[1], 10)}`; // YYYY-M-D
+            }
+            return '';
+        });
+
+        // 🚀 MATRIKS KEDISIPLINAN REAL-TIME BERDASARKAN OUTLET TERPILIH
+        let terisiCount = 0;
+        for (let d = 1; d <= currentDayLimit; d++) {
+            if (terisiDates.includes(`${year}-${month + 1}-${d}`)) {
+                terisiCount++;
+            }
+        }
+        let kosongCount = Math.max(0, currentDayLimit - terisiCount);
+
+        // Update teks keterangan judul bulan berjalan & ringkasan di dashboard utama
+        let dDate = new Date(year, month, 1);
+        if (document.getElementById('calendar-summary-month')) {
+            document.getElementById('calendar-summary-month').innerText = dDate.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+        }
+        if (document.getElementById('cal-stat-terisi')) document.getElementById('cal-stat-terisi').innerText = `${terisiCount} Hari`;
+        if (document.getElementById('cal-stat-kosong')) document.getElementById('cal-stat-kosong').innerText = `${kosongCount} Hari`;
+
+        // Render struktur grid ke dalam modal popup kalender
+        const grid = document.getElementById('modal-calendar-grid');
+        const modalTitle = document.getElementById('modal-cal-month-title');
+        if (!grid) return;
+
+        if (modalTitle) modalTitle.innerText = dDate.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+
+        const firstDay = dDate.getDay(); 
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        grid.innerHTML = `
+            <div class="text-slate-400 py-1.5 font-black">Sen</div><div class="text-slate-400 py-1.5 font-black">Sel</div><div class="text-slate-400 py-1.5 font-black">Rab</div>
+            <div class="text-slate-400 py-1.5 font-black">Kam</div><div class="text-slate-400 py-1.5 font-black">Jum</div><div class="text-slate-400 py-1.5 font-black">Sab</div><div class="text-slate-400 py-1.5 font-black">Min</div>
+        `;
+        
+        let offset = (firstDay === 0) ? 6 : firstDay - 1;
+        for(let i = 0; i < offset; i++) {
+            grid.appendChild(document.createElement('div'));
+        }
+        
+        for(let d = 1; d <= daysInMonth; d++) {
+            let dateKey = `${year}-${month + 1}-${d}`;
+            let isDone = terisiDates.includes(dateKey);
+            
+            let div = document.createElement('div');
+            div.className = `aspect-square h-10 mx-auto flex items-center justify-center rounded-2xl text-xs font-black cursor-pointer transition-all active:scale-90 ${
+                isDone 
+                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' 
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200/60'
+            }`;
+            div.innerText = d;
+            
+            div.onclick = () => {
+                let pad = n => String(n).padStart(2, '0');
+                let tglPilihan = `${year}-${pad(month + 1)}-${pad(d)}`;
+                if (typeof this.applyBackdate === 'function') {
+                    this.applyBackdate(tglPilihan);
+                }
+                this.closeCalendarModal();
+                this.showToast(`Memilih laporan tanggal: ${d}-${month+1}-${year}`);
+            };
+            grid.appendChild(div);
+        }
+    },
+
+    // =========================================================
+    // 🚀 CONTROLLER MODAL POPUP WA LAPORAN HARIAN
+    // =========================================================
+    openWaLaporanModal: function(text) {
+        const modal = document.getElementById('modal-wa-laporan-harian');
+        const textarea = document.getElementById('wa-laporan-preview-text');
+        
+        if (textarea) {
+            textarea.value = text;
+        }
+        
+        if (modal) {
+            modal.classList.remove('hidden');
+            // Reset focus textarea ke atas agar rapi saat dibaca kasir
+            textarea.scrollTop = 0; 
+        } else {
+            // Fallback jika elemen modal utama tidak ditemukan di index.html
+            this.showToast("Gagal memuat popup WA, meredireksi langsung...", "error");
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+    },
+
+    closeWaLaporanModal: function() {
+        const modal = document.getElementById('modal-wa-laporan-harian');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    },
+
+    copyWaLaporanText: function() {
+        const textarea = document.getElementById('wa-laporan-preview-text');
+        if (!textarea || !textarea.value) return;
+        
+        // Block text untuk visualisasi salin
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+        
+        navigator.clipboard.writeText(textarea.value).then(() => {
+            const btn = document.getElementById('btn-copy-wa-lap');
+            if (btn) {
+                let originalContent = btn.innerHTML;
+                // Transisi tombol interaktif menjadi sukses tersalin
+                btn.innerHTML = `<i class="fas fa-check text-emerald-500"></i> Tersalin!`;
+                btn.classList.add('border-emerald-500', 'text-emerald-600', 'bg-emerald-50');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalContent;
+                    btn.classList.remove('border-emerald-500', 'text-emerald-600', 'bg-emerald-50');
+                }, 2000);
+            }
+            this.showToast("Teks laporan berhasil disalin!", "success");
+        }).catch(err => {
+            this.showToast("Gagal menyalin teks, silakan salin manual.", "error");
+        });
+    },
+
+    sendWaLaporanNow: function() {
+        const textarea = document.getElementById('wa-laporan-preview-text');
+        if (!textarea || !textarea.value) return;
+        
+        let textEncoded = encodeURIComponent(textarea.value);
+        // Membuka tautan resmi kirim teks API WhatsApp (Mendukung Web & Aplikasi HP)
+        window.open(`https://api.whatsapp.com/send?text=${textEncoded}`, '_blank');
+        
+        // Tutup modal secara otomatis setelah mengalihkan user ke WA
+        this.closeWaLaporanModal();
+    },
+
+    
     // =========================================================
     // 🚀 1. RENDER MANAJEMEN USER (PC & MOBILE DUAL RENDER)
     // =========================================================
@@ -2123,39 +3961,84 @@ const superApp = {
     },
     
     
-    // SHIFT & KAS KELUAR
+    // =========================================================
+    // 🚀 SHIFT SYSTEM (ANTI-RESET & AUTO TUTUP JAM 12 MALAM)
+    // =========================================================
     checkShiftStatus: function() {
-        const shiftOutName = document.getElementById('shift-outlet-name'); if (shiftOutName) shiftOutName.innerText = this.outlet;
-        let openShift = (this.db.shifts || []).find(s => s.Outlet === this.outlet && s.Waktu_Tutup === '');
+        let cleanActiveOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        const shiftOutName = document.getElementById('shift-outlet-name'); 
+        if (shiftOutName) shiftOutName.innerText = `Ai-CHA ${cleanActiveOutlet}`;
+
+        let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+        let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+        // 1. Cari shift yang masih terbuka di cabang ini
+        let openShift = (this.db.shifts || []).find(s => {
+            let sOutClean = String(s.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            return sOutClean === cleanActiveOutlet && (s.Waktu_Tutup === '' || !s.Waktu_Tutup);
+        });
+
+        // 🚀 2. DETEKSI SHIFT KADALUWSA (AUTO TUTUP JIKA MELEWATI JAM 12 MALAM / GANTI HARI)
+        if (openShift && openShift.Tanggal !== todayStrLocal) {
+            console.warn(`Shift lama (${openShift.ID_Shift}) terdeteksi melewati jam 12 malam. Melakukan Auto-Close...`);
+            this.autoCloseExpiredShift(openShift);
+            return; // Hentikan pengecekan, biarkan sistem menutup shift kemarin
+        }
+
         const posView = document.getElementById('view-pos');
 
         if (openShift) {
+            // 🔒 SHIFT TERBUKA: Kunci sesi di memori agar tidak reset saat keluar masuk
             this.activeShiftId = openShift.ID_Shift;
+            localStorage.setItem('aicha_active_shift_id_' + cleanActiveOutlet, openShift.ID_Shift);
+            
             try { this.activeStaffTeam = JSON.parse(openShift.Tim_Operasional); } catch (e) { this.activeStaffTeam = []; }
             if (posView) posView.classList.remove('blur-lock');
         } else {
-            this.activeShiftId = null; this.activeStaffTeam = [];
+            // 🔓 SHIFT KOSONG: Minta kasir buka shift
+            this.activeShiftId = null; 
+            this.activeStaffTeam = [];
+            localStorage.removeItem('aicha_active_shift_id_' + cleanActiveOutlet);
+            
             if (posView) posView.classList.add('blur-lock');
 
-            const shiftUserName = document.getElementById('shift-user-name'); if (shiftUserName && this.currentUser) shiftUserName.innerText = this.currentUser.Username;
+            const shiftUserName = document.getElementById('shift-user-name'); 
+            if (shiftUserName && this.currentUser) shiftUserName.innerText = this.currentUser.Username;
 
             let staffHtml = '';
-            (this.db.users || []).filter(u => u.Outlet === this.outlet || u.Outlet === 'Pusat').forEach(u => {
+            (this.db.users || []).filter(u => {
+                let uOutClean = String(u.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+                return uOutClean === cleanActiveOutlet || uOutClean === 'Pusat' || uOutClean === 'Semua';
+            }).forEach(u => {
                 let badge = String(u.Role).toLowerCase().includes('senior') || String(u.Role).toLowerCase().includes('admin') ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-slate-100 text-slate-500';
                 staffHtml += `<label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-100 transition"><input type="checkbox" value="${u.Username}" data-role="${u.Role}" class="shift-cb w-5 h-5 text-brand-500 rounded"><div class="flex-1 font-bold text-sm text-slate-800">${u.Username}</div><span class="px-2 py-0.5 border rounded text-[10px] font-black uppercase ${badge}"></span></label>`;
             });
 
-            const staffListEl = document.getElementById('shift-staff-list'); if (staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500">Tidak ada staf terdaftar di cabang ini.</p>';
-            const mAwal = document.getElementById('shift-modal-awal'); if (mAwal) mAwal.value = '';
+            const staffListEl = document.getElementById('shift-staff-list'); 
+            if (staffListEl) staffListEl.innerHTML = staffHtml || '<p class="text-sm text-red-500 font-bold">Tidak ada staf terdaftar di cabang ini.</p>';
+            
+            const mAwal = document.getElementById('shift-modal-awal'); 
+            if (mAwal) mAwal.value = '';
 
-            const modalShift = document.getElementById('modal-shift'); const modalShiftContent = document.getElementById('modal-shift-content');
-            if (modalShift && modalShiftContent) { modalShift.classList.remove('hidden'); setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); }
+            const modalShift = document.getElementById('modal-shift'); 
+            const modalShiftContent = document.getElementById('modal-shift-content');
+            if (modalShift && modalShiftContent) { 
+                modalShift.classList.remove('hidden'); 
+                setTimeout(() => modalShiftContent.classList.add('modal-enter-active'), 10); 
+            }
         }
     },
+
     executeBukaShift: async function() {
         if (this.isProcessing) return;
-        let cbs = document.querySelectorAll('.shift-cb:checked'); if (cbs.length === 0) return this.showToast("Pilih minimal 1 anggota tim!", "error");
-        let mAwalEl = document.getElementById('shift-modal-awal'); let m_awal = mAwalEl ? this.getNumericValue(mAwalEl.value) : 0;
+        let cleanActiveOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        let cbs = document.querySelectorAll('.shift-cb:checked'); 
+        if (cbs.length === 0) return this.showToast("Pilih minimal 1 anggota tim!", "error");
+        
+        let mAwalEl = document.getElementById('shift-modal-awal'); 
+        let m_awal = mAwalEl ? this.getNumericValue(mAwalEl.value) : 0;
         if (m_awal === 0 && (!mAwalEl || mAwalEl.value === '')) return this.showToast("Uang Laci Awal wajib diisi!", "error");
 
         let tim = []; let hasSenior = false;
@@ -2167,81 +4050,168 @@ const superApp = {
 
         this.setLoading(true, "Membuka Laci Kasir...");
         let shiftID = 'SHF' + new Date().getTime();
-        const payload = { action: 'buka_shift', outlet: this.outlet, tim: tim, modal_awal: m_awal, id_shift: shiftID };
+        
+        const payload = { action: 'buka_shift', outlet: cleanActiveOutlet, tim: tim, modal_awal: m_awal, id_shift: shiftID };
         let res = await this.apiPost(payload);
 
         if (res.status === 'sukses') {
-            this.activeShiftId = shiftID; this.activeStaffTeam = tim;
-            if (res.is_offline) {
-                let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
-                this.db.shifts.push({ ID_Shift: shiftID, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Outlet: this.outlet, Waktu_Tutup: '', Tim_Operasional: JSON.stringify(tim), Modal_Awal: m_awal });
-            }
-            this.closeModal('modal-shift'); const posView = document.getElementById('view-pos'); if (posView) posView.classList.remove('blur-lock');
-            this.showToast(res.is_offline ? "Shift Dibuka (Mode Offline)" : "Shift Dibuka! Laci siap digunakan.");
+            this.activeShiftId = shiftID; 
+            this.activeStaffTeam = tim;
+            
+            let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+            let newShiftObj = { 
+                ID_Shift: shiftID, 
+                Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, 
+                Outlet: cleanActiveOutlet, 
+                Waktu_Tutup: '', 
+                Tim_Operasional: JSON.stringify(tim), 
+                Modal_Awal: m_awal 
+            };
+
+            // 🚀 PERBAIKAN KRITIS: SIMPAN LANGSUNG KE MEMORI & CACHE BROWSER (BAIK ONLINE MAUPUN OFFLINE)
+            if (!this.db.shifts) this.db.shifts = [];
+            this.db.shifts.push(newShiftObj);
+            localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+            localStorage.setItem('aicha_active_shift_id_' + cleanActiveOutlet, shiftID);
+
+            this.closeModal('modal-shift'); 
+            const posView = document.getElementById('view-pos'); 
+            if (posView) posView.classList.remove('blur-lock');
+            this.showToast("Shift Dibuka! Laci siap digunakan.");
         }
         this.setLoading(false);
     },
+
+    // =========================================================
+    // 🚀 ENGINE OTOMATIS TUTUP SHIFT JAM 12 MALAM
+    // =========================================================
+    autoCloseExpiredShift: async function(expiredShift) {
+        let cleanActiveOutlet = String(expiredShift.Outlet || this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+        let shiftDate = expiredShift.Tanggal;
+        
+        let modal = Number(expiredShift.Modal_Awal || 0);
+        let salesTunai = 0; let totalKasKeluar = 0;
+
+        // Hitung transaksi tunai & kas keluar pada tanggal shift tersebut
+        (this.db.transactions || []).forEach(t => {
+            let tOutClean = String(t.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let tDate = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
+            if (tOutClean === cleanActiveOutlet && tDate === shiftDate && t.Status === 'Sukses' && String(t.Metode_Bayar || '').toUpperCase() === 'TUNAI') {
+                salesTunai += Number(t.Total_Bayar);
+            }
+        });
+
+        (this.db.kasKeluar || []).forEach(k => {
+            let kOutClean = String(k.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let kDate = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(k.Tanggal) : k.Tanggal;
+            if (kOutClean === cleanActiveOutlet && kDate === shiftDate) {
+                totalKasKeluar += Number(k.Nominal);
+            }
+        });
+
+        let expectedCash = modal + salesTunai - totalKasKeluar;
+
+        this.setLoading(true, "Auto-Closing Shift Kemarin (00:00)...");
+        
+        // Kirim penutupan otomatis ke server (Selisih 0 karena dianggap sesuai hitungan sistem)
+        const payload = { 
+            action: 'tutup_shift', 
+            id_shift: expiredShift.ID_Shift, 
+            setoran_akhir: expectedCash, 
+            selisih: 0,
+            keterangan: 'Auto-Closed by System (Midnight 00:00)' 
+        };
+        await this.apiPost(payload);
+
+        // Update status di memori lokal
+        let idx = (this.db.shifts || []).findIndex(s => s.ID_Shift === expiredShift.ID_Shift);
+        if (idx > -1) {
+            this.db.shifts[idx].Waktu_Tutup = '00:00 (Auto)';
+            this.db.shifts[idx].Setoran_Akhir = expectedCash;
+        }
+        localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+        localStorage.removeItem('aicha_active_shift_id_' + cleanActiveOutlet);
+
+        this.setLoading(false);
+        this.showToast(`Shift tanggal ${shiftDate} telah otomatis ditutup sistem (Jam 12 Malam).`, "info");
+        
+        // Panggil kembali pengecekan shift untuk hari baru
+        this.checkShiftStatus();
+    },
+
     openKasKeluar: function() {
         const nom = document.getElementById('kas-out-nominal'); if (nom) nom.value = '';
         const ket = document.getElementById('kas-out-ket'); if (ket) ket.value = '';
         const mod = document.getElementById('modal-kas-keluar'); const modc = document.getElementById('modal-kas-keluar-content');
         if (mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
     },
+
     executeKasKeluar: async function() {
         if (this.isProcessing) return;
+        let cleanActiveOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
         let nomEl = document.getElementById('kas-out-nominal'); let ketEl = document.getElementById('kas-out-ket');
-        if (!nomEl || !ketEl) return; let nom = this.getNumericValue(nomEl.value); let ket = ketEl.value;
+        if (!nomEl || !ketEl) return; 
+        let nom = this.getNumericValue(nomEl.value); let ket = ketEl.value;
         if (nom === 0 || !ket) return this.showToast("Nominal dan Keterangan wajib diisi!", "error");
 
         this.setLoading(true, "Mencatat Pengeluaran...");
         let kasId = 'KAS' + new Date().getTime();
-        const payload = { action: 'kas_keluar', id_kas: kasId, outlet: this.outlet, kasir: this.currentUser.Username, nominal: nom, keterangan: ket, id_shift: this.activeShiftId };
+        
+        // 🚀 Kunci pengeluaran ke cabang aktif saat ini
+        const payload = { action: 'kas_keluar', id_kas: kasId, outlet: cleanActiveOutlet, kasir: this.currentUser ? this.currentUser.Username : 'Kasir', nominal: nom, keterangan: ket, id_shift: this.activeShiftId };
 
         let res = await this.apiPost(payload);
         if (res.status === 'sukses') {
             if (res.is_offline) {
                 let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
                 if (!this.db.kasKeluar) this.db.kasKeluar = [];
-                this.db.kasKeluar.push({ ID_Kas: kasId, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: this.outlet, Kasir: this.currentUser.Username, Nominal: nom, Keterangan: ket, ID_Shift: this.activeShiftId });
+                this.db.kasKeluar.push({ ID_Kas: kasId, Tanggal: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, Outlet: cleanActiveOutlet, Kasir: this.currentUser ? this.currentUser.Username : 'Kasir', Nominal: nom, Keterangan: ket, ID_Shift: this.activeShiftId });
             }
-            this.closeModal('modal-kas-keluar'); this.showToast("Kas Keluar Tersimpan.");
-            if (!res.is_offline) { const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); this.db = await r.json(); this.refreshData(); }
+            this.closeModal('modal-kas-keluar'); 
+            this.showToast("Kas Keluar Tersimpan.");
+            if (!res.is_offline) { 
+                const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                this.db = await r.json(); 
+                this.refreshData(); 
+            }
         }
         this.setLoading(false);
     },
-   promptTutupShift: function() {
+
+    promptTutupShift: function() {
         const setAkhir = document.getElementById('shift-setoran-akhir'); if (setAkhir) setAkhir.value = '';
         
-        // 1. Dapatkan Tanggal Hari Ini Sesuai Format Server
+        let cleanActiveOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 
         let modal = 0; let salesTunai = 0; let totalKasKeluar = 0;
 
-        // 2. Jumlahkan semua Modal Awal dalam 1 HARI PENUH (Bisa jadi kasir input modal > 1 kali)
+        // 🚀 Normalisasi perbandingan saat menghitung rekap harian
         (this.db.shifts || []).forEach(s => {
-            if (s.Outlet === this.outlet && s.Tanggal === todayStrLocal) {
+            let sOutClean = String(s.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (sOutClean === cleanActiveOutlet && s.Tanggal === todayStrLocal) {
                 modal += Number(s.Modal_Awal || 0);
             }
         });
 
-        // 3. Jumlahkan semua Penjualan TUNAI dalam 1 HARI PENUH (Abaikan ID Shift)
         (this.db.transactions || []).forEach(t => {
-            let t_date = this.cleanDateOnly(t.Tanggal);
-            if (t.Outlet === this.outlet && t_date === todayStrLocal && t.Status === 'Sukses' && String(t.Metode_Bayar || '').toUpperCase() === 'TUNAI') {
+            let t_date = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
+            let tOutClean = String(t.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (tOutClean === cleanActiveOutlet && t_date === todayStrLocal && t.Status === 'Sukses' && String(t.Metode_Bayar || '').toUpperCase() === 'TUNAI') {
                 salesTunai += Number(t.Total_Bayar);
             }
         });
 
-        // 4. Jumlahkan semua Kas Keluar dalam 1 HARI PENUH
         (this.db.kasKeluar || []).forEach(k => { 
-            let k_date = this.cleanDateOnly(k.Tanggal);
-            if (k.Outlet === this.outlet && k_date === todayStrLocal) {
+            let k_date = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(k.Tanggal) : k.Tanggal;
+            let kOutClean = String(k.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (kOutClean === cleanActiveOutlet && k_date === todayStrLocal) {
                 totalKasKeluar += Number(k.Nominal); 
             }
         });
 
-        // Kalkulasi Uang Fisik yang harusnya ada di Laci hari ini
         let expected = modal + salesTunai - totalKasKeluar;
 
         const tMod = document.getElementById('ts-modal'); if (tMod) tMod.innerText = `Rp ${modal.toLocaleString('id-ID')}`;
@@ -2258,20 +4228,25 @@ const superApp = {
         let setAkhirEl = document.getElementById('shift-setoran-akhir'); let setor = setAkhirEl ? this.getNumericValue(setAkhirEl.value) : 0;
         if (setor === 0 && (!setAkhirEl || setAkhirEl.value === '')) return this.showToast("Hitung uang fisik di laci!", "error");
 
+        let cleanActiveOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 
         let modal = 0; let salesTunai = 0; let totalKasKeluar = 0;
 
-        // Lakukan kalkulasi ulang saat eksekusi agar data sangat akurat
-        (this.db.shifts || []).forEach(s => { if (s.Outlet === this.outlet && s.Tanggal === todayStrLocal) modal += Number(s.Modal_Awal || 0); });
+        (this.db.shifts || []).forEach(s => { 
+            let sOutClean = String(s.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (sOutClean === cleanActiveOutlet && s.Tanggal === todayStrLocal) modal += Number(s.Modal_Awal || 0); 
+        });
         (this.db.transactions || []).forEach(t => { 
-            let t_date = this.cleanDateOnly(t.Tanggal);
-            if (t.Outlet === this.outlet && t_date === todayStrLocal && t.Status === 'Sukses' && String(t.Metode_Bayar || '').toUpperCase() === 'TUNAI') salesTunai += Number(t.Total_Bayar); 
+            let t_date = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
+            let tOutClean = String(t.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (tOutClean === cleanActiveOutlet && t_date === todayStrLocal && t.Status === 'Sukses' && String(t.Metode_Bayar || '').toUpperCase() === 'TUNAI') salesTunai += Number(t.Total_Bayar); 
         });
         (this.db.kasKeluar || []).forEach(k => { 
-            let k_date = this.cleanDateOnly(k.Tanggal);
-            if (k.Outlet === this.outlet && k_date === todayStrLocal) totalKasKeluar += Number(k.Nominal); 
+            let k_date = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(k.Tanggal) : k.Tanggal;
+            let kOutClean = String(k.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (kOutClean === cleanActiveOutlet && k_date === todayStrLocal) totalKasKeluar += Number(k.Nominal); 
         });
 
         let expected = modal + salesTunai - totalKasKeluar; 
@@ -2282,12 +4257,12 @@ const superApp = {
         let res = await this.apiPost(payload);
 
         if (res.status === 'sukses') {
-            alert(`REKAP HARIAN DITUTUP!\n\nUang Sistem (1 Hari): Rp ${expected.toLocaleString('id-ID')}\nUang Fisik (Setoran): Rp ${setor.toLocaleString('id-ID')}\nSelisih: Rp ${selisih.toLocaleString('id-ID')}`);
+            alert(`REKAP HARIAN DITUTUP!\n\nCabang: Ai-CHA ${cleanActiveOutlet}\nUang Sistem (1 Hari): Rp ${expected.toLocaleString('id-ID')}\nUang Fisik (Setoran): Rp ${setor.toLocaleString('id-ID')}\nSelisih: Rp ${selisih.toLocaleString('id-ID')}`);
             location.reload();
         }
         this.setLoading(false);
     },
-
+    
 updatePendingNotifications: function() {
         if (!this.db) return;
 
@@ -2423,14 +4398,7 @@ refreshData: function() {
         }
     },
 
-    // Pastikan blok kode ini ADA di dalam object superApp
-changeOutlet: function(val) { 
-    this.outlet = val; 
-    this.cart = []; 
-    this.renderCart(); 
-    this.checkShiftStatus(); 
-    this.refreshData(); 
-},
+
     
    switchMenu: function(menu) {
     // 1. Bersihkan akses (Tidak perlu lagi memblokir hpp/profit karena sudah dilebur)
@@ -2447,6 +4415,7 @@ changeOutlet: function(val) {
         'gudang': 'text-emerald-600', 
         'outlet': 'text-teal-600',    
         'staf': 'text-amber-600',
+        'laporan-harian': 'text-rose-600',
         'user': 'text-purple-600' // 🚀 TAMBAHAN: Warna ungu elegan untuk Manajemen User
     };
     const allColors = Object.values(colors);
@@ -2476,7 +4445,7 @@ changeOutlet: function(val) {
     const titles = { 
         'pos': 'POS', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 
         'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'CFO Dashboard & Asisten AI', 
-        'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan',
+        'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan', 'laporan-harian': 'Laporan Harian Ai-CHA',
         'user': 'Manajemen Pengguna' // 🚀 TAMBAHAN: Judul halaman otomatis untuk User
     };
     const pageTitle = document.getElementById('page-title'); 
@@ -2494,6 +4463,9 @@ changeOutlet: function(val) {
     if (menu === 'opname' && typeof this.renderOpname === 'function') {
         this.renderOpname();
         if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('opname'), 200);
+    }
+    if (menu === 'laporan-harian' && typeof this.initLaporanHarian === 'function') {
+    this.initLaporanHarian();
     }
     if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
     if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
@@ -2921,39 +4893,56 @@ changeOutlet: function(val) {
         }).catch(err => { console.log("Masuk ke antrean offline."); });
     },
     
-    // TERIMA BARANG, OPNAME & WA MODAL
-    showWaModal: function(waText) {
-        try { navigator.clipboard.writeText(waText); } catch (err) { 
-            let txtArea = document.createElement("textarea"); txtArea.value = waText; document.body.appendChild(txtArea); 
-            txtArea.select(); try { document.execCommand("copy"); } catch(e){} document.body.removeChild(txtArea); 
+   // =========================================================
+    // 🚀 MODAL WHATSAPP DENGAN SAFE CLIPBOARD COPY
+    // =========================================================
+    showWaModal: async function(text, customNumber = '') {
+        // 1. Coba salin ke clipboard dengan proteksi Try-Catch & Fallback
+        try {
+            if (navigator.clipboard && window.isSecureContext && document.hasFocus()) {
+                await navigator.clipboard.writeText(text);
+                this.showToast("Teks laporan otomatis disalin ke clipboard!");
+            } else {
+                // Fallback tradisional untuk browser HP / saat kehilangan fokus
+                let textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    this.showToast("Teks laporan berhasil disalin!");
+                } catch (err) {
+                    console.warn("Fallback copy gagal, pengguna harus salin manual.");
+                }
+                textArea.remove();
+            }
+        } catch (err) {
+            console.warn("Clipboard API dicegah browser: ", err.message);
         }
-        let waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`; 
-        const btnGoWa = document.getElementById('btn-go-wa');
-        const btnCopyWa = document.getElementById('btn-copy-wa');
 
-        if (btnGoWa) {
-            btnGoWa.onclick = () => {
-                let popWin = window.open(waUrl, '_blank'); 
-                if(!popWin || popWin.closed || typeof popWin.closed === 'undefined') {
-                    window.location.href = waUrl; 
+        // 2. Tampilkan Pop-Up Modal WA seperti biasa
+        let modal = document.getElementById('modal-wa');
+        let textAreaModal = document.getElementById('wa-preview-text');
+        
+        if (textAreaModal) textAreaModal.value = text;
+        this.pendingWaText = text;
+        this.pendingWaNumber = customNumber;
+
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                let content = modal.querySelector('div');
+                if (content) {
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
                 }
-                this.closeModal('modal-wa-confirm');
-            };
+            }, 10);
         }
-        if (btnCopyWa) {
-            btnCopyWa.onclick = () => {
-                try { navigator.clipboard.writeText(waText); } catch (err) { 
-                    let txtArea = document.createElement("textarea"); txtArea.value = waText; document.body.appendChild(txtArea); 
-                    txtArea.select(); try { document.execCommand("copy"); } catch(e){} document.body.removeChild(txtArea); 
-                }
-                this.showToast("Teks Berhasil Disalin!", "success");
-                btnCopyWa.innerHTML = `<i class="fas fa-check"></i> Sudah Tersalin!`;
-                setTimeout(() => { btnCopyWa.innerHTML = `<i class="fas fa-copy"></i> Salin Teks Laporan`; }, 2000);
-            };
-        }
-        const mWa = document.getElementById('modal-wa-confirm'); 
-        const mWac = document.getElementById('modal-wa-confirm-content');
-        if(mWa && mWac) { mWa.classList.remove('hidden'); setTimeout(() => mWac.classList.add('modal-enter-active'), 10); }
     },
     openWaHistory: function(type) {
         const tbody = document.getElementById('wa-history-tbody');
@@ -6336,10 +8325,8 @@ executeVoidTrx: async function(trxId) {
         }
     },
 
-    updateHeaderOutletName: function() {
-        const hName = document.getElementById('header-outlet-name');
-        if (hName) hName.innerText = this.outlet || 'Pusat';
-    },
+
+
 
     openOutletSelector: function() {
         const listEl = document.getElementById('outlet-selector-list');
@@ -6366,7 +8353,7 @@ executeVoidTrx: async function(trxId) {
             let disableClick = (!isAdmin && !isActive) ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer';
             let clickEvent = (!isAdmin && !isActive) 
                 ? `onclick="superApp.showToast('Kasir tidak diizinkan pindah ke cabang lain', 'error')"` 
-                : `onclick="superApp.selectOutlet('${o.ID_Outlet}')"`;
+                : `onclick="superApp.changeOutlet('${o.ID_Outlet}')"`;
 
             html += `
             <div ${clickEvent} class="${activeClass} ${disableClick} p-4 rounded-[1.5rem] mb-4 transition-all duration-300 flex items-center justify-between group">
@@ -6388,11 +8375,6 @@ executeVoidTrx: async function(trxId) {
     },
     
   
-selectOutlet: function(id) {
-    superApp.changeOutlet(id);
-    superApp.updateHeaderOutletName(); 
-    superApp.closeModal('modal-outlet-selector');
-},
 
    renderGlobalStockMatrix: function() {
         if (!this.db || !this.db.masterProduk || !this.db.outlets) return;
@@ -6893,4 +8875,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
 
