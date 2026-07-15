@@ -1610,7 +1610,7 @@ const superApp = {
     },
 
 
-// =========================================================
+    // =========================================================
     // 🚀 MODUL LAPORAN HARIAN USAHA AI-CHA (NEW ENGINE)
     // =========================================================
     dailyExpensesList: [], // Memori daftar pengeluaran hari ini
@@ -2176,10 +2176,98 @@ const superApp = {
     },
 
     // =========================================================
+    // 🚀 ENGINE MODAL KOMPARASI REVISI ULTRA-MODERN
+    // =========================================================
+    currentApprovalId: null, // Memori penyimpan ID laporan yang sedang di-review
+
+    openApprovalModal: function(idRep) {
+        let rep = (this.db.laporanHarian || []).find(x => x.ID_Laporan === idRep);
+        if (!rep || !rep.Revisi_JSON) return this.showToast("Data revisi tidak ditemukan", "error");
+
+        this.currentApprovalId = idRep;
+        
+        let rev = {};
+        try { rev = JSON.parse(rep.Revisi_JSON); } catch(e) {}
+
+        // 1. Set Meta Info (Siapa yang mengedit dan kapan)
+        document.getElementById('approval-meta-info').innerText = `Diajukan oleh: ${rev.editor || 'Kasir / Staf'} (${rep.Tanggal})`;
+        
+        // 2. Fungsi perakit baris komparasi (Hanya memunculkan angka yang BERUBAH)
+        let compHtml = '';
+        const makeRow = (label, oldVal, newVal, isCurrency = true) => {
+            let numOld = Number(oldVal || 0);
+            let numNew = Number(newVal || 0);
+            if (numOld === numNew) return ''; // Abaikan jika angka tidak diedit
+            
+            let strOld = isCurrency ? `Rp ${numOld.toLocaleString('id-ID')}` : `${numOld}`;
+            let strNew = isCurrency ? `Rp ${numNew.toLocaleString('id-ID')}` : `${numNew}`;
+            
+            return `
+            <div class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between mb-3 hover:shadow-md hover:border-indigo-200 transition-all">
+                <div class="w-1/3">
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">${label} Lama</span>
+                    <div class="font-black text-rose-500 text-sm line-through opacity-70 decoration-rose-300 decoration-2">${strOld}</div>
+                </div>
+                <div class="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-400 border border-indigo-100 shrink-0">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="w-1/3 text-right">
+                    <span class="text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Revisi Baru</span>
+                    <div class="font-black text-emerald-600 text-base md:text-lg bg-emerald-50 px-2 py-1 rounded-lg inline-block shadow-inner border border-emerald-100">${strNew}</div>
+                </div>
+            </div>`;
+        };
+
+        // 3. Rakit perbandingan masing-masing item
+        compHtml += makeRow('Net Sales', rep.Net_Sales, rev.net_sales);
+        compHtml += makeRow('Cash Laci', rep.Cash, rev.cash);
+        compHtml += makeRow('QRIS', rep.QRIS, rev.qris);
+        compHtml += makeRow('Total Bill', rep.Bill, rev.bill, false);
+        compHtml += makeRow('Pcs Terjual', rep.Pcs, rev.pcs, false);
+        compHtml += makeRow('Pengeluaran', rep.Total_Pengeluaran, rev.total_pengeluaran);
+
+        if (compHtml === '') {
+            compHtml = `<div class="p-5 text-center text-slate-500 text-xs font-bold border-2 border-dashed border-slate-200 bg-white rounded-2xl">Tidak ada perubahan angka pada revisi ini. (Hanya menyimpan ulang)</div>`;
+        }
+
+        document.getElementById('approval-comparison-list').innerHTML = compHtml;
+        
+        // 4. Tampilkan Modal dengan Animasi Transisi Halus
+        const modal = document.getElementById('modal-approval-revisi');
+        modal.classList.remove('hidden');
+        // Force reflow agar transisi terbaca browser
+        void modal.offsetWidth; 
+        modal.classList.add('opacity-100');
+        modal.firstElementChild.classList.remove('scale-95');
+        modal.firstElementChild.classList.add('scale-100');
+    },
+
+    closeApprovalModal: function() {
+        const modal = document.getElementById('modal-approval-revisi');
+        modal.classList.remove('opacity-100');
+        modal.firstElementChild.classList.remove('scale-100');
+        modal.firstElementChild.classList.add('scale-95');
+        setTimeout(() => modal.classList.add('hidden'), 400);
+        this.currentApprovalId = null;
+    },
+
+    approveRevision: function() {
+        if (!this.currentApprovalId) return;
+        this.eksekusiApprovalEdit(this.currentApprovalId, 'Disetujui');
+        this.closeApprovalModal();
+    },
+
+    rejectRevision: function() {
+        if (!this.currentApprovalId) return;
+        this.eksekusiApprovalEdit(this.currentApprovalId, 'Ditolak');
+        this.closeApprovalModal();
+    },
+
+    // =========================================================
     // 🚀 EKSEKUSI APPROVAL OWNER (SETUJUI / TOLAK)
     // =========================================================
     eksekusiApprovalEdit: async function(idRep, keputusan) {
-        if (!confirm(`Apakah Anda yakin ingin ${keputusan === 'Disetujui' ? 'MENYETUJUI' : 'MENOLAK'} revisi laporan ini?`)) return;
+        
 
         this.setLoading(true, "Memproses persetujuan...");
         
@@ -2325,16 +2413,18 @@ const superApp = {
             }
 
             let tombolOwnerDesk = (status === 'Pending Edit' && isOwner) ? `
-                <div class="flex gap-1 mt-1.5 pt-1.5 border-t border-slate-200">
-                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Disetujui')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1 rounded text-[10px] font-black shadow-2xs">✔ Setuju</button>
-                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Ditolak')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-1 rounded text-[10px] font-black shadow-2xs">✖ Tolak</button>
+                <div class="mt-1.5 pt-1.5 border-t border-slate-200">
+                    <button type="button" onclick="superApp.openApprovalModal('${item.ID_Laporan}')" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white py-1.5 rounded-lg text-[10px] font-black shadow-md shadow-amber-500/30 flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <i class="fas fa-magnifying-glass-chart"></i> Tinjau Revisi Baru
+                    </button>
                 </div>
             ` : '';
 
             let tombolOwnerMob = (status === 'Pending Edit' && isOwner) ? `
-                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Disetujui')" class="bg-emerald-500 text-white py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"><i class="fas fa-check"></i> Setujui</button>
-                    <button type="button" onclick="superApp.eksekusiApprovalEdit('${item.ID_Laporan}', 'Ditolak')" class="bg-rose-500 text-white py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1"><i class="fas fa-xmark"></i> Tolak</button>
+                <div class="pt-1 border-t border-slate-100">
+                    <button type="button" onclick="superApp.openApprovalModal('${item.ID_Laporan}')" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/30 active:scale-95 transition">
+                        <i class="fas fa-magnifying-glass-chart"></i> Tinjau Perubahan Angka
+                    </button>
                 </div>
             ` : '';
 
