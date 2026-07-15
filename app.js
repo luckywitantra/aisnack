@@ -3213,11 +3213,11 @@ changeOutlet: function(val) {
                     let nom = expenseItemMap[itemName];
                     let pctExp = totExp > 0 ? Math.round((nom / totExp) * 100) : 0;
                     return `
-                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex justify-between items-center text-xs">
-                        <span class="font-extrabold text-slate-200 block uppercase">▪️ ${itemName}</span>
+                    <div onclick="superApp.openExpenseDetailModal('${itemName}')" class="group p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/60 hover:border-amber-500/50 flex justify-between items-center text-xs cursor-pointer transition-all active:scale-95 shadow-sm">
+                        <span class="font-extrabold text-slate-200 block uppercase group-hover:text-amber-400 transition-colors">▪️ ${itemName}</span>
                         <div class="text-right">
-                            <span class="font-black text-amber-400 block">Rp ${nom.toLocaleString('id-ID')}</span>
-                            <span class="text-[9px] text-slate-400">${pctExp}% dari biaya</span>
+                            <span class="font-black text-amber-400 block group-hover:scale-105 transition-transform origin-right">Rp ${nom.toLocaleString('id-ID')}</span>
+                            <span class="text-[9px] text-slate-400">${pctExp}% dari biaya <i class="fas fa-arrow-right text-[8px] ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"></i></span>
                         </div>
                     </div>`;
                 }).join('');
