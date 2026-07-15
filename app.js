@@ -3038,16 +3038,32 @@ changeOutlet: function(val) {
                 <span class="text-base font-black text-emerald-400">Rp ${netLaci.toLocaleString('id-ID')}</span>
             </div>
 
-            <!-- Rincian Biaya Khusus Cabang Ini -->
-            <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60 space-y-2">
-                <h5 class="text-xs font-black text-amber-400 flex items-center gap-2">
-                    <i class="fas fa-list"></i> Breakdown Pengeluaran Cabang ${outName}
-                </h5>
-                <div class="space-y-1.5 max-h-36 overflow-y-auto custom-scroll pr-1 mt-2">
-                    ${expHtml}
+            // Rincian Biaya Khusus Cabang Ini
+            <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60 flex flex-col min-h-[220px]">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-700/60">
+                    <h5 class="text-xs font-black text-amber-400 flex items-center gap-2">
+                        <i class="fas fa-list"></i> Breakdown Cabang ${outName}
+                    </h5>
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex-1 sm:w-36">
+                            <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[9px]"></i>
+                            <input type="text" id="detail-expense-search" oninput="superApp.renderDetailOutletExpenseList()" placeholder="Cari..." class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-bold rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-amber-500 transition-colors shadow-inner">
+                        </div>
+                        <select id="detail-expense-sort" onchange="superApp.renderDetailOutletExpenseList()" class="bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-bold rounded-lg px-2 py-1.5 outline-none focus:border-amber-500 cursor-pointer shadow-sm">
+                            <option value="nominal">Tertinggi</option>
+                            <option value="az">A - Z</option>
+                        </select>
+                    </div>
                 </div>
+                
+                <!-- Area Daftar Interaktif -->
+                <div class="flex-1 overflow-y-auto custom-scroll pr-1 mt-3" id="detail-outlet-expense-list"></div>
             </div>
-        </div>`;
+        `;
+        
+        // 🚀 PENTING: Simpan data ke variabel global dan render list
+        this.detailExpenseData = expItemMap;
+        this.renderDetailOutletExpenseList();
     },
 
     closeDetailOutletModal: function() {
@@ -3096,7 +3112,9 @@ changeOutlet: function(val) {
 
         let totSales = 0, totCash = 0, totQris = 0, totExp = 0;
         let outletMap = {};
-        let expenseItemMap = {};
+        
+        // 🚀 KUNCI PERBAIKAN: Gunakan variabel global superApp untuk menampung data item biaya
+        this.execExpenseData = {}; 
 
         (this.db.laporanHarian || []).forEach(rep => {
             if (rep.Status_Approval === 'Ditolak') return;
@@ -3138,8 +3156,8 @@ changeOutlet: function(val) {
                     let itemName = String(itemExp.nama || 'LAINNYA').toUpperCase().trim();
                     let itemNom = Number(itemExp.nominal || 0);
                     if (itemName !== '' && itemNom > 0) {
-                        if (!expenseItemMap[itemName]) expenseItemMap[itemName] = 0;
-                        expenseItemMap[itemName] += itemNom;
+                        if (!this.execExpenseData[itemName]) this.execExpenseData[itemName] = 0;
+                        this.execExpenseData[itemName] += itemNom;
                     }
                 });
             } catch(e){}
@@ -3151,7 +3169,7 @@ changeOutlet: function(val) {
         if (document.getElementById('exec-total-qris')) document.getElementById('exec-total-qris').innerText = `Rp ${totQris.toLocaleString('id-ID')}`;
         if (document.getElementById('exec-total-expense')) document.getElementById('exec-total-expense').innerText = `Rp ${totExp.toLocaleString('id-ID')}`;
 
-        // 3. Update Akumulasi & Target Bulanan yang Terintegrasi
+        // 3. Update Akumulasi Target
         let targetTotal = this.targetBulanan || 180000000;
         if (isConsolidated && this.db && this.db.outlets) {
             let tCons = 0;
@@ -3173,56 +3191,33 @@ changeOutlet: function(val) {
         if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pctExec}%`;
         if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${sisaTarget.toLocaleString('id-ID')}`;
 
-        // 4. Render Kartu Mini Outlet Interaktif
+        // 4. Render Kartu Mini Outlet
         const cardsGrid = document.getElementById('exec-outlet-cards-grid');
         if (cardsGrid) {
             let outletKeys = Object.keys(outletMap).sort((a,b) => outletMap[b].sales - outletMap[a].sales);
-            if (outletKeys.length === 0) {
-                cardsGrid.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-700 rounded-2xl">Belum ada transaksi di periode ini</div>`;
-            } else {
-                cardsGrid.innerHTML = outletKeys.map(outName => {
+            cardsGrid.innerHTML = outletKeys.length === 0 
+                ? `<div class="col-span-full text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-700 rounded-2xl">Belum ada transaksi di periode ini</div>`
+                : outletKeys.map(outName => {
                     let oData = outletMap[outName];
                     let pct = totSales > 0 ? Math.round((oData.sales / totSales) * 100) : 0;
                     return `
                     <div onclick="superApp.openDetailOutletModal('${outName}')" class="bg-slate-800/80 hover:bg-slate-700/90 p-3.5 rounded-2xl border border-slate-700 hover:border-rose-500/50 cursor-pointer transition-all active:scale-95 shadow-md flex flex-col justify-between group">
                         <div class="flex justify-between items-start mb-2">
                             <span class="font-black text-white text-sm group-hover:text-rose-400 transition">Ai-CHA ${outName}</span>
-                            <span class="text-[9px] font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">${pct}% Kontribusi</span>
+                            <span class="text-[9px] font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">${pct}%</span>
                         </div>
                         <div>
-                            <span class="text-[10px] text-slate-400 block uppercase font-bold">Total Sales Cabang</span>
+                            <span class="text-[10px] text-slate-400 block uppercase font-bold">Sales Cabang</span>
                             <span class="font-black text-rose-400 text-base block tracking-tight">Rp ${oData.sales.toLocaleString('id-ID')}</span>
                         </div>
-                        <div class="mt-2 pt-2 border-t border-slate-700/70 flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                            <span>💵 C: Rp ${oData.cash.toLocaleString('id-ID')}</span>
-                            <span class="text-indigo-300 group-hover:translate-x-1 transition-transform">Detail <i class="fas fa-arrow-right text-[9px] ml-0.5"></i></span>
-                        </div>
                     </div>`;
                 }).join('');
-            }
         }
 
-        // 5. Render Breakdown Pengeluaran Per Item
-        const expCont = document.getElementById('exec-expense-list');
-        if (expCont) {
-            let expKeys = Object.keys(expenseItemMap).sort((a,b) => expenseItemMap[b] - expenseItemMap[a]);
-            if (expKeys.length === 0) {
-                expCont.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic text-center py-4">Belum ada pengeluaran pada periode ini</div>`;
-            } else {
-                expCont.innerHTML = expKeys.map(itemName => {
-                    let nom = expenseItemMap[itemName];
-                    let pctExp = totExp > 0 ? Math.round((nom / totExp) * 100) : 0;
-                    return `
-                    <div onclick="superApp.openExpenseDetailModal('${itemName}')" class="group p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/60 hover:border-amber-500/50 flex justify-between items-center text-xs cursor-pointer transition-all active:scale-95 shadow-sm">
-                        <span class="font-extrabold text-slate-200 block uppercase group-hover:text-amber-400 transition-colors">▪️ ${itemName}</span>
-                        <div class="text-right">
-                            <span class="font-black text-amber-400 block group-hover:scale-105 transition-transform origin-right">Rp ${nom.toLocaleString('id-ID')}</span>
-                            <span class="text-[9px] text-slate-400">${pctExp}% dari biaya <i class="fas fa-arrow-right text-[8px] ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"></i></span>
-                        </div>
-                    </div>`;
-                }).join('');
-            }
-        }
+        // 5. Simpan Total ke Global & Panggil Engine List Interaktif (Search & Sort)
+        this.execExpenseData = expenseItemMap;
+        this.execTotalExpense = totExp;
+        this.renderExecExpenseList();
     },
 
     // =========================================================
@@ -7374,6 +7369,86 @@ openDetailStokOpname: function(sku) {
                 modal.firstElementChild.classList.add('scale-95');
             }
             setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+    },
+
+    // =========================================================
+    // 🚀 ENGINE LIST PENGELUARAN DINAMIS (SEARCH & SORT)
+    // =========================================================
+    execExpenseData: {},
+    execTotalExpense: 0,
+    detailExpenseData: {},
+
+    renderExecExpenseList: function() {
+        const expCont = document.getElementById('exec-expense-list');
+        const searchInput = (document.getElementById('exec-expense-search')?.value || '').toLowerCase();
+        const sortMode = document.getElementById('exec-expense-sort')?.value || 'nominal';
+
+        if (!expCont) return;
+
+        let expKeys = Object.keys(this.execExpenseData || {});
+        
+        // Fitur Pencarian
+        if (searchInput) expKeys = expKeys.filter(k => k.toLowerCase().includes(searchInput));
+
+        // Fitur Pengurutan
+        if (sortMode === 'nominal') {
+            expKeys.sort((a,b) => this.execExpenseData[b] - this.execExpenseData[a]);
+        } else {
+            expKeys.sort((a,b) => a.localeCompare(b));
+        }
+
+        if (expKeys.length === 0) {
+            expCont.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-700/50 rounded-xl">Item tidak ditemukan</div>`;
+        } else {
+            expCont.innerHTML = expKeys.map(itemName => {
+                let nom = this.execExpenseData[itemName];
+                let pctExp = this.execTotalExpense > 0 ? Math.round((nom / this.execTotalExpense) * 100) : 0;
+                return `
+                <div onclick="superApp.openExpenseDetailModal('${itemName}')" class="group p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/60 hover:border-amber-500/50 flex justify-between items-center text-xs cursor-pointer transition-all active:scale-95 shadow-sm">
+                    <span class="font-extrabold text-slate-200 block uppercase group-hover:text-amber-400 transition-colors truncate pr-2">▪️ ${itemName}</span>
+                    <div class="text-right shrink-0">
+                        <span class="font-black text-amber-400 block group-hover:scale-105 transition-transform origin-right">Rp ${nom.toLocaleString('id-ID')}</span>
+                        <span class="text-[9px] text-slate-400">${pctExp}% dari biaya <i class="fas fa-arrow-right text-[8px] ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"></i></span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    },
+
+    renderDetailOutletExpenseList: function() {
+        const expCont = document.getElementById('detail-outlet-expense-list');
+        const searchInput = (document.getElementById('detail-expense-search')?.value || '').toLowerCase();
+        const sortMode = document.getElementById('detail-expense-sort')?.value || 'nominal';
+
+        if (!expCont) return;
+
+        let expKeys = Object.keys(this.detailExpenseData || {});
+        
+        // Fitur Pencarian
+        if (searchInput) expKeys = expKeys.filter(k => k.toLowerCase().includes(searchInput));
+
+        // Fitur Pengurutan
+        if (sortMode === 'nominal') {
+            expKeys.sort((a,b) => this.detailExpenseData[b] - this.detailExpenseData[a]);
+        } else {
+            expKeys.sort((a,b) => a.localeCompare(b));
+        }
+
+        if (expKeys.length === 0) {
+            expCont.innerHTML = `<div class="text-[11px] text-slate-400 italic text-center py-4 border border-dashed border-slate-700/50 rounded-xl mt-2">Item tidak ditemukan</div>`;
+        } else {
+            expCont.innerHTML = expKeys.map(k => {
+                let nom = this.detailExpenseData[k];
+                return `
+                <div onclick="superApp.openExpenseDetailModal('${k}')" class="flex justify-between items-center bg-slate-800/80 hover:bg-slate-700/80 p-3 rounded-xl text-[11px] border border-slate-700/50 hover:border-amber-500/50 cursor-pointer transition-all active:scale-95 group shadow-sm mb-1.5">
+                    <span class="font-extrabold text-slate-300 group-hover:text-amber-400 transition-colors uppercase truncate pr-2">▪️ ${k}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="font-black text-amber-400 group-hover:scale-105 transition-transform origin-right">Rp ${nom.toLocaleString('id-ID')}</span>
+                        <i class="fas fa-arrow-right text-[9px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                    </div>
+                </div>`;
+            }).join('');
         }
     },
 
