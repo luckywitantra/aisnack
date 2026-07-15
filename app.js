@@ -2335,7 +2335,7 @@ const superApp = {
     },
 
    
-    resetDailyForm: function() {
+    resetDailyForm: function(skipDateReset = false) {
         // Reset memori edit
         this.editReportId = null;
         let titleEl = document.getElementById('form-title-mode');
@@ -2343,17 +2343,20 @@ const superApp = {
         if (titleEl) titleEl.innerText = "Input Data Hari Ini";
         if (btnCancel) btnCancel.classList.add('hidden');
 
-        // Kembali ke tanggal hari ini
-        let d = new Date();
-        let days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-        let pad = n => String(n).padStart(2, '0');
-        let dateEl = document.getElementById('daily-form-date');
-        if (dateEl) dateEl.innerText = `${days[d.getDay()]}, ${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+        // Hanya kembali ke tanggal hari ini jika TIDAK sedang memuat tanggal masa lalu (skipDateReset false)
+        if (!skipDateReset) {
+            let d = new Date();
+            let days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            let pad = n => String(n).padStart(2, '0');
+            let dateEl = document.getElementById('daily-form-date');
+            if (dateEl) dateEl.innerText = `${days[d.getDay()]}, ${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+        }
 
         // Kosongkan input
         ['daily-cash', 'daily-qris', 'daily-bill', 'daily-pcs'].forEach(id => {
             let el = document.getElementById(id); if (el) el.value = '';
         });
+        
         this.dailyExpensesList = [];
         this.addDailyExpenseRow();
         this.calcDailyReportLive();
@@ -2717,30 +2720,43 @@ const superApp = {
     },
 
     // =========================================================
-    // 🚀 2. ENGINE PEMILIHAN TANGGAL TERPADU (SINKRON DI KEDUA MENU)
+    // 🚀 ENGINE PEMILIHAN TANGGAL TERPADU (ANTI-MELESET)
     // =========================================================
     applyBackdate: function(dateVal) {
         if (!dateVal) return;
-        let targetDateObj = this.normalizeDateObj(dateVal);
-        let pad = n => String(n).padStart(2, '0');
-        let dateKeySearch = `${pad(targetDateObj.getDate())}-${pad(targetDateObj.getMonth() + 1)}-${targetDateObj.getFullYear()}`;
-        let dateKeySearchSlash = `${pad(targetDateObj.getDate())}/${pad(targetDateObj.getMonth() + 1)}/${targetDateObj.getFullYear()}`;
+        
+        let targetDate = this.normalizeDateObj(dateVal);
+        let tDay = targetDate.getDate();
+        let tMonth = targetDate.getMonth();
+        let tYear = targetDate.getFullYear();
 
-        // Cari apakah laporan untuk tanggal & outlet ini sudah ada di database
-        let existingReport = (this.db.laporanHarian || []).find(x => 
-            (x.Outlet === this.outlet || this.outlet === 'Pusat') && 
-            (String(x.Tanggal).includes(dateKeySearch) || String(x.Tanggal).includes(dateKeySearchSlash))
-        );
+        // 1. Blokir jika sedang di mode "Semua Cabang"
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        if (isConsolidated) {
+            this.showToast("Pilih salah satu cabang di barisan atas terlebih dahulu untuk mengedit laporan.", "error");
+            return;
+        }
+
+        let cleanOutlet = String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+
+        // 2. Cari laporan dengan mencocokkan Hari, Bulan, Tahun secara presisi (Matematika)
+        let existingReport = (this.db.laporanHarian || []).find(x => {
+            let xOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (xOutlet !== cleanOutlet || x.Status_Approval === 'Ditolak') return false;
+
+            let xDate = this.normalizeDateObj(x.Tanggal);
+            return (xDate.getDate() === tDay && xDate.getMonth() === tMonth && xDate.getFullYear() === tYear);
+        });
 
         if (existingReport) {
             // 🚀 DATA SUDAH ADA -> Masuk ke Mode Edit secara sinkron
             this.editLaporanHarian(existingReport.ID_Laporan);
         } else {
             // 🚀 DATA KOSONG -> Masuk ke Mode Input Baru untuk Tanggal Pilihan
-            this.resetDailyForm(true); // Reset tanpa konfirmasi ulang
+            this.resetDailyForm(true); // Reset dengan perintah khusus agar tanggal tidak kembali ke hari ini
             
-            let indoStr = this.formatToIndoDate(targetDateObj);
-            let inputStr = this.formatToInputDate(targetDateObj);
+            let indoStr = this.formatToIndoDate(targetDate);
+            let inputStr = this.formatToInputDate(targetDate);
 
             let dateEl = document.getElementById('daily-form-date');
             let picker = document.getElementById('hidden-date-picker');
@@ -2759,7 +2775,7 @@ const superApp = {
     },
 
     // =========================================================
-    // 🚀 3. ENGINE EDIT DATA (SINKRONISASI TANGGAL SANGAT PRESISI)
+    // 🚀 ENGINE EDIT DATA (SINKRONISASI REVISI & TANGGAL PRESISI)
     // =========================================================
     editLaporanHarian: function(idRep) {
         let rep = (this.db.laporanHarian || []).find(x => x.ID_Laporan === idRep);
@@ -2775,21 +2791,42 @@ const superApp = {
         if (titleEl) titleEl.innerText = "📝 Ajukan Revisi Laporan";
         if (btnCancel) btnCancel.classList.remove('hidden');
 
-        // 🚀 STANDARISASI TANGGAL AGAR TETAP BENAR DI FORM & KALENDER
+        // Standarisasi Tanggal
         let targetDateObj = this.normalizeDateObj(rep.Tanggal);
         if (dateEl) dateEl.innerText = this.formatToIndoDate(targetDateObj);
         if (picker) picker.value = this.formatToInputDate(targetDateObj);
 
-        // Isi form dengan angka lama
-        if (document.getElementById('daily-cash')) document.getElementById('daily-cash').value = Number(rep.Cash || 0).toLocaleString('id-ID');
-        if (document.getElementById('daily-qris')) document.getElementById('daily-qris').value = Number(rep.QRIS || 0).toLocaleString('id-ID');
-        if (document.getElementById('daily-bill')) document.getElementById('daily-bill').value = rep.Bill || 0;
-        if (document.getElementById('daily-pcs')) document.getElementById('daily-pcs').value = rep.Pcs || 0;
+        // 🚀 KUNCI: Ekstrak data Revisi_JSON jika laporan sedang "Pending Edit"
+        let cashVal = rep.Cash;
+        let qrisVal = rep.QRIS;
+        let billVal = rep.Bill;
+        let pcsVal = rep.Pcs;
+        let expJson = rep.Pengeluaran_JSON;
 
-        // Muat pengeluaran lama
+        if (rep.Status_Approval === 'Pending Edit' && rep.Revisi_JSON) {
+            try {
+                let rev = JSON.parse(rep.Revisi_JSON);
+                if (rev.net_sales !== undefined) {
+                    cashVal = rev.cash; qrisVal = rev.qris;
+                    billVal = rev.bill; pcsVal = rev.pcs;
+                    expJson = rev.pengeluaran_json;
+                    this.showToast("Menampilkan draf revisi yang belum disetujui", "warning");
+                }
+            } catch(e) {}
+        } else {
+            this.showToast(`Memuat data tanggal ${this.formatToIndoDate(targetDateObj)} untuk diperbaiki.`);
+        }
+
+        // Isi form dengan angka yang tepat
+        if (document.getElementById('daily-cash')) document.getElementById('daily-cash').value = Number(cashVal || 0).toLocaleString('id-ID');
+        if (document.getElementById('daily-qris')) document.getElementById('daily-qris').value = Number(qrisVal || 0).toLocaleString('id-ID');
+        if (document.getElementById('daily-bill')) document.getElementById('daily-bill').value = billVal || 0;
+        if (document.getElementById('daily-pcs')) document.getElementById('daily-pcs').value = pcsVal || 0;
+
+        // Muat pengeluaran
         this.dailyExpensesList = [];
         try {
-            let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+            let expArr = JSON.parse(expJson || '[]');
             expArr.forEach(x => this.addDailyExpenseRow(x.nama, x.nominal));
         } catch(e) {}
         if (this.dailyExpensesList.length === 0) this.addDailyExpenseRow();
@@ -2797,7 +2834,6 @@ const superApp = {
         // Kalkulasi ulang & alihkan ke tab Input
         this.calcDailyReportLive();
         this.switchLapHarianSubTab('input');
-        this.showToast(`Memuat data tanggal ${this.formatToIndoDate(targetDateObj)} untuk diperbaiki.`);
     },
 
     // =========================================================
