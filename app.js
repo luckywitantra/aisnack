@@ -3214,7 +3214,6 @@ changeOutlet: function(val) {
         }
 
         // 5. Simpan Total ke Global & Panggil Engine List Interaktif (Search & Sort)
-        this.execExpenseData = expenseItemMap;
         this.execTotalExpense = totExp;
         this.renderExecExpenseList();
     },
