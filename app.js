@@ -2189,10 +2189,11 @@ const superApp = {
         let rev = {};
         try { rev = JSON.parse(rep.Revisi_JSON); } catch(e) {}
 
-        // 1. Set Meta Info (Siapa yang mengedit dan kapan)
-        document.getElementById('approval-meta-info').innerText = `Diajukan oleh: ${rev.editor || 'Kasir / Staf'} (${rep.Tanggal})`;
+        // 1. Set Meta Info
+        let metaEl = document.getElementById('approval-meta-info');
+        if (metaEl) metaEl.innerText = `Diajukan oleh: ${rev.editor || 'Kasir / Staf'} (${rep.Tanggal})`;
         
-        // 2. Fungsi perakit baris komparasi (Hanya memunculkan angka yang BERUBAH)
+        // 2. Fungsi perakit baris komparasi
         let compHtml = '';
         const makeRow = (label, oldVal, newVal, isCurrency = true) => {
             let numOld = Number(oldVal || 0);
@@ -2224,24 +2225,53 @@ const superApp = {
         compHtml += makeRow('QRIS', rep.QRIS, rev.qris);
         compHtml += makeRow('Total Bill', rep.Bill, rev.bill, false);
         compHtml += makeRow('Pcs Terjual', rep.Pcs, rev.pcs, false);
-        compHtml += makeRow('Pengeluaran', rep.Total_Pengeluaran, rev.total_pengeluaran);
+        compHtml += makeRow('Total Pengeluaran', rep.Total_Pengeluaran, rev.total_pengeluaran);
 
-        if (compHtml === '') {
-            compHtml = `<div class="p-5 text-center text-slate-500 text-xs font-bold border-2 border-dashed border-slate-200 bg-white rounded-2xl">Tidak ada perubahan angka pada revisi ini. (Hanya menyimpan ulang)</div>`;
+        // 🚀 4. DETEKSI PERUBAHAN RINCIAN ITEM PENGELUARAN (ULTRA MODERN DIFF)
+        if (rep.Pengeluaran_JSON !== rev.pengeluaran_json) {
+            let oldExp = []; let newExp = [];
+            try { oldExp = JSON.parse(rep.Pengeluaran_JSON || '[]'); } catch(e){}
+            try { newExp = JSON.parse(rev.pengeluaran_json || '[]'); } catch(e){}
+
+            let oldHtml = oldExp.length === 0 ? '<span class="italic text-slate-400">Kosong</span>' : oldExp.map(x => `▪️ ${x.nama}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('<br>');
+            let newHtml = newExp.length === 0 ? '<span class="italic text-slate-400">Kosong</span>' : newExp.map(x => `▪️ ${x.nama}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('<br>');
+
+            compHtml += `
+            <div class="bg-amber-50/40 border border-amber-200 p-4 rounded-2xl shadow-sm mt-4">
+                <h5 class="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-1.5"><i class="fas fa-receipt"></i> Rincian Pengeluaran Diubah</h5>
+                <div class="flex flex-col sm:flex-row items-stretch justify-between gap-3">
+                    <div class="flex-1 bg-white p-3 rounded-xl border border-slate-200 text-[10px] font-bold text-rose-500 line-through decoration-rose-300 opacity-80 leading-relaxed">
+                        <span class="block text-slate-400 mb-1.5 no-underline uppercase text-[8px] font-black">Data Lama:</span>
+                        ${oldHtml}
+                    </div>
+                    <div class="flex-1 bg-white p-3 rounded-xl border border-emerald-200 text-[10px] font-bold text-emerald-700 leading-relaxed shadow-inner">
+                        <span class="block text-emerald-500 mb-1.5 uppercase text-[8px] font-black">Data Baru Diajukan:</span>
+                        ${newHtml}
+                    </div>
+                </div>
+            </div>`;
         }
 
-        document.getElementById('approval-comparison-list').innerHTML = compHtml;
-        
-        // 4. Tampilkan Modal dengan Animasi Transisi Halus
-        const modal = document.getElementById('modal-approval-revisi');
-        modal.classList.remove('hidden');
-        // Force reflow agar transisi terbaca browser
-        void modal.offsetWidth; 
-        modal.classList.add('opacity-100');
-        modal.firstElementChild.classList.remove('scale-95');
-        modal.firstElementChild.classList.add('scale-100');
-    },
+        if (compHtml === '') {
+            compHtml = `<div class="p-5 text-center text-slate-500 text-xs font-bold border-2 border-dashed border-slate-200 bg-white rounded-2xl">Tidak ada perubahan angka pada revisi ini. (Kasir hanya menyimpan ulang)</div>`;
+        }
 
+        const listCont = document.getElementById('approval-comparison-list');
+        if (listCont) listCont.innerHTML = compHtml;
+        
+        // 5. Tampilkan Modal dengan Animasi Transisi Halus
+        const modal = document.getElementById('modal-approval-revisi');
+        if (modal) {
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; 
+            modal.classList.add('opacity-100');
+            if(modal.firstElementChild) {
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }
+        }
+    },
+    
     closeApprovalModal: function() {
         const modal = document.getElementById('modal-approval-revisi');
         modal.classList.remove('opacity-100');
@@ -2402,11 +2432,16 @@ const superApp = {
                 try {
                     let rev = JSON.parse(item.Revisi_JSON || '{}');
                     if (rev.net_sales !== undefined) {
+                        // Cek apakah item pengeluaran diubah
+                        let expChanged = (item.Pengeluaran_JSON !== rev.pengeluaran_json);
+                        let expBadge = expChanged ? `<div class="mt-1.5 bg-amber-200/60 text-amber-800 px-2 py-1 rounded-md border border-amber-300 inline-block text-[9px] shadow-sm"><i class="fas fa-receipt mr-1"></i> Rincian Pengeluaran Diubah</div>` : '';
+                        
                         infoRevisi = `
-                        <div class="mt-1.5 p-2 bg-amber-100/90 border border-amber-300 rounded-lg text-[10px] text-amber-900 leading-tight">
+                        <div class="mt-1.5 p-2.5 bg-amber-100/90 border border-amber-300 rounded-lg text-[10px] text-amber-900 leading-tight">
                             <b>📌 Ajuan Revisi (${rev.editor || 'Staf'}):</b><br>
                             Sales Baru: <b class="text-rose-600">Rp ${Number(rev.net_sales).toLocaleString('id-ID')}</b><br>
                             C: Rp ${Number(rev.cash||0).toLocaleString('id-ID')} | Q: Rp ${Number(rev.qris||0).toLocaleString('id-ID')}
+                            <br>${expBadge}
                         </div>`;
                     }
                 } catch(e){}
