@@ -863,9 +863,21 @@
                             <span>Lihat Rincian</span> <i class="fas fa-chevron-down transition-transform duration-300" id="icon-toggle-exp"></i>
                         </span>
                     </button>
-                    <div id="exec-expense-dropdown-box" class="hidden p-4 pt-1 border-t border-slate-800 space-y-2 max-h-56 overflow-y-auto custom-scroll">
-                        <div id="exec-expense-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2"></div>
-                    </div>
+                    <div id="exec-expense-dropdown-box" class="hidden p-4 pt-4 border-t border-slate-800 flex-col gap-3">
+    <!-- Kontrol Pencarian & Pengurutan -->
+    <div class="flex items-center gap-2 shrink-0">
+        <div class="relative flex-1">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+            <input type="text" id="exec-expense-search" oninput="superApp.renderExecExpenseList()" placeholder="Cari item pengeluaran..." class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded-xl pl-8 pr-3 py-2 outline-none focus:border-amber-500 transition-colors shadow-inner">
+        </div>
+        <select id="exec-expense-sort" onchange="superApp.renderExecExpenseList()" class="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded-xl px-3 py-2 outline-none focus:border-amber-500 cursor-pointer shadow-sm">
+            <option value="nominal">💵 Nominal Tertinggi</option>
+            <option value="az">🔤 Abjad A - Z</option>
+        </select>
+    </div>
+    <!-- Area Daftar Item -->
+    <div id="exec-expense-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto custom-scroll pr-1"></div>
+</div>
                 </div>
             </div>
 
