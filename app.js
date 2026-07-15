@@ -7282,6 +7282,101 @@ openDetailStokOpname: function(sku) {
         }
     },
 
+    // =========================================================
+    // 🚀 ENGINE DETAIL RIWAYAT ITEM PENGELUARAN (POPUP)
+    // =========================================================
+    openExpenseDetailModal: function(itemName) {
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
+        if (startObj) startObj.setHours(0, 0, 0, 0);
+        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
+        if (endObj) endObj.setHours(23, 59, 59, 999);
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        let detailList = [];
+        let totalNominal = 0;
+
+        // Kumpulkan data riwayat
+        (this.db.laporanHarian || []).forEach(rep => {
+            if (rep.Status_Approval === 'Ditolak') return;
+
+            let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (!isConsolidated && repOutlet !== currOutletClean) return;
+
+            if (startObj || endObj) {
+                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
+                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    let repDateObj = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
+                    if (startObj && repDateObj < startObj) return;
+                    if (endObj && repDateObj > endObj) return;
+                } else return;
+            }
+
+            try {
+                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                expArr.forEach(itemExp => {
+                    let nm = String(itemExp.nama || '').toUpperCase().trim();
+                    let nmNom = Number(itemExp.nominal || 0);
+                    
+                    if (nm === itemName && nmNom > 0) {
+                        detailList.push({
+                            tanggal: rep.Tanggal,
+                            outlet: repOutlet,
+                            nominal: nmNom,
+                            dateStr: rep.Tanggal // Disimpan untuk sorting jika perlu
+                        });
+                        totalNominal += nmNom;
+                    }
+                });
+            } catch(e){}
+        });
+
+        // Eksekusi UI
+        document.getElementById('modal-expense-title').innerText = itemName;
+        document.getElementById('modal-expense-meta').innerText = `Total: Rp ${totalNominal.toLocaleString('id-ID')} dari ${detailList.length} Transaksi`;
+
+        let tbody = document.getElementById('modal-expense-tbody');
+        if (detailList.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="py-10 text-center text-slate-500 italic">Tidak ada rincian ditemukan</td></tr>`;
+        } else {
+            tbody.innerHTML = detailList.map(d => `
+                <tr class="hover:bg-slate-800/80 transition-colors">
+                    <td class="py-3 px-5 text-slate-300 font-extrabold">${d.tanggal}</td>
+                    <td class="py-3 px-5 text-amber-400 font-black text-[11px]"><i class="fas fa-store mr-1 opacity-70"></i> Ai-CHA ${d.outlet}</td>
+                    <td class="py-3 px-5 text-right text-rose-400 font-black">Rp ${d.nominal.toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Animasi Tampil
+        const modal = document.getElementById('modal-detail-expense');
+        if (modal) {
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; 
+            modal.classList.add('opacity-100');
+            if(modal.firstElementChild) {
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }
+        }
+    },
+
+    closeExpenseDetailModal: function() {
+        const modal = document.getElementById('modal-detail-expense');
+        if (modal) {
+            modal.classList.remove('opacity-100');
+            if(modal.firstElementChild) {
+                modal.firstElementChild.classList.remove('scale-100');
+                modal.firstElementChild.classList.add('scale-95');
+            }
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+    },
+
     // Membuka Modal Detail Struk di Tab Laporan
     openDetailTrx: function(trxID) {
         let t = (this.db.transactions || []).find(x => x.ID_TRX === trxID);
