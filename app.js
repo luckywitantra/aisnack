@@ -3038,7 +3038,6 @@ changeOutlet: function(val) {
                 <span class="text-base font-black text-emerald-400">Rp ${netLaci.toLocaleString('id-ID')}</span>
             </div>
 
-            // Rincian Biaya Khusus Cabang Ini
             <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60 flex flex-col min-h-[220px]">
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-700/60">
                     <h5 class="text-xs font-black text-amber-400 flex items-center gap-2">
