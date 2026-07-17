@@ -4423,22 +4423,26 @@ updatePendingNotifications: function() {
         let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
         let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
 
+        // 🚀 MENGGUNAKAN GETGROUPED AGAR YANG DIHITUNG ADALAH "DOKUMEN LAPORAN", BUKAN "ITEM ECERAN"
+        let groupedOpname = typeof this.getGroupedOpname === 'function' ? this.getGroupedOpname() : [];
+        let groupedRestok = typeof this.getGroupedRestok === 'function' ? this.getGroupedRestok() : [];
+
         let pOpnameTotal = 0; let pTerimaTotal = 0;
         let pOpnameOutlet = 0; let pTerimaOutlet = 0;
 
-        // 1. Hitung Opname Fisik Pending
-        (this.db.opname || []).forEach(o => {
-            if (o.Status_Approval === 'Pending') {
+        // 1. Hitung Laporan Opname Fisik Pending
+        groupedOpname.forEach(o => {
+            if (o.Status === 'Pending') {
                 pOpnameTotal++;
                 if (o.Outlet === this.outlet) pOpnameOutlet++;
             }
         });
 
-        // 2. Hitung Terima Barang (Mutasi) Pending
-        (this.db.mutasi || []).forEach(m => {
-            if (m.Status_Approval === 'Pending') {
+        // 2. Hitung Laporan Terima Barang (Mutasi) Pending
+        groupedRestok.forEach(m => {
+            if (m.Status === 'Pending') {
                 pTerimaTotal++;
-                if (m.Outlet_Tujuan === this.outlet) pTerimaOutlet++;
+                if (m.Outlet === this.outlet) pTerimaOutlet++;
             }
         });
 
@@ -4463,7 +4467,8 @@ updatePendingNotifications: function() {
             if (pTerimaOutlet > 0) {
                 badgeTerima.innerText = pTerimaOutlet;
                 badgeTerima.classList.remove('hidden');
-                textTerima.innerHTML = `Terdapat <b>${pTerimaOutlet} item</b> barang masuk di Cabang ${this.outlet} yang belum disetujui. Stok belum bertambah.`;
+                // Teks diubah agar lebih logis (menyebut antrean dokumen, bukan item)
+                textTerima.innerHTML = `Terdapat <b>${pTerimaOutlet} antrean Surat Jalan</b> di Cabang ${this.outlet} yang belum disetujui. Stok belum bertambah.`;
                 bannerTerima.classList.remove('hidden');
             } else {
                 badgeTerima.classList.add('hidden');
@@ -4479,7 +4484,8 @@ updatePendingNotifications: function() {
             if (pOpnameOutlet > 0) {
                 badgeOpname.innerText = pOpnameOutlet;
                 badgeOpname.classList.remove('hidden');
-                textOpname.innerHTML = `Terdapat <b>${pOpnameOutlet} item</b> laporan selisih di Cabang ${this.outlet} yang menunggu diperiksa Owner.`;
+                // Teks diubah agar lebih logis
+                textOpname.innerHTML = `Terdapat <b>${pOpnameOutlet} antrean Laporan Audit</b> di Cabang ${this.outlet} yang menunggu diperiksa Owner.`;
                 bannerOpname.classList.remove('hidden');
             } else {
                 badgeOpname.classList.add('hidden');
@@ -4756,9 +4762,22 @@ refreshData: function() {
     },
     
     addToCart: function(sku, nama, price, maxStok, skuBahan, event) {
-        let currentStokBahanDiKeranjang = 0; let refBahan = skuBahan || sku;
+        // 1. Pancing sinkronisasi data secara diam-diam di latar belakang
+        if (typeof this.refreshStokOnly === 'function') this.refreshStokOnly();
+
+        let currentStokBahanDiKeranjang = 0; 
+        let refBahan = skuBahan || sku;
+        
+        // 2. 🚀 CEK STOK AKTUAL: Tarik dari memori terbaru (bukan dari tampilan HTML lama)
+        let realStokData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
+        let actualMaxStok = realStokData ? Number(realStokData.Stok_Toko) : maxStok;
+
         this.cart.forEach(i => { if ((i.sku_bahan || i.sku) === refBahan) currentStokBahanDiKeranjang += i.qty; });
-        if (currentStokBahanDiKeranjang >= maxStok) return this.showToast(`Stok Habis! Sisa di Toko: ${maxStok - currentStokBahanDiKeranjang}`, 'error');
+        
+        // Cek menggunakan stok aktual terbaru
+        if (currentStokBahanDiKeranjang >= actualMaxStok) {
+            return this.showToast(`Stok Habis! Sisa di Toko: ${actualMaxStok - currentStokBahanDiKeranjang}`, 'error');
+        }
 
         if (event) {
             const cartIcon = document.getElementById('cart-badge');
@@ -4770,8 +4789,15 @@ refreshData: function() {
                 setTimeout(() => dot.remove(), 500);
             }
         }
+        
         let item = this.cart.find(i => i.sku === sku);
-        if (item) item.qty++; else this.cart.push({ sku, nama, price, qty: 1, sku_bahan: skuBahan, maxStok: maxStok });
+        if (item) {
+            item.qty++;
+            item.maxStok = actualMaxStok; // Update referensi maksimal terbaru di keranjang
+        } else {
+            this.cart.push({ sku, nama, price, qty: 1, sku_bahan: skuBahan, maxStok: actualMaxStok });
+        }
+        
         this.renderCart();
         setTimeout(() => { const cont = document.getElementById('cart-container'); if (cont) cont.scrollTop = cont.scrollHeight; }, 50);
     },
@@ -4942,9 +4968,38 @@ refreshData: function() {
             }
         }
     },
+
+    // =========================================================
+    // 🚀 ENGINE: SILENT SYNC (SINKRONISASI STOK DI LATAR BELAKANG)
+    // =========================================================
+    refreshStokOnly: async function() {
+        // Anti-Spam: Beri jeda 10 detik antar penarikan agar server Google tidak kelebihan beban
+        let now = new Date().getTime();
+        if (this._lastSyncTime && (now - this._lastSyncTime < 10000)) return;
+        this._lastSyncTime = now;
+
+        try {
+            let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+            // Gunakan history=1 agar penarikan super kilat (hanya data hari ini)
+            const res = await fetch(rUrl + "?ts=" + now + "&history=1", { redirect: 'follow' });
+            const data = await res.json();
+            
+            if (data && data.hargaStokOutlet) {
+                // Hanya perbarui blok stok dan transaksi, biarkan yang lain utuh
+                this.db.hargaStokOutlet = data.hargaStokOutlet;
+                this.db.transactions = data.transactions;
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+                
+                // Opsional: Anda bisa memanggil this.renderProducts() di sini jika ingin 
+                // angka di kartu produk otomatis berkedip/berubah saat HP kasir didiamkan.
+            }
+        } catch(e) {
+            console.log("Silent sync terganggu koneksi, lanjut gunakan cache.");
+        }
+    },
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN
-   executeCheckout: async function() {
+    executeCheckout: async function() {
         // 1. GEMBOK ANTI DOUBLE-CLICK & KERANJANG KOSONG
         if (this.isProcessing) return; 
         if (this.cart.length === 0) {
@@ -4961,19 +5016,63 @@ refreshData: function() {
         if (btnPay) {
             originalBtnHtml = btnPay.innerHTML;
             btnPay.disabled = true;
-            btnPay.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Memproses...';
+            btnPay.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Cek Server...';
             btnPay.classList.add('opacity-70', 'cursor-not-allowed');
         }
         
+        // ======================================================================
+        // 🚀 SINKRONISASI KILAT SEBELUM BAYAR (Cegah Antrian & Stok Bentrok)
+        // ======================================================================
+        if (this.isOnline && typeof this.refreshStokOnly === 'function') {
+            await this.refreshStokOnly(); // Tarik data terbaru diam-diam
+        }
+
+        // 🚀 VALIDASI STOK TERAKHIR (Cegah stok minus karena keduluan device lain)
+        let stokAman = true;
+        let barangHabis = '';
+        
+        for (let item of this.cart) {
+            let refBahan = item.sku_bahan || item.sku;
+            let realStokData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
+            let actualMaxStok = realStokData ? Number(realStokData.Stok_Toko) : item.maxStok;
+            
+            let qtyTerpakaiDiKeranjang = 0;
+            this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) qtyTerpakaiDiKeranjang += c.qty; });
+
+            if (qtyTerpakaiDiKeranjang > actualMaxStok) {
+                stokAman = false;
+                barangHabis = item.nama;
+                break;
+            }
+        }
+
+        // Jika keduluan dibeli kasir PC, tolak transaksi di HP!
+        if (!stokAman) {
+            this.isProcessing = false;
+            if (btnPay) {
+                btnPay.disabled = false;
+                btnPay.innerHTML = originalBtnHtml;
+                btnPay.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+            this.showToast(`Gagal! Stok ${barangHabis} baru saja dihabiskan device lain.`, "error");
+            return;
+        }
+        // ======================================================================
+
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         
+        // Nomor Antrean dijamin urut karena database memori baru saja di-refresh
         let countToday = 0;
         (this.db.transactions || []).forEach(t => {
-            if (t.Outlet === this.outlet && this.cleanDateOnly(t.Tanggal) === todayStrLocal) { countToday++; }
+            let tglTrx = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
+            if (t.Outlet === this.outlet && tglTrx === todayStrLocal) { countToday++; }
         });
         let noAntrian = countToday + 1;
-        let trxID = 'TRX' + d.getTime();
+        
+        // ID Resi Dijamin Unik
+        let kasirPrefix = this.currentUser ? this.currentUser.Username.substring(0,3).toUpperCase() : 'KSR';
+        let trxID = `TRX-${kasirPrefix}-${d.getTime()}`;
 
         let isPrintSuccess = this.printerCharacteristic ? true : false;
         
@@ -4988,6 +5087,14 @@ refreshData: function() {
             Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian,
             Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'
         });
+
+        // 🚀 Kurangi visual stok langsung di layar kasir device ini
+        this.cart.forEach(item => {
+            let refBahan = item.sku_bahan || item.sku;
+            let realStokData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
+            if(realStokData) realStokData.Stok_Toko -= item.qty;
+        });
+
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
         this.refreshData(); 
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
@@ -5001,7 +5108,7 @@ refreshData: function() {
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
         this.cart = []; 
-        this.payCash = 0; // Hapus ingatan uang tunai yang diketik
+        this.payCash = 0; 
         this.payTotal = 0;
         this.renderCart(); 
         this.syncStorage('paid', noAntrian); 
@@ -5020,22 +5127,10 @@ refreshData: function() {
         // 4. SINKRONISASI SERVER DI LATAR BELAKANG
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
-                
                 if (isPrintSuccess) {
                     this.laporStrukDicetak(trxID);
                 }
-
-                fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && data.status === 'sukses') {
-                            this.db = data;
-                            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                            if (this.cart.length === 0) {
-                                this.refreshData();
-                            }
-                        }
-                    }).catch(e => console.log("Aman, memori lokal sudah tercatat."));
+                // Hapus fetch manual di sini karena refreshStokOnly sudah menanganinya di awal!
             } else if (res && res.status !== 'sukses' && !res.is_offline) {
                let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
                if (!isAlreadyQueued) {
@@ -5098,47 +5193,88 @@ refreshData: function() {
             }, 10);
         }
     },
+  // =========================================================
+    // 🚀 ENGINE: TAMPILKAN MODAL RIWAYAT WA (TABLE VIEW)
+    // =========================================================
     openWaHistory: function(type) {
+        const modal = document.getElementById('modal-wa-history');
         const tbody = document.getElementById('wa-history-tbody');
-        if(!tbody) return;
-        let grouped = {};
+        const titleEl = document.getElementById('wa-history-title');
         
-        if (type === 'terima') {
-            document.getElementById('wa-history-title').innerText = 'Riwayat Terima Barang';
-            (this.db.mutasi || []).forEach(m => {
-                if (m.Outlet_Tujuan === this.outlet) {
-                    let w = String(m.Waktu);
-                    if(!grouped[w]) grouped[w] = { kasir: m.Kasir, items: [], waktu: w };
-                    let nama = this.db.masterProduk.find(x => x.SKU === m.SKU)?.Nama_Produk || m.SKU;
-                    grouped[w].items.push({ nama: nama, qty: m.Qty, note: m.Keterangan });
-                }
-            });
-        } else {
-            document.getElementById('wa-history-title').innerText = 'Riwayat Opname Fisik';
-            (this.db.opname || []).forEach(o => {
-                if (o.Outlet === this.outlet) {
-                    let w = String(o.Waktu);
-                    if(!grouped[w]) grouped[w] = { kasir: o.Kasir, items: [], waktu: w };
-                    let nama = this.db.masterProduk.find(x => x.SKU === o.SKU)?.Nama_Produk || o.SKU;
-                    grouped[w].items.push({ nama: nama, sys: o.Stok_Sistem, fisik: o.Stok_Fisik, selisih: o.Selisih, note: o.Keterangan_Fisik });
-                }
-            });
+        if (!modal || !tbody) {
+            this.showToast("Komponen Modal Riwayat WA belum tersedia.", "error");
+            return;
         }
 
-        let arr = Object.values(grouped).sort((a,b) => new Date(this.parseDateId(b.waktu)) - new Date(this.parseDateId(a.waktu)));
-        let html = '';
-        arr.slice(0, 50).forEach(g => { 
-            let safeWaktu = g.waktu.includes('T') ? this.cleanDateOnly(g.waktu) + ' ' + this.cleanTimeOnly(g.waktu) : g.waktu;
-            let btnAction = `<button onclick="superApp.resendWa('${type}', '${encodeURIComponent(g.waktu)}')" class="bg-[#25D366] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#20bd5a] transition"><i class="fab fa-whatsapp mr-1"></i> Kirim</button>`;
-            html += `<tr class="border-b border-slate-50 hover:bg-slate-100 transition"><td class="py-3 px-4 text-xs">${safeWaktu}</td><td class="py-3 px-4 text-xs font-bold">${g.kasir}</td><td class="py-3 px-4 text-center text-xs">${g.items.length} Item</td><td class="py-3 px-4 text-center">${btnAction}</td></tr>`;
-        });
+        let filteredData = [];
+        let htmlList = '';
+
+        if (type === 'opname') {
+            titleEl.innerText = "Riwayat WA Opname (Hari Ini)";
+            filteredData = this.getGroupedOpname().filter(x => x.Outlet === this.outlet);
+
+            if (filteredData.length === 0) {
+                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic">Belum ada riwayat pengajuan opname.</td></tr>`;
+            } else {
+                htmlList = filteredData.map(op => `
+                    <tr class="hover:bg-indigo-50/50 transition-colors">
+                        <td class="py-3 px-4 text-xs font-black text-indigo-600">${op.Waktu}</td>
+                        <td class="py-3 px-4">
+                            <span class="text-xs block text-slate-700">${op.Kasir}</span>
+                            <span class="text-[9px] text-slate-400 block">${op.ID_Opname} • Status: ${op.Status}</span>
+                        </td>
+                        <td class="py-3 px-4 text-center text-xs text-slate-600">${op.Items.length} Macam</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="superApp.sendWaOpname('${op.Waktu}', '${op.Outlet}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto">
+                                <i class="fab fa-whatsapp text-sm"></i> Kirim
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        } 
+        else if (type === 'terima') {
+            titleEl.innerText = "Riwayat WA Restok (Hari Ini)";
+            filteredData = this.getGroupedRestok().filter(x => x.Outlet === this.outlet);
+
+            if (filteredData.length === 0) {
+                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic">Belum ada riwayat penerimaan barang.</td></tr>`;
+            } else {
+                htmlList = filteredData.map(bm => `
+                    <tr class="hover:bg-emerald-50/50 transition-colors">
+                        <td class="py-3 px-4 text-xs font-black text-emerald-600">${bm.Waktu}</td>
+                        <td class="py-3 px-4">
+                            <span class="text-xs block text-slate-700">${bm.Kasir}</span>
+                            <span class="text-[9px] text-slate-400 block">${bm.Surat_Jalan} • Asal: ${bm.Supplier}</span>
+                        </td>
+                        <td class="py-3 px-4 text-center text-xs text-slate-600">${bm.Items.length} Macam</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="superApp.sendWaTerima('${bm.Surat_Jalan}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto">
+                                <i class="fab fa-whatsapp text-sm"></i> Kirim
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Tembakkan HTML ke dalam tabel
+        tbody.innerHTML = htmlList;
         
-        tbody.innerHTML = html || `<tr><td colspan="4" class="text-center py-6 text-slate-400 text-xs italic">Belum ada riwayat laporan</td></tr>`;
-        
-        const mod = document.getElementById('modal-wa-history');
-        const modc = document.getElementById('modal-wa-history-content');
-        if(mod && modc) { mod.classList.remove('hidden'); setTimeout(() => modc.classList.add('modal-enter-active'), 10); }
+        // Buka Modal (Anti Gagal)
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
     },
+
+    closeWaHistory: function() {
+        const modal = document.getElementById('modal-wa-history');
+        if (modal) {
+            // Tutup Modal Langsung
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    },
+    
     resendWa: function(type, encodedWaktu) {
         let waktu = decodeURIComponent(encodedWaktu);
         let waText = '';
@@ -5387,15 +5523,13 @@ refreshData: function() {
         }, 50); 
     },
     
-   // =========================================================
-    // 🚀 1. TAHAP VALIDASI & PEMICU MODAL TERIMA BARANG CANTIK
-    // =========================================================
-    submitTerimaBarang: async function() {
+  
+   submitTerimaBarang: async function() {
         if (this.isProcessing) return;
         
         let items = [];
         let totalPcs = 0;
-        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser.Username}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
+        let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser ? this.currentUser.Username : 'Kasir'}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
 
         (this.db.masterProduk || []).forEach(m => {
             if (String(m.Kategori || '').toLowerCase() === 'bahan' || String(m.Kategori || '').toLowerCase() === 'pendukung') {
@@ -5422,9 +5556,9 @@ refreshData: function() {
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         
-        let sudahInputHariIni = this.db.mutasi.some(m => 
+        let sudahInputHariIni = (this.db.barangMasuk || []).some(m => 
             m.Outlet_Tujuan === this.outlet && 
-            this.cleanDateOnly(m.Waktu) === todayStrLocal &&
+            (typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(m.Waktu) : m.Waktu.includes(todayStrLocal)) &&
             m.Status_Approval === 'Pending'
         );
 
@@ -5435,7 +5569,6 @@ refreshData: function() {
         const warningBox = document.getElementById('terima-confirm-warning-box');
 
         if (sudahInputHariIni) {
-            // Ubah tema modal menjadi Kuning Peringatan (Warning)
             if (iconBox) iconBox.className = "w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-amber-100/60 shadow-inner";
             if (titleEl) titleEl.innerText = "Laporan Ganda Terdeteksi";
             if (subtitleEl) subtitleEl.innerText = "Cabang ini sudah mengirim data pending hari ini.";
@@ -5444,7 +5577,6 @@ refreshData: function() {
                 warningBox.innerHTML = `<i class="fas fa-triangle-exclamation text-red-500 text-base mt-0.5 shrink-0"></i><p class="text-[11px] font-bold text-red-800 leading-relaxed"><b>PERINGATAN GRAV:</b> Sudah ada input barang datang yang pending hari ini. Yakin ingin mengirim antrean laporan baru?</p>`;
             }
         } else {
-            // Kembalikan ke tema Hijau Normal (Success/Info)
             if (iconBox) iconBox.className = "w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-emerald-100/60 shadow-inner";
             if (titleEl) titleEl.innerText = "Konfirmasi Barang Datang";
             if (subtitleEl) subtitleEl.innerText = "Verifikasi jumlah barang yang dikirim kurir pusat.";
@@ -5454,7 +5586,6 @@ refreshData: function() {
             }
         }
 
-        // Inject Ringkasan Angka
         const summaryContainer = document.getElementById('terima-confirm-summary');
         if (summaryContainer) {
             summaryContainer.innerHTML = `
@@ -5473,43 +5604,147 @@ refreshData: function() {
             `;
         }
 
-        // Tautkan fungsi eksekusi ke tombol
         const btnExecute = document.getElementById('btn-confirm-terima-execute');
         if (btnExecute) {
             btnExecute.onclick = () => this.executeSubmitTerimaBarang(items, waText);
         }
 
-        // Buka Modal Box
-        this.openModal('modal-confirm-terima');
+        if (typeof this.openModal === 'function') {
+            this.openModal('modal-confirm-terima');
+        } else {
+            let confirmMsg = sudahInputHariIni 
+                ? "Laporan ganda terdeteksi! Yakin ingin melanjutkan pengiriman antrean baru?"
+                : `Konfirmasi pengiriman ${totalPcs} Pcs barang?`;
+            if (confirm(confirmMsg)) this.executeSubmitTerimaBarang(items, waText);
+        }
     },
 
     // =========================================================
-    // 🚀 2. TAHAP EKSEKUSI DATA KELUAR KE SERVER & WA MODAL
+    // 🚀 ENGINE: TAMPILKAN POPUP WA (DENGAN FALLBACK AMAN)
+    // =========================================================
+    openWaShareModal: function(text) {
+        const modal = document.getElementById('modal-wa-share');
+        const preview = document.getElementById('wa-share-preview');
+        const btn = document.getElementById('btn-wa-share-execute');
+        
+        // JIKA ELEMEN HTML DITEMUKAN: Buka Popup Cantiknya
+        if (modal && preview && btn) {
+            preview.innerText = text;
+            btn.onclick = () => {
+                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                this.closeWaShareModal();
+            };
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        } 
+        // JIKA HTML GAGAL DITEMUKAN: Panggil Alert Sistem
+        else {
+            let confirmKirim = confirm("✅ Laporan Berhasil Disimpan ke Sistem!\n\nKlik 'OK' untuk langsung mengirimkan laporan audit ke WhatsApp.");
+            if (confirmKirim) window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+    },
+
+    closeWaShareModal: function() {
+        const modal = document.getElementById('modal-wa-share');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    },
+
+    closeWaShareModal: function() {
+        const modal = document.getElementById('modal-wa-share');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    },
+
+
+    // =========================================================
+    // 🚀 UPDATE: EKSEKUSI TERIMA BARANG
     // =========================================================
     executeSubmitTerimaBarang: async function(items, waText) {
         if (this.isProcessing) return;
-        this.closeModal('modal-confirm-terima');
+        if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-terima');
         
-        // Beri sedikit jeda waktu agar transisi modal tutup selesai
         setTimeout(async () => {
             this.setLoading(true, "Menyimpan Laporan Masuk...");
-            const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser.Username, items: items };
+            const payload = { action: 'terima_barang_kasir', outlet: this.outlet, kasir: this.currentUser ? this.currentUser.Username : 'Kasir', items: items };
             
             let res = await this.apiPost(payload);
             
             if (res.status === 'sukses') {
-                this.showToast("Berhasil Disimpan di Sistem!");
-                this.showWaModal(waText);
+                this.setLoading(false);
                 
+                // 1. Tampilkan Popup WA Cantik!
+                this.openWaShareModal(waText);
+
+                // 2. Bersihkan Inputan
+                items.forEach(i => {
+                    let idDesk = document.getElementById(`trm-qty-${i.sku}`); if(idDesk) idDesk.value = '';
+                    let idMob = document.getElementById(`trm-qty-mob-${i.sku}`); if(idMob) idMob.value = '';
+                    let nd = document.getElementById(`trm-note-${i.sku}`); if(nd) nd.value = '';
+                    let nm = document.getElementById(`trm-note-mob-${i.sku}`); if(nm) nm.value = '';
+                });
+                
+                // 3. Refresh Data
                 if (!res.is_offline) { 
-                    const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-                    this.db = await r.json(); 
-                    this.refreshData(); 
+                    try {
+                        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+                        const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                        this.db = await r.json(); 
+                        if (typeof this.refreshData === 'function') this.refreshData(); 
+                    } catch(e) {}
                 }
-                this.switchMenu('pos');
+            } else {
+                this.setLoading(false);
+                this.showToast("Gagal menyimpan data: " + res.pesan, "error");
             }
-            this.setLoading(false);
-        }, 200);
+        }, 300);
+    },
+
+    // =========================================================
+    // 🚀 UPDATE: EKSEKUSI OPNAME FISIK
+    // =========================================================
+    executeSubmitOpname: async function(items, waText) {
+        if (this.isProcessing) return;
+        if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-opname');
+        
+        setTimeout(async () => {
+            this.setLoading(true, "Menyimpan Hasil Opname...");
+            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser ? this.currentUser.Username : 'Kasir', items: items };
+            
+            let res = await this.apiPost(payload);
+            
+            if (res.status === 'sukses') {
+                this.setLoading(false);
+                
+                // 1. Tampilkan Popup WA Cantik!
+                this.openWaShareModal(waText);
+
+                // 2. Bersihkan Inputan Fisik
+                items.forEach(i => {
+                    let idDesk = document.getElementById(`op-qty-${i.sku}`); if(idDesk) idDesk.value = '';
+                    let idMob = document.getElementById(`op-qty-mob-${i.sku}`); if(idMob) idMob.value = '';
+                    let nd = document.getElementById(`op-note-${i.sku}`); if(nd) nd.value = '';
+                    let nm = document.getElementById(`op-note-mob-${i.sku}`); if(nm) nm.value = '';
+                });
+                
+                // 3. Refresh Data
+                if (!res.is_offline) { 
+                    try {
+                        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+                        const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                        this.db = await r.json(); 
+                        if (typeof this.refreshData === 'function') this.refreshData(); 
+                    } catch(e) {}
+                }
+            } else {
+                this.setLoading(false);
+                this.showToast("Gagal menyimpan data: " + res.pesan, "error");
+            }
+        }, 300);
     },
     
     calcOpname: function(sku) {
@@ -5528,28 +5763,35 @@ refreshData: function() {
         let selisih = fisik - sys; selEl.innerText = selisih > 0 ? `+${selisih}` : selisih;
         if (selisih < 0) selEl.className = 'font-black text-red-500 text-lg'; else if (selisih > 0) selEl.className = 'font-black text-green-500 text-lg'; else selEl.className = 'font-black text-slate-400 text-lg';
     },
-   buildOpnameWaText: function(outlet, kasir, waktu, items) {
+   // =========================================================
+    // 🚀 ENGINE: GENERATOR WA OPNAME (DAFTAR DIJADIKAN SATU)
+    // =========================================================
+    buildOpnameWaText: function(outlet, kasir, waktu, items) {
+        if (!Array.isArray(items)) items = [];
+
         // 1. Hitung Kecepatan Jualan (Velocity) untuk Bahan Utama dari Riwayat Transaksi
         let productSales = {};
         let oldestDate = new Date();
         
         (this.db.transactions || []).forEach(t => {
             if(t.Status === 'Sukses' && t.Outlet === outlet) {
-                let d = this.parseDateId(t.Tanggal); 
+                let d = typeof this.parseDateId === 'function' ? this.parseDateId(t.Tanggal) : new Date(t.Tanggal); 
                 if(d < oldestDate && d.getTime() > 0) oldestDate = d;
                 
                 let parsedItems = []; 
                 try { parsedItems = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 
-                parsedItems.forEach(item => {
-                    let refSku = item.sku_bahan || item.sku;
-                    if(!productSales[refSku]) productSales[refSku] = 0;
-                    productSales[refSku] += Number(item.qty) || 0;
-                });
+                if (Array.isArray(parsedItems)) {
+                    parsedItems.forEach(item => {
+                        let refSku = item.sku_bahan || item.sku;
+                        if(!productSales[refSku]) productSales[refSku] = 0;
+                        productSales[refSku] += Number(item.qty) || 0;
+                    });
+                }
             }
         });
         
-        // 1.5 🚀 Hitung Total Barang Masuk (Mutasi) untuk Barang Pendukung
+        // 1.5 Hitung Total Barang Masuk (Mutasi) untuk Barang Pendukung
         let mutasiIn = {};
         (this.db.mutasi || []).forEach(m => {
             if(m.Outlet_Tujuan === outlet && m.Status_Approval === 'Disetujui') {
@@ -5562,71 +5804,62 @@ refreshData: function() {
         let daysActive = Math.ceil((todayObj - oldestDate) / (1000 * 60 * 60 * 24));
         if (daysActive < 1) daysActive = 1;
 
-        // 2. Pisahkan Kategori & Urutkan A-Z
-        let bermasalah = [];
-        let aman = [];
+        // 2. Pisahkan Kategori (Hanya Utama vs Pendukung)
+        let listBahan = [];
+        let listPendukung = [];
 
         items.forEach(item => {
+            let master = (this.db.masterProduk || []).find(m => m.SKU === item.sku);
+            let kategori = master ? String(master.Kategori || '').toLowerCase() : 'bahan';
             
-            // 🚀 KALKULASI PINTAR BERDASARKAN KATEGORI BARANG
-            if (String(item.kategori).toLowerCase() === 'bahan') {
-                // A. Barang Utama (Dihitung dari kasir/POS)
+            if (kategori === 'bahan') {
                 let soldQty = productSales[item.sku] || 0;
                 let vel = soldQty / daysActive;
-                if (vel > 0) item.estHari = Math.floor(item.fisik / vel);
-                else item.estHari = -1; 
+                item.estHari = vel > 0 ? Math.floor(item.fisik / vel) : -1; 
+                listBahan.push(item);
             } else {
-                // B. Barang Pendukung (Dihitung dari Arus Masuk vs Fisik)
-                // Total Terpakai = Total Pernah Dikirim Pusat - Sisa Fisik Saat Ini
-                let totalReceived = mutasiIn[item.sku] || item.sys; // Fallback ke stok sistem jika blm ada mutasi
+                let totalReceived = mutasiIn[item.sku] || item.sistem; 
                 let totalUsed = totalReceived - item.fisik;
                 
                 if (totalUsed > 0 && daysActive > 0) {
-                    let vel = totalUsed / daysActive; // Rata-rata pemakaian pcs per hari
+                    let vel = totalUsed / daysActive; 
                     item.estHari = Math.floor(item.fisik / vel);
                 } else {
-                    item.estHari = -1; // Jika barang belum pernah dipakai sama sekali
+                    item.estHari = -1; 
                 }
-            }
-
-            // FILTER: Jika ada selisih ATAU kasir memberikan catatan khusus
-            if (item.selisih !== 0 || (item.note && item.note.trim() !== '')) {
-                bermasalah.push(item);
-            } else {
-                aman.push(item);
+                listPendukung.push(item);
             }
         });
 
-       // 1. Pengurutan Mutlak A-Z (Mengabaikan huruf besar/kecil)
-        bermasalah.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
-        aman.sort((a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase()));
+       // 3. Pengurutan Mutlak A-Z
+        const sortAZ = (a,b) => String(a.nama).toUpperCase().localeCompare(String(b.nama).toUpperCase());
+        listBahan.sort(sortAZ);
+        listPendukung.sort(sortAZ);
 
-        // 2. SUSUN TEKS WHATSAPP EKSEKUTIF
-        let waText = `*LAPORAN OPNAME FISIK & AUDIT*\n📍 Cabang: ${outlet}\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek menu Audit Opname di aplikasi untuk menyetujui_*\n\n`;
+        // 4. SUSUN TEKS WHATSAPP EKSEKUTIF
+        let waText = `*[ LAPORAN OPNAME FISIK & AUDIT ]*\n📍 Cabang: *Ai-CHA ${outlet}*\n👤 Kasir: ${kasir}\n📅 Waktu: ${waktu}\n\n*_Mohon cek menu Audit Opname di aplikasi untuk menyetujui_*\n\n`;
 
-        // --- A. Render Barang Bermasalah / Selisih ---
-        if (bermasalah.length > 0) {
-            waText += `🚨 *ITEM SELISIH / CATATAN (${bermasalah.length})*\n`;
-            bermasalah.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
-                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '⚠️');
+        if (listBahan.length > 0) {
+            waText += `*📦 BAHAN UTAMA*\n`;
+            listBahan.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '✅');
+                let diffBadge = i.selisih === 0 ? "PAS" : (i.selisih > 0 ? `+${i.selisih}` : `${i.selisih}`);
+                let noteStr = (i.catatan && i.catatan.trim() !== '') ? `\nCatatan: ${i.catatan}` : '';
                 
-                waText += `${icon} *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *${i.selisih > 0 ? '+'+i.selisih : i.selisih}*\n⏳ Est Habis: ${alertStr}\nCatatan: ${i.note || '-'}\n\n`;
+                waText += `${icon} *${i.nama}*\nSys: ${i.sistem} | Fisik: ${i.fisik} | Selisih: *${diffBadge}*\n⏳ Est Habis: ${alertStr}${noteStr}\n\n`;
             });
-        } else {
-            waText += `🚨 *ITEM SELISIH / CATATAN*\n_Nihil. Kinerja staf sangat teliti, tidak ada selisih stok!_ 🎉\n\n`;
         }
 
-        // --- B. Render Barang Aman ---
-        if (aman.length > 0) {
-            waText += `✅ *ITEM AMAN FISIK SESUAI SISTEM (${aman.length})*\n`;
-            
-            // Loop semua barang aman agar rincian stoknya muncul ke bawah
-            aman.forEach(i => {
-                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada data pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+        if (listPendukung.length > 0) {
+            waText += `*🛒 BAHAN PENDUKUNG*\n`;
+            listPendukung.forEach(i => {
+                let alertStr = i.fisik <= 0 ? 'HABIS 🛑' : (i.estHari === -1 ? 'Belum ada pakai 📉' : (i.estHari < 4 ? `${i.estHari} Hari (Kritis ⚠️)` : `${i.estHari > 99 ? '>99' : i.estHari} Hari (Aman ✅)`));
+                let icon = i.selisih < 0 ? '📉' : (i.selisih > 0 ? '📈' : '✅');
+                let diffBadge = i.selisih === 0 ? "PAS" : (i.selisih > 0 ? `+${i.selisih}` : `${i.selisih}`);
+                let noteStr = (i.catatan && i.catatan.trim() !== '') ? `\nCatatan: ${i.catatan}` : '';
                 
-                // Selisih pasti 0 untuk kategori aman, catatan tidak perlu ditampilkan agar laporan bersih
-                waText += `📦 *${i.nama}*\nSys: ${i.sys} | Fisik: ${i.fisik} | Selisih: *0*\n⏳ Est Habis: ${alertStr}\n\n`;
+                waText += `${icon} *${i.nama}*\nSys: ${i.sistem} | Fisik: ${i.fisik} | Selisih: *${diffBadge}*\n⏳ Est Habis: ${alertStr}${noteStr}\n\n`;
             });
         }
 
@@ -5725,143 +5958,734 @@ openDetailStokOpname: function(sku) {
         this.openModal('modal-stok-detail');
     },
     
-// =========================================================
-    // 🚀 1. PEMERIKSAAN & PEMANGGIL POPUP CANTIK OPNAME
     // =========================================================
-    submitOpname: function() {
+    // 🚀 ENGINE: SUBMIT OPNAME FISIK (HANYA SIMPAN YANG BERUBAH)
+    // =========================================================
+    submitOpname: async function() {
         if (this.isProcessing) return;
-
-        let itemsToSubmit = [];
-        let itemsForWa = [];
+        
+        let allItems = []; // Array 100% Lengkap untuk Laporan WA
+        let dbItems = []; // Array Filter untuk masuk Google Sheets
         let countSelisih = 0;
 
         (this.db.masterProduk || []).forEach(m => {
-            let kat = String(m.Kategori || '').toLowerCase();
-            if (kat === 'bahan' || kat === 'pendukung') {
+            let cat = String(m.Kategori || '').toLowerCase();
+            if (cat === 'bahan' || cat === 'pendukung') {
                 
-                // 1. Ambil Data Sistem
-                let sData = (this.db.hargaStokOutlet || []).find(x => x.SKU === m.SKU && x.ID_Outlet === this.outlet);
-                let sys = sData ? Number(sData.Stok_Toko) : 0;
-
-                // 2. Ambil Elemen Input (Desktop & Mobile)
                 let inputDesk = document.getElementById(`opn-fisik-${m.SKU}`); 
                 let inputMob = document.getElementById(`opn-fisik-mob-${m.SKU}`);
+                
+                let stokData = (this.db.hargaStokOutlet || []).find(s => s.SKU === m.SKU && s.ID_Outlet === this.outlet);
+                let stokSistem = stokData ? parseInt(stokData.Stok_Toko || 0) : 0;
+                
+                let fisikStr = (inputDesk && inputDesk.value !== '') ? inputDesk.value : ((inputMob && inputMob.value !== '') ? inputMob.value : '');
+                
+                let stokFisik = stokSistem;
+                if (fisikStr !== '') {
+                    let parsed = parseInt(String(fisikStr).replace(/\D/g, ''));
+                    if (!isNaN(parsed)) stokFisik = parsed;
+                }
+                
                 let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
                 let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
-
-                // 3. Baca Isian Kasir
-                let valDesk = inputDesk && inputDesk.value !== '' ? this.getNumericValue(inputDesk.value) : sys;
-                let valMob = inputMob && inputMob.value !== '' ? this.getNumericValue(inputMob.value) : sys;
-
-                // 4. Deteksi Otomatis Sumber Input
-                let fisik = sys;
-                let note = '';
-
-                if (valMob !== sys) {
-                    fisik = valMob;
-                    note = noteMob ? noteMob.value : '';
-                } else if (valDesk !== sys) {
-                    fisik = valDesk;
-                    note = noteDesk ? noteDesk.value : '';
-                } else {
-                    note = (noteMob && noteMob.value !== '') ? noteMob.value : (noteDesk && noteDesk.value !== '' ? noteDesk.value : '');
-                }
-
-                let selisih = fisik - sys;
-                if (selisih !== 0) countSelisih++;
-
-                // 5. Masukkan ke list WA
-                itemsForWa.push({ sku: m.SKU, nama: m.Nama_Produk, kategori: m.Kategori, sys: sys, fisik: fisik, selisih: selisih, note: note });
+                let note = (noteDesk && noteDesk.value !== '') ? noteDesk.value : ((noteMob && noteMob.value !== '') ? noteMob.value : '');
                 
-                // 6. Masukkan ke list Submit jika ada perubahan
-                if (fisik !== sys || note !== '') {
-                    itemsToSubmit.push({ sku: m.SKU, sistem: sys, fisik: fisik, selisih: selisih, catatan: note });
+                let selisih = stokFisik - stokSistem;
+
+                let itemObj = { 
+                    sku: m.SKU, nama: m.Nama_Produk, sistem: stokSistem, fisik: stokFisik, selisih: selisih, catatan: note 
+                };
+
+                // Masukkan ke Array WA (Semua Barang)
+                allItems.push(itemObj);
+
+                // 🛑 FILTERING: HANYA MASUKKAN KE DB JIKA ADA SELISIH ATAU CATATAN
+                if (selisih !== 0 || (note && note.trim() !== '')) {
+                    dbItems.push(itemObj);
+                    if (selisih !== 0) countSelisih++;
                 }
             }
         });
+
+        if (allItems.length === 0) return this.showToast("Database master produk kosong!", "error");
+
+        let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
+        let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        let kasirName = this.currentUser ? this.currentUser.Username : 'Kasir';
+        let waktuStr = d.toLocaleString('id-ID');
         
-        // Pencegahan jika kasir belum mengubah apapun
-        if (itemsToSubmit.length === 0) { 
-            return this.showToast("Tidak ada perubahan stok atau catatan untuk dilaporkan!", "warning"); 
+        // Buat Teks WA Menggunakan "allItems" (100% Barang)
+        let waTextFinal = this.buildOpnameWaText(this.outlet, kasirName, waktuStr, allItems);
+
+        let sudahInputHariIni = (this.db.riwayatOpname || []).some(m => 
+            m.Outlet === this.outlet && 
+            (typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(m.Waktu) : m.Waktu.includes(todayStrLocal)) &&
+            m.Status_Approval === 'Pending'
+        );
+
+        const iconBox = document.getElementById('opname-confirm-icon-box');
+        const titleEl = document.getElementById('opname-confirm-title');
+        const subtitleEl = document.getElementById('opname-confirm-subtitle');
+        const warningBox = document.getElementById('opname-confirm-warning-box');
+
+        if (sudahInputHariIni) {
+            if (iconBox) iconBox.className = "w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-amber-100/60 shadow-inner";
+            if (titleEl) titleEl.innerText = "Laporan Ganda Terdeteksi";
+            if (subtitleEl) subtitleEl.innerText = "Cabang ini sudah mengirim data pending hari ini.";
+            if (warningBox) warningBox.innerHTML = `<i class="fas fa-triangle-exclamation text-red-500 text-base mt-0.5 shrink-0"></i><p class="text-[11px] font-bold text-red-800 leading-relaxed"><b>PERINGATAN GRAV:</b> Sudah ada pengajuan opname yang pending hari ini. Lanjutkan kirim?</p>`;
+        } else {
+            if (iconBox) iconBox.className = "w-20 h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-indigo-100/60 shadow-inner";
+            if (titleEl) titleEl.innerText = "Konfirmasi Laporan Audit";
+            if (subtitleEl) subtitleEl.innerText = "Pastikan fisik telah dihitung ulang dengan benar.";
+            if (warningBox) warningBox.innerHTML = `<i class="fas fa-circle-info text-amber-500 text-base mt-0.5 shrink-0"></i><p class="text-[11px] font-bold text-amber-800 leading-relaxed">Hanya barang yang berselisih (${dbItems.length} Item) yang akan dikirim ke server.</p>`;
         }
 
-        // 🚀 SUSUN KARTU RINGKASAN DI DALAM MODAL
         const summaryContainer = document.getElementById('opname-confirm-summary');
         if (summaryContainer) {
             summaryContainer.innerHTML = `
                 <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                    <span class="text-xs font-bold text-slate-500">Cabang Audit</span>
-                    <span class="text-xs font-black text-slate-800 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">${this.outlet}</span>
-                </div>
-                <div class="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                    <span class="text-xs font-bold text-slate-500">Total Item Diperiksa</span>
-                    <span class="text-xs font-black text-indigo-600">${itemsToSubmit.length} Barang</span>
+                    <span class="text-xs font-bold text-slate-500">Item Akurat (Otomatis Aman)</span>
+                    <span class="text-xs font-black text-emerald-600">${allItems.length - dbItems.length} Macam</span>
                 </div>
                 <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-slate-500">Ditemukan Selisih</span>
-                    <span class="text-xs font-black ${countSelisih > 0 ? 'text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md animate-pulse' : 'text-emerald-600'}">${countSelisih} Barang Berselisih</span>
+                    <span class="text-xs font-bold text-slate-500">Item Masuk Server (Selisih/Note)</span>
+                    <span class="text-xs font-black text-rose-600">${dbItems.length} Macam</span>
                 </div>
             `;
         }
 
-        // Hubungkan data ke tombol "Ya, Kirim Audit"
         const btnExecute = document.getElementById('btn-confirm-opname-execute');
-        if (btnExecute) {
-            btnExecute.onclick = () => this.executeSubmitOpname(itemsToSubmit, itemsForWa);
+        // KUNCI PENTING: Melempar "dbItems" (yg sudah difilter) ke server, dan "waTextFinal" (Lengkap) ke WhatsApp
+        if (btnExecute) btnExecute.onclick = () => {
+            // JIKA SEMUA AKURAT 100%, TIDAK PERLU PUSH KE DB! LANGSUNG MUNCUL WA!
+            if (dbItems.length === 0) {
+                if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-opname');
+                this.showToast("Semua stok akurat! Tidak ada yang diupload ke server.", "success");
+                if (typeof this.openWaShareModal === 'function') this.openWaShareModal(waTextFinal);
+            } else {
+                this.executeSubmitOpname(dbItems, waTextFinal);
+            }
+        };
+
+        if (typeof this.openModal === 'function') {
+            this.openModal('modal-confirm-opname');
+        } else {
+            let confirmMsg = sudahInputHariIni ? "Laporan ganda terdeteksi! Lanjutkan?" : `Konfirmasi laporan opname dengan ${countSelisih} selisih?`;
+            if (confirm(confirmMsg)) this.executeSubmitOpname(dbItems, waTextFinal);
         }
-
-        // Buka Popup Modal
-        this.openModal('modal-confirm-opname');
     },
-
+    
     // =========================================================
-    // 🚀 2. EKSEKUSI PENGIRIMAN API & WHATSAPP
+    // 🚀 ENGINE: EKSEKUSI DATA (MEMANGGIL WA POPUP)
     // =========================================================
-    executeSubmitOpname: async function(itemsToSubmit, itemsForWa) {
+    executeSubmitOpname: async function(items, waText) {
         if (this.isProcessing) return;
-        this.closeModal('modal-confirm-opname');
+        if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-opname');
         
         setTimeout(async () => {
-            this.setLoading(true, "Menyimpan & Mengirim Audit...");
-            
-            let waText = this.buildOpnameWaText(this.outlet, this.currentUser.Username, new Date().toLocaleString('id-ID'), itemsForWa);
-            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser.Username, items: itemsToSubmit };
+            this.setLoading(true, "Menyimpan Hasil Opname...");
+            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser ? this.currentUser.Username : 'Kasir', items: items };
             
             let res = await this.apiPost(payload);
             
             if (res.status === 'sukses') {
-                this.showToast("Opname berhasil Disimpan!");
-                this.showWaModal(waText);
-                if (!res.is_offline) { 
-                    const r = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-                    this.db = await r.json(); 
-                    this.refreshData(); 
-                    this.switchMenu('pos'); 
-                } else { 
-                    this.switchMenu('pos'); 
+                this.setLoading(false);
+                
+                // 1. TAMPILKAN POPUP WA CANTIK
+                if (typeof this.openWaShareModal === 'function') {
+                    this.openWaShareModal(waText);
+                } else {
+                    this.showToast("Berhasil disimpan!", "success");
                 }
+
+                // 2. Bersihkan Inputan Fisik
+               items.forEach(i => {
+               let idDesk = document.getElementById(`opn-fisik-${i.sku}`); if(idDesk) idDesk.value = i.sistem; // Kembalikan ke nilai sistem awal
+               let idMob = document.getElementById(`opn-fisik-mob-${i.sku}`); if(idMob) idMob.value = i.sistem;
+               let nd = document.getElementById(`opn-note-${i.sku}`); if(nd) nd.value = '';
+               let nm = document.getElementById(`opn-note-mob-${i.sku}`); if(nm) nm.value = '';
+            });
+                
+                // 3. Refresh Data
+                if (!res.is_offline) { 
+                    try {
+                        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+                        const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
+                        this.db = await r.json(); 
+                        if (typeof this.refreshData === 'function') this.refreshData(); 
+                    } catch(e) {}
+                }
+            } else {
+                this.setLoading(false);
+                this.showToast("Gagal menyimpan data: " + res.pesan, "error");
             }
-            this.setLoading(false);
-        }, 200);
+        }, 300);
     },
     
-    // AUDIT & BULK APPROVAL
-    toggleAuditTab: function(tab) {
-        const co = document.getElementById('audit-content-opname'); if(co) co.classList.add('hidden'); 
-        const ct = document.getElementById('audit-content-terima'); if(ct) ct.classList.add('hidden');
-        
-        // CSS untuk Tab Tidak Aktif (Mati)
-        const inactiveClass = 'px-6 py-3 text-slate-500 hover:bg-white hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition border border-transparent flex items-center gap-2';
-        
-        // CSS untuk Tab Aktif (Menyala)
-        const activeClass = 'px-6 py-3 bg-white text-indigo-600 rounded-xl text-xs md:text-sm font-black shadow-sm whitespace-nowrap transition border border-slate-200 flex items-center gap-2';
-        
-        const to = document.getElementById('tab-audit-opname'); if(to) to.className = inactiveClass;
-        const tt = document.getElementById('tab-audit-terima'); if(tt) tt.className = inactiveClass;
-        
-        const vContent = document.getElementById(`audit-content-${tab}`); if(vContent) vContent.classList.remove('hidden'); 
-        const vBtn = document.getElementById(`tab-audit-${tab}`); if(vBtn) vBtn.className = activeClass;
+   
+
+    // =========================================================
+    // 🚀 HELPER: GROUPING DATA ECERAN MENJADI DATA SESI TRANSAKSI
+    // =========================================================
+    getProductName: function(sku) {
+        let prod = (this.db.masterProduk || []).find(p => p.SKU === sku);
+        return prod ? prod.Nama_Produk : sku;
     },
+
+    getGroupedOpname: function() {
+        let map = {};
+        (this.db.riwayatOpname || []).forEach(r => {
+            let key = r.Waktu + "_" + r.Outlet;
+            if(!map[key]) {
+                map[key] = {
+                    Waktu: r.Waktu, Outlet: r.Outlet, Kasir: r.Kasir, Status: r.Status_Approval,
+                    ID_Opname: 'OPN-' + (r.Waktu||'').replace(/\D/g, '').substring(0,8) + '-' + (r.Outlet||'').substring(0,3).toUpperCase(),
+                    Items: []
+                };
+            }
+            map[key].Items.push({ sku: r.SKU, nama: this.getProductName(r.SKU), sistem: r.Stok_Sistem, fisik: r.Stok_Fisik, selisih: r.Selisih, catatan: r.Keterangan_Fisik });
+        });
+        return Object.values(map).reverse();
+    },
+
+    getGroupedRestok: function() {
+        let map = {};
+        (this.db.barangMasuk || []).forEach(r => {
+            let key = r.Waktu + "_" + r.Outlet_Tujuan;
+            if(!map[key]) {
+                map[key] = {
+                    Waktu: r.Waktu, Outlet: r.Outlet_Tujuan, Kasir: r.Kasir, Status: r.Status_Approval,
+                    Surat_Jalan: r.ID_Mutasi || 'MUT-' + (r.Waktu||'').replace(/\D/g, '').substring(0,8),
+                    Supplier: (r.Keterangan||'').includes('Transfer') ? r.Keterangan : 'Pusat',
+                    Items: []
+                };
+            }
+            // KUNCI PENTING: Sisipkan id_mutasi agar bisa di-approve per-item
+            map[key].Items.push({ id_mutasi: r.ID_Mutasi, sku: r.SKU, nama: this.getProductName(r.SKU), qty: r.Qty, catatan: r.Keterangan });
+        });
+        return Object.values(map).reverse();
+    },
+
+   
+    // =========================================================
+    // 🚀 ENGINE AUDIT: NAVIGASI BULAN (BARU)
+    // =========================================================
+    auditHistoryDate: new Date(),
+
+    changeAuditMonth: function(offset) {
+        this.auditHistoryDate.setMonth(this.auditHistoryDate.getMonth() + offset);
+        this.updateAuditMonthLabel();
+        this.renderOpnameHistory();
+        this.renderRestokHistory();
+    },
+
+    resetAuditMonth: function() {
+        this.auditHistoryDate = new Date();
+        this.updateAuditMonthLabel();
+        this.renderOpnameHistory();
+        this.renderRestokHistory();
+    },
+
+    updateAuditMonthLabel: function() {
+        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const label = `${months[this.auditHistoryDate.getMonth()]} ${this.auditHistoryDate.getFullYear()}`;
+        const lbls = document.querySelectorAll('.audit-month-label');
+        lbls.forEach(el => el.innerText = label);
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AUDIT: SWITCHER TABS (Bulk Hapus)
+    // =========================================================
+    toggleAuditTab: function(tabName) {
+        const tabs = ['opname', 'terima', 'riwayat-opname', 'riwayat-terima'];
+        
+        tabs.forEach(t => {
+            const btn = document.getElementById(`tab-audit-${t}`);
+            const content = document.getElementById(`audit-content-${t}`);
+            if (!btn || !content) return;
+
+            if (t === tabName) {
+                btn.classList.replace('text-slate-500', 'text-indigo-600');
+                btn.classList.add('bg-white', 'shadow-[0_4px_12px_rgba(0,0,0,0.05)]');
+                content.classList.remove('hidden');
+                content.classList.add('flex');
+            } else {
+                btn.classList.replace('text-indigo-600', 'text-slate-500');
+                btn.classList.remove('bg-white', 'shadow-[0_4px_12px_rgba(0,0,0,0.05)]');
+                content.classList.add('hidden');
+                content.classList.remove('flex');
+            }
+        });
+
+        // Setel tanggal ke bulan saat ini tiap buka tab
+        this.updateAuditMonthLabel();
+
+        // Panggil Engine Render untuk memuat tabel
+        if (tabName === 'riwayat-opname' && typeof this.renderOpnameHistory === 'function') this.renderOpnameHistory();
+        if (tabName === 'riwayat-terima' && typeof this.renderRestokHistory === 'function') this.renderRestokHistory();
+        if (tabName === 'opname' && typeof this.renderAuditOpname === 'function') this.renderAuditOpname();
+        if (tabName === 'terima' && typeof this.renderAuditTerima === 'function') this.renderAuditTerima();
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AUDIT 1: PENDING OPNAME (Auto-Kalkulasi Selisih)
+    // =========================================================
+    renderAuditOpname: function() {
+        const tbody = document.getElementById('audit-opname-tbody');
+        if (!tbody) return;
+        
+        let pendingData = this.getGroupedOpname().filter(x => x.Status === 'Pending');
+
+        if (pendingData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 italic text-xs border border-dashed border-slate-200 rounded-xl">Tidak ada pengajuan Opname yang menunggu persetujuan</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = pendingData.map(op => {
+            let akuratCount = 0;
+            let totalDeviasi = 0;
+            let catatanKasir = '';
+
+            op.Items.forEach(i => { 
+                let diff = Number(i.fisik) - Number(i.sistem);
+                if (diff === 0) {
+                    akuratCount++; 
+                } else {
+                    totalDeviasi += Math.abs(diff); // Menghitung total pcs yang selisih
+                    if (!catatanKasir && i.catatan && i.catatan.trim() !== '') {
+                        catatanKasir = i.catatan; // Mengambil catatan pertama yang ditemukan
+                    }
+                }
+            });
+
+            let isAkurat = akuratCount === op.Items.length;
+            let statusBadge = isAkurat
+                ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px]">Akurat</span>`
+                : `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[9px]">Ada Selisih</span>`;
+
+            // Tampilkan jumlah item yang selisih & total pcs deviasinya
+            let selisihTeks = isAkurat ? '-' : `<span class="text-rose-600 font-black">${op.Items.length - akuratCount} Brg</span> <span class="text-slate-400 text-[9px]">(Deviasi ${totalDeviasi})</span>`;
+            let catatanTeks = catatanKasir ? catatanKasir : '-';
+
+            return `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+                <td class="py-3 px-4 text-[11px]">${op.Waktu}</td>
+                <td class="py-3 px-4"><span class="text-indigo-600 font-black">Ai-CHA ${op.Outlet}</span><br><span class="text-[9px] text-slate-400">Oleh: ${op.Kasir}</span></td>
+                <td class="py-3 px-4 text-center">
+                    <button onclick="superApp.openDetailOpnameModal('${op.Waktu}', '${op.Outlet}')" class="text-indigo-500 underline text-[10px] font-black bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition"><i class="fas fa-tasks mr-1"></i> ${op.Items.length} Item</button>
+                </td>
+                <td class="py-3 px-4 text-center">${statusBadge}</td>
+                <td class="py-3 px-4 text-right text-[11px]">${selisihTeks}</td>
+                <td class="py-3 px-4 text-[10px] text-slate-500 italic max-w-[150px] truncate" title="${catatanTeks}">${catatanTeks}</td>
+            </tr>`;
+        }).join('');
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AUDIT 2: PENDING TERIMA BARANG (Info Ekstra)
+    // =========================================================
+    renderAuditTerima: function() {
+        const tbody = document.getElementById('audit-terima-tbody');
+        if (!tbody) return;
+        
+        let pendingData = this.getGroupedRestok().filter(x => x.Status === 'Pending');
+
+        if (pendingData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 italic text-xs border border-dashed border-slate-200 rounded-xl">Tidak ada pengajuan Restok yang menunggu persetujuan</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = pendingData.map(bm => {
+            let totalQty = 0; 
+            let firstNote = '';
+            
+            bm.Items.forEach(i => { 
+                totalQty += Number(i.qty);
+                if (!firstNote && i.catatan && i.catatan.trim() !== '') firstNote = i.catatan;
+            });
+
+            // Menampilkan catatan kasir jika ada, jika tidak tampilkan Nomor Surat Jalan
+            let noteTeks = firstNote ? `<span class="text-slate-600">${firstNote}</span>` : `SJ: ${bm.Surat_Jalan}`;
+
+            return `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+                <td class="py-3 px-4 text-[11px]">${bm.Waktu}</td>
+                <td class="py-3 px-4"><span class="text-emerald-600 font-black">Ai-CHA ${bm.Outlet}</span><br><span class="text-[9px] text-slate-400">Oleh: ${bm.Kasir}</span></td>
+                <td class="py-3 px-4 text-center">
+                    <button onclick="superApp.openDetailRestokModal('${bm.Surat_Jalan}')" class="text-emerald-500 underline text-[10px] font-black bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition"><i class="fas fa-box-open mr-1"></i> ${bm.Items.length} Item</button>
+                </td>
+                <td class="py-3 px-4 text-center font-black">${totalQty} Pcs</td>
+                <td class="py-3 px-4 text-[10px] text-slate-500 italic max-w-[150px] truncate" title="${bm.Surat_Jalan}">${noteTeks}</td>
+            </tr>`;
+        }).join('');
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AUDIT 3 & 4: RIWAYAT (DENGAN FILTER BULAN)
+    // =========================================================
+    renderOpnameHistory: function() {
+        const tbody = document.getElementById('audit-riwayat-opname-tbody');
+        const searchVal = (document.getElementById('search-opname')?.value || '').toLowerCase();
+        if (!tbody) return;
+
+        let targetMonth = this.auditHistoryDate.getMonth();
+        let targetYear = this.auditHistoryDate.getFullYear();
+
+        let historyData = this.getGroupedOpname().filter(x => {
+            if (x.Status === 'Pending') return false; // Jangan tampilkan pending di riwayat
+            
+            // Filter Berdasarkan Bulan dan Tahun
+            let parts = (x.Waktu || '').split(' ')[0].split(/[\/\-]/); 
+            if(parts.length === 3) {
+                let m = parseInt(parts[1], 10) - 1;
+                let y = parseInt(parts[2], 10);
+                if (m !== targetMonth || y !== targetYear) return false;
+            }
+            
+            // Filter Berdasarkan Search (jika ada)
+            if (searchVal && !`${x.ID_Opname} ${x.Outlet} ${x.Kasir}`.toLowerCase().includes(searchVal)) return false;
+            return true;
+        });
+
+        if (historyData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 italic text-xs border border-dashed border-slate-200 rounded-xl">Tidak ada riwayat audit di bulan ini.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = historyData.map(op => {
+            let akuratCount = 0; op.Items.forEach(i => { if (Number(i.fisik) === Number(i.sistem)) akuratCount++; });
+            let isPerfect = op.Items.length > 0 && akuratCount === op.Items.length;
+            let statusBadge = isPerfect ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px]">100% Akurat</span>` : `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[9px]">Ada Selisih</span>`;
+
+            return `
+            <tr class="hover:bg-slate-50 transition">
+                <td class="py-3 px-4 text-[11px]">${op.Waktu}</td>
+                <td class="py-3 px-4"><span class="text-indigo-600 font-black">Ai-CHA ${op.Outlet}</span><br><span class="text-[9px] text-slate-400">Oleh: ${op.Kasir}</span></td>
+                <td class="py-3 px-4 text-center">${op.Items.length} Item</td>
+                <td class="py-3 px-4 text-center">${statusBadge}<br><span class="text-[9px] text-slate-400">${op.Status}</span></td>
+                <td class="py-3 px-4 text-center flex justify-center gap-1.5">
+                    <button onclick="superApp.openDetailOpnameModal('${op.Waktu}', '${op.Outlet}')" class="bg-indigo-50 hover:bg-indigo-500 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition"><i class="fas fa-search-plus"></i> Detail</button>
+                    <button onclick="superApp.sendWaOpname('${op.Waktu}', '${op.Outlet}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1.5 rounded-lg text-[10px] transition"><i class="fab fa-whatsapp"></i></button>
+                </td>
+            </tr>`;
+        }).join('');
+    },
+
+    renderRestokHistory: function() {
+        const tbody = document.getElementById('audit-riwayat-restok-tbody');
+        const searchVal = (document.getElementById('search-restok')?.value || '').toLowerCase();
+        if (!tbody) return;
+
+        let targetMonth = this.auditHistoryDate.getMonth();
+        let targetYear = this.auditHistoryDate.getFullYear();
+
+        let historyData = this.getGroupedRestok().filter(x => {
+            if (x.Status === 'Pending') return false; // Jangan tampilkan pending di riwayat
+            
+            // Filter Berdasarkan Bulan dan Tahun
+            let parts = (x.Waktu || '').split(' ')[0].split(/[\/\-]/); 
+            if(parts.length === 3) {
+                let m = parseInt(parts[1], 10) - 1;
+                let y = parseInt(parts[2], 10);
+                if (m !== targetMonth || y !== targetYear) return false;
+            }
+
+            // Filter Berdasarkan Search (jika ada)
+            if (searchVal && !`${x.Surat_Jalan} ${x.Outlet} ${x.Supplier}`.toLowerCase().includes(searchVal)) return false;
+            return true;
+        });
+
+        if (historyData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 italic text-xs border border-dashed border-slate-200 rounded-xl">Tidak ada riwayat penerimaan di bulan ini.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = historyData.map(bm => `
+            <tr class="hover:bg-slate-50 transition">
+                <td class="py-3 px-4 text-[11px]">${bm.Waktu}</td>
+                <td class="py-3 px-4 font-black"><span class="text-slate-700">${bm.Surat_Jalan}</span><br><span class="text-[9px] text-slate-400 font-bold">Dari: ${bm.Supplier}</span></td>
+                <td class="py-3 px-4 text-emerald-600 font-black">Ai-CHA ${bm.Outlet}</td>
+                <td class="py-3 px-4 text-center"><span class="bg-emerald-50 border border-emerald-200 text-emerald-600 px-2 py-0.5 rounded text-[9px]">${bm.Status}</span></td>
+                <td class="py-3 px-4 text-center flex justify-center gap-1.5">
+                    <button onclick="superApp.openDetailRestokModal('${bm.Surat_Jalan}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition"><i class="fas fa-box-open"></i> Buka</button>
+                    <button onclick="superApp.sendWaTerima('${bm.Surat_Jalan}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1.5 rounded-lg text-[10px] transition"><i class="fab fa-whatsapp"></i></button>
+                </td>
+            </tr>`).join('');
+    },
+
+    
+   // =========================================================
+    // 🚀 ENGINE: MODAL OTORISASI (HANYA TAMPIL YANG BERUBAH)
+    // =========================================================
+    openDetailOpnameModal: function(waktu, outlet) {
+        let op = this.getGroupedOpname().find(x => x.Waktu === waktu && x.Outlet === outlet);
+        if (!op) return;
+
+        document.getElementById('opname-meta-id').innerText = op.ID_Opname;
+        document.getElementById('opname-meta-subtitle').innerText = `Cabang: Ai-CHA ${op.Outlet} | Auditor: ${op.Kasir}`;
+
+        // JIKA PENDING: HANYA TAMPILKAN ITEM YANG ADA SELISIH / CATATAN
+        let displayItems = op.Status === 'Pending' 
+            ? op.Items.filter(i => Number(i.fisik) !== Number(i.sistem) || (i.catatan && i.catatan.trim() !== '')) 
+            : op.Items;
+
+        const listCont = document.getElementById('opname-item-list');
+        
+        if (displayItems.length === 0 && op.Status === 'Pending') {
+            listCont.innerHTML = `<div class="p-8 text-center text-emerald-600 font-bold text-xs border border-dashed border-emerald-200 bg-emerald-50 rounded-2xl">🎉 Luar biasa! Seluruh stok 100% akurat.<br>Silakan langsung Setujui Laporan ini.</div>`;
+        } else {
+            listCont.innerHTML = displayItems.map(i => {
+                let nSis = Number(i.sistem); let nFis = Number(i.fisik); let diff = nFis - nSis;
+                let diffBadge = `<div class="font-black text-slate-400 text-sm bg-slate-100 px-2 py-1 rounded-lg">Match ✔</div>`;
+                let borderClass = 'border-slate-200';
+                
+                if (diff > 0) { diffBadge = `<div class="font-black text-emerald-600 text-sm bg-emerald-50 px-2 py-1 rounded-lg">+${diff} Surplus</div>`; borderClass = 'border-emerald-200'; } 
+                else if (diff < 0) { diffBadge = `<div class="font-black text-rose-600 text-sm bg-rose-50 px-2 py-1 rounded-lg">${diff} Defisit</div>`; borderClass = 'border-rose-200'; }
+
+                let actionHtml = '';
+                if (op.Status === 'Pending') {
+                    // MENGGUNAKAN SKU SEBAGAI NAMA RADIO BUTTON AGAR TIDAK TERTUKAR
+                    actionHtml = `
+                    <div class="mt-3 pt-3 border-t border-slate-100 flex gap-2">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="op_app_${i.sku}" value="Disetujui" class="peer sr-only" checked>
+                            <div class="text-center py-2 rounded-lg border border-slate-200 text-slate-400 text-[10px] font-black peer-checked:bg-emerald-50 peer-checked:text-emerald-600 peer-checked:border-emerald-300 transition-all">✅ SETUJUI</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="op_app_${i.sku}" value="Ditolak" class="peer sr-only">
+                            <div class="text-center py-2 rounded-lg border border-slate-200 text-slate-400 text-[10px] font-black peer-checked:bg-rose-50 peer-checked:text-rose-600 peer-checked:border-rose-300 transition-all">❌ TOLAK</div>
+                        </label>
+                    </div>`;
+                }
+
+                return `
+                <div class="bg-white border ${borderClass} p-3 rounded-2xl shadow-sm flex flex-col hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <div class="w-1/2">
+                            <span class="font-extrabold text-slate-700 text-xs block mb-1 truncate">${i.nama}</span>
+                            <div class="flex gap-3 text-[10px] font-bold text-slate-400">
+                                <span>Sistem: <b class="text-slate-600">${nSis}</b></span><span>Fisik: <b class="text-slate-800">${nFis}</b></span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">${diffBadge}</div>
+                    </div>
+                    ${actionHtml}
+                </div>`;
+            }).join('');
+        }
+
+        let footer = document.getElementById('opname-modal-footer');
+        if (footer) {
+            if (op.Status === 'Pending') {
+                footer.innerHTML = `<button onclick="superApp.processPartialOpname('${op.Waktu}', '${op.Outlet}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-check-double"></i> Simpan Otorisasi Laporan</button>`;
+                footer.classList.remove('hidden');
+            } else {
+                footer.innerHTML = ''; footer.classList.add('hidden');
+            }
+        }
+
+        const modal = document.getElementById('modal-detail-opname');
+        if (modal) { modal.classList.remove('hidden'); void modal.offsetWidth; modal.classList.add('opacity-100'); modal.firstElementChild.classList.remove('scale-95'); modal.firstElementChild.classList.add('scale-100'); }
+    },
+
+    openDetailRestokModal: function(suratJalan) {
+        let bm = this.getGroupedRestok().find(x => x.Surat_Jalan === suratJalan);
+        if (!bm) return;
+
+        document.getElementById('restok-meta-id').innerText = bm.Surat_Jalan;
+        document.getElementById('restok-meta-subtitle').innerText = `Tujuan: Ai-CHA ${bm.Outlet} | Diterima: ${bm.Waktu}`;
+
+        document.getElementById('restok-item-list').innerHTML = bm.Items.map((i, idx) => {
+            let actionHtml = '';
+            if (bm.Status === 'Pending') {
+                actionHtml = `
+                <div class="mt-2 flex gap-1.5 w-full">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="res_app_${idx}" value="Disetujui" class="peer sr-only" checked>
+                        <div class="text-center py-1.5 rounded border border-slate-200 text-slate-400 text-[9px] font-black peer-checked:bg-emerald-50 peer-checked:text-emerald-600 peer-checked:border-emerald-300 transition-all">SETUJU</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="res_app_${idx}" value="Ditolak" class="peer sr-only">
+                        <div class="text-center py-1.5 rounded border border-slate-200 text-slate-400 text-[9px] font-black peer-checked:bg-rose-50 peer-checked:text-rose-600 peer-checked:border-rose-300 transition-all">TOLAK</div>
+                    </label>
+                </div>`;
+            }
+
+            return `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+                <td class="py-3 px-4">
+                    <span class="font-extrabold text-slate-700 block">${i.nama}</span>
+                    ${actionHtml}
+                </td>
+                <td class="py-3 px-4 text-center align-top"><span class="bg-slate-100 text-slate-600 font-black px-2 py-1 rounded-md border border-slate-200">${i.qty}</span></td>
+                <td class="py-3 px-4 text-[10px] text-slate-400 italic align-top">${i.catatan || '-'}</td>
+            </tr>`;
+        }).join('');
+
+        let footer = document.getElementById('restok-modal-footer');
+        if (footer) {
+            if (bm.Status === 'Pending') {
+                footer.innerHTML = `<button onclick="superApp.processPartialRestok('${bm.Surat_Jalan}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-check-double"></i> Simpan Otorisasi Pilihan</button>`;
+                footer.classList.remove('hidden');
+            } else {
+                footer.innerHTML = ''; footer.classList.add('hidden');
+            }
+        }
+
+        const modal = document.getElementById('modal-detail-restok');
+        if (modal) { modal.classList.remove('hidden'); void modal.offsetWidth; modal.classList.add('opacity-100'); modal.firstElementChild.classList.remove('scale-95'); modal.firstElementChild.classList.add('scale-100'); }
+    },
+   
+    closeDetailOpnameModal: function() {
+        const modal = document.getElementById('modal-detail-opname');
+        if (modal) {
+            modal.classList.remove('opacity-100');
+            if(modal.firstElementChild) {
+                modal.firstElementChild.classList.remove('scale-100');
+                modal.firstElementChild.classList.add('scale-95');
+            }
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+    },
+
+
+    closeDetailRestokModal: function() {
+        const modal = document.getElementById('modal-detail-restok');
+        if (modal) {
+            modal.classList.remove('opacity-100');
+            if(modal.firstElementChild) {
+                modal.firstElementChild.classList.remove('scale-100');
+                modal.firstElementChild.classList.add('scale-95');
+            }
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+    },
+
+    sendWaOpname: function(waktu, outlet) {
+        let op = this.getGroupedOpname().find(x => x.Waktu === waktu && x.Outlet === outlet);
+        if (!op) return;
+
+        let txt = `*[ LAPORAN OPNAME FISIK ]*\n\nCabang: *Ai-CHA ${op.Outlet}*\nWaktu: ${op.Waktu}\nAuditor: ${op.Kasir}\n\n*Rincian Selisih:*\n`;
+        op.Items.forEach(i => {
+            let diff = Number(i.fisik) - Number(i.sistem);
+            if (diff !== 0) {
+                let status = diff > 0 ? 'Surplus' : 'Defisit (HILANG)';
+                txt += `- ${i.nama}:\n  (Sis: ${i.sistem} | Fis: ${i.fisik} | *${diff} ${status}*)\n`;
+            }
+        });
+        if (op.Items.every(i => Number(i.fisik) === Number(i.sistem))) txt += `✅ SELURUH STOK 100% AKURAT. TIDAK ADA SELISIH.\n`;
+        
+        // TYPO DIPERBAIKI (txt bukan text)
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`, '_blank');
+    },
+
+    sendWaTerima: function(suratJalan) {
+        let bm = this.getGroupedRestok().find(x => x.Surat_Jalan === suratJalan);
+        if (!bm) return;
+
+        let txt = `*[ LAPORAN PENERIMAAN BARANG ]*\n\nCabang: *Ai-CHA ${bm.Outlet}*\nSurat Jalan: ${bm.Surat_Jalan}\nWaktu Terima: ${bm.Waktu}\nPenerima: ${bm.Kasir}\n\n*Rincian Barang Diterima:*\n`;
+        bm.Items.forEach(i => { txt += `- ${i.nama} (*${i.qty} Pcs*)\n`; });
+        
+        // TYPO DIPERBAIKI (txt bukan text)
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`, '_blank');
+    },
+
+  
+   // =========================================================
+    // 🚀 ENGINE: PROSES OTORISASI OPNAME (AUTO-REFRESH FIXED)
+    // =========================================================
+    processPartialOpname: async function(waktu, outlet) {
+        let op = this.getGroupedOpname().find(x => x.Waktu === waktu && x.Outlet === outlet);
+        if (!op) return;
+
+        let itemsSetuju = []; let itemsTolak = [];
+        op.Items.forEach((item) => {
+            if (Number(item.fisik) === Number(item.sistem) && (!item.catatan || item.catatan.trim() === '')) {
+                itemsSetuju.push({ waktu: op.Waktu, outlet: op.Outlet, sku: item.sku });
+                return; 
+            }
+            let radio = document.querySelector(`input[name="op_app_${item.sku}"]:checked`);
+            let val = radio ? radio.value : 'Disetujui'; 
+            let payloadItem = { waktu: op.Waktu, outlet: op.Outlet, sku: item.sku };
+            
+            if (val === 'Disetujui') itemsSetuju.push(payloadItem);
+            else itemsTolak.push(payloadItem);
+        });
+
+        this.setLoading(true, "Menyimpan Keputusan Opname...");
+        
+        if (itemsSetuju.length > 0) {
+            await this.apiPost({ action: 'bulk_approve_opname', status_app: 'Disetujui', items: itemsSetuju });
+        }
+        if (itemsTolak.length > 0) {
+            await this.apiPost({ action: 'bulk_approve_opname', status_app: 'Ditolak', items: itemsTolak });
+        }
+
+        this.showToast("Keputusan berhasil disimpan!");
+        this.closeDetailOpnameModal();
+        
+        // 🛑 TARIK DATA TERBARU DARI SERVER SEBELUM MERENDER ULANG 🛑
+        try {
+            let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+            const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' });
+            this.db = await r.json();
+            
+            if (typeof this.refreshData === 'function') this.refreshData(); 
+            this.updatePendingNotifications(); // Update Saklar Banner
+            this.renderAuditOpname();    // Bersihkan Tabel Pending
+            this.renderOpnameHistory();  // Masukkan ke Tabel Riwayat
+        } catch (e) {
+            console.error("Gagal sinkronisasi data", e);
+        }
+        
+        this.setLoading(false);
+    },
+
+    // =========================================================
+    // 🚀 ENGINE: PROSES OTORISASI RESTOK (AUTO-REFRESH FIXED)
+    // =========================================================
+    processPartialRestok: async function(suratJalan) {
+        let bm = this.getGroupedRestok().find(x => x.Surat_Jalan === suratJalan);
+        if (!bm) return;
+
+        let itemsSetuju = []; let itemsTolak = [];
+        bm.Items.forEach((item, idx) => {
+            let radio = document.querySelector(`input[name="res_app_${idx}"]:checked`);
+            let val = radio ? radio.value : 'Disetujui'; 
+
+            if (val === 'Disetujui') itemsSetuju.push(item.id_mutasi);
+            else itemsTolak.push(item.id_mutasi);
+        });
+
+        this.setLoading(true, "Menyimpan Keputusan Restok...");
+        
+        if (itemsSetuju.length > 0) {
+            await this.apiPost({ action: 'bulk_approve_mutasi', status_app: 'Disetujui', items: itemsSetuju });
+        }
+        if (itemsTolak.length > 0) {
+            await this.apiPost({ action: 'bulk_approve_mutasi', status_app: 'Ditolak', items: itemsTolak });
+        }
+
+        this.showToast("Keputusan berhasil disimpan!");
+        this.closeDetailRestokModal();
+
+        // 🛑 TARIK DATA TERBARU DARI SERVER SEBELUM MERENDER ULANG 🛑
+        try {
+            let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+            const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' });
+            this.db = await r.json();
+            
+            if (typeof this.refreshData === 'function') this.refreshData(); 
+            this.updatePendingNotifications(); // Update Saklar Banner
+            this.renderAuditTerima();    // Bersihkan Tabel Pending
+            this.renderRestokHistory();  // Masukkan ke Tabel Riwayat
+        } catch (e) {
+            console.error("Gagal sinkronisasi data", e);
+        }
+        
+        this.setLoading(false);
+    },
+    
 
     toggleGudangTab: function(tab) {
         const tabs = ['stok', 'menu', 'outlet', 'hpp'];
