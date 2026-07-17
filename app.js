@@ -5193,10 +5193,18 @@ refreshData: function() {
             }, 10);
         }
     },
-  // =========================================================
-    // 🚀 ENGINE: TAMPILKAN MODAL RIWAYAT WA (TABLE VIEW)
+ // =========================================================
+    // 🚀 ENGINE: MODAL RIWAYAT WA (DENGAN NAVIGASI BULAN)
     // =========================================================
-    openWaHistory: function(type) {
+    waHistoryDate: new Date(),
+    waHistoryType: '',
+
+    changeWaHistoryMonth: function(offset) {
+        this.waHistoryDate.setMonth(this.waHistoryDate.getMonth() + offset);
+        this.openWaHistory(this.waHistoryType, true);
+    },
+
+    openWaHistory: function(type, isNavigating = false) {
         const modal = document.getElementById('modal-wa-history');
         const tbody = document.getElementById('wa-history-tbody');
         const titleEl = document.getElementById('wa-history-title');
@@ -5206,26 +5214,54 @@ refreshData: function() {
             return;
         }
 
+        // 1. Reset ke bulan saat ini jika baru dibuka (bukan karena klik tombol navigasi)
+        if (!isNavigating) {
+            this.waHistoryDate = new Date();
+        }
+        this.waHistoryType = type;
+
+        let targetMonth = this.waHistoryDate.getMonth();
+        let targetYear = this.waHistoryDate.getFullYear();
+        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        let monthLabel = `${months[targetMonth]} ${targetYear}`;
+
+        // 2. Suntikkan Tombol Navigasi ke Judul Modal secara dinamis
+        if (titleEl) {
+            titleEl.innerHTML = `
+                <div class="flex items-center justify-between w-full pr-6">
+                    <span class="text-sm md:text-base font-black text-slate-800">Riwayat WA ${type === 'opname' ? 'Opname' : 'Restok'}</span>
+                    <div class="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200">
+                        <button onclick="superApp.changeWaHistoryMonth(-1)" class="w-6 h-6 flex items-center justify-center rounded bg-white shadow-sm text-slate-600 hover:text-indigo-600 transition active:scale-95"><i class="fas fa-chevron-left text-[10px]"></i></button>
+                        <span class="w-20 text-center font-bold text-indigo-600 text-[10px] tracking-wide">${monthLabel}</span>
+                        <button onclick="superApp.changeWaHistoryMonth(1)" class="w-6 h-6 flex items-center justify-center rounded bg-white shadow-sm text-slate-600 hover:text-indigo-600 transition active:scale-95"><i class="fas fa-chevron-right text-[10px]"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
         let filteredData = [];
         let htmlList = '';
 
         if (type === 'opname') {
-            titleEl.innerText = "Riwayat WA Opname (Hari Ini)";
-            filteredData = this.getGroupedOpname().filter(x => x.Outlet === this.outlet);
+            filteredData = this.getGroupedOpname().filter(x => {
+                if (x.Outlet !== this.outlet) return false;
+                let opDate = typeof this.parseDateId === 'function' ? this.parseDateId((x.Waktu || '').split(' ')[0]) : new Date();
+                return opDate.getMonth() === targetMonth && opDate.getFullYear() === targetYear;
+            });
 
             if (filteredData.length === 0) {
-                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic">Belum ada riwayat pengajuan opname.</td></tr>`;
+                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">Belum ada riwayat pengajuan opname di bulan ini.</td></tr>`;
             } else {
                 htmlList = filteredData.map(op => `
-                    <tr class="hover:bg-indigo-50/50 transition-colors">
+                    <tr class="hover:bg-indigo-50/50 transition-colors border-b border-slate-100">
                         <td class="py-3 px-4 text-xs font-black text-indigo-600">${op.Waktu}</td>
                         <td class="py-3 px-4">
-                            <span class="text-xs block text-slate-700">${op.Kasir}</span>
-                            <span class="text-[9px] text-slate-400 block">${op.ID_Opname} • Status: ${op.Status}</span>
+                            <span class="text-xs block text-slate-700 font-bold">${op.Kasir}</span>
+                            <span class="text-[9px] text-slate-400 block mt-0.5">${op.ID_Opname} • Status: ${op.Status}</span>
                         </td>
-                        <td class="py-3 px-4 text-center text-xs text-slate-600">${op.Items.length} Macam</td>
+                        <td class="py-3 px-4 text-center text-xs text-slate-600 font-bold">${op.Items.length} Macam</td>
                         <td class="py-3 px-4 text-center">
-                            <button onclick="superApp.sendWaOpname('${op.Waktu}', '${op.Outlet}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto">
+                            <button onclick="superApp.sendWaOpname('${op.Waktu}', '${op.Outlet}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto active:scale-95">
                                 <i class="fab fa-whatsapp text-sm"></i> Kirim
                             </button>
                         </td>
@@ -5234,22 +5270,25 @@ refreshData: function() {
             }
         } 
         else if (type === 'terima') {
-            titleEl.innerText = "Riwayat WA Restok (Hari Ini)";
-            filteredData = this.getGroupedRestok().filter(x => x.Outlet === this.outlet);
+            filteredData = this.getGroupedRestok().filter(x => {
+                if (x.Outlet !== this.outlet) return false;
+                let mutDate = typeof this.parseDateId === 'function' ? this.parseDateId((x.Waktu || '').split(' ')[0]) : new Date();
+                return mutDate.getMonth() === targetMonth && mutDate.getFullYear() === targetYear;
+            });
 
             if (filteredData.length === 0) {
-                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic">Belum ada riwayat penerimaan barang.</td></tr>`;
+                htmlList = `<tr><td colspan="4" class="text-center p-8 text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">Belum ada riwayat penerimaan barang di bulan ini.</td></tr>`;
             } else {
                 htmlList = filteredData.map(bm => `
-                    <tr class="hover:bg-emerald-50/50 transition-colors">
+                    <tr class="hover:bg-emerald-50/50 transition-colors border-b border-slate-100">
                         <td class="py-3 px-4 text-xs font-black text-emerald-600">${bm.Waktu}</td>
                         <td class="py-3 px-4">
-                            <span class="text-xs block text-slate-700">${bm.Kasir}</span>
-                            <span class="text-[9px] text-slate-400 block">${bm.Surat_Jalan} • Asal: ${bm.Supplier}</span>
+                            <span class="text-xs block text-slate-700 font-bold">${bm.Kasir}</span>
+                            <span class="text-[9px] text-slate-400 block mt-0.5">${bm.Surat_Jalan} • Asal: ${bm.Supplier}</span>
                         </td>
-                        <td class="py-3 px-4 text-center text-xs text-slate-600">${bm.Items.length} Macam</td>
+                        <td class="py-3 px-4 text-center text-xs text-slate-600 font-bold">${bm.Items.length} Macam</td>
                         <td class="py-3 px-4 text-center">
-                            <button onclick="superApp.sendWaTerima('${bm.Surat_Jalan}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto">
+                            <button onclick="superApp.sendWaTerima('${bm.Surat_Jalan}')" class="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm border border-emerald-100 flex items-center gap-1.5 mx-auto active:scale-95">
                                 <i class="fab fa-whatsapp text-sm"></i> Kirim
                             </button>
                         </td>
@@ -5704,49 +5743,6 @@ refreshData: function() {
         }, 300);
     },
 
-    // =========================================================
-    // 🚀 UPDATE: EKSEKUSI OPNAME FISIK
-    // =========================================================
-    executeSubmitOpname: async function(items, waText) {
-        if (this.isProcessing) return;
-        if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-opname');
-        
-        setTimeout(async () => {
-            this.setLoading(true, "Menyimpan Hasil Opname...");
-            const payload = { action: 'submit_opname', outlet: this.outlet, kasir: this.currentUser ? this.currentUser.Username : 'Kasir', items: items };
-            
-            let res = await this.apiPost(payload);
-            
-            if (res.status === 'sukses') {
-                this.setLoading(false);
-                
-                // 1. Tampilkan Popup WA Cantik!
-                this.openWaShareModal(waText);
-
-                // 2. Bersihkan Inputan Fisik
-                items.forEach(i => {
-                    let idDesk = document.getElementById(`op-qty-${i.sku}`); if(idDesk) idDesk.value = '';
-                    let idMob = document.getElementById(`op-qty-mob-${i.sku}`); if(idMob) idMob.value = '';
-                    let nd = document.getElementById(`op-note-${i.sku}`); if(nd) nd.value = '';
-                    let nm = document.getElementById(`op-note-mob-${i.sku}`); if(nm) nm.value = '';
-                });
-                
-                // 3. Refresh Data
-                if (!res.is_offline) { 
-                    try {
-                        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                        const r = await fetch(rUrl + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-                        this.db = await r.json(); 
-                        if (typeof this.refreshData === 'function') this.refreshData(); 
-                    } catch(e) {}
-                }
-            } else {
-                this.setLoading(false);
-                this.showToast("Gagal menyimpan data: " + res.pesan, "error");
-            }
-        }, 300);
-    },
-    
     calcOpname: function(sku) {
         const sysEl = document.getElementById(`opn-sys-${sku}`); let sys = parseInt(sysEl ? sysEl.innerText : 0) || 0;
         let fisikEl = document.getElementById(`opn-fisik-${sku}`); let fisik = this.getNumericValue(fisikEl ? fisikEl.value : 0);
@@ -5958,15 +5954,19 @@ openDetailStokOpname: function(sku) {
         this.openModal('modal-stok-detail');
     },
     
-    // =========================================================
-    // 🚀 ENGINE: SUBMIT OPNAME FISIK (HANYA SIMPAN YANG BERUBAH)
+  // =========================================================
+    // 🚀 ENGINE: SUBMIT OPNAME FISIK (ANTI-KASIR MALAS)
     // =========================================================
     submitOpname: async function() {
         if (this.isProcessing) return;
         
-        let allItems = []; // Array 100% Lengkap untuk Laporan WA
-        let dbItems = []; // Array Filter untuk masuk Google Sheets
+        let allItems = []; 
+        let dbItems = []; 
         let countSelisih = 0;
+        let totalDiisi = 0; // 🚀 RADAR PENDETEKSI INPUT
+
+        // Deteksi Layar: HP (< 768px) atau PC (>= 768px)
+        let isMobile = window.innerWidth < 768;
 
         (this.db.masterProduk || []).forEach(m => {
             let cat = String(m.Kategori || '').toLowerCase();
@@ -5978,17 +5978,29 @@ openDetailStokOpname: function(sku) {
                 let stokData = (this.db.hargaStokOutlet || []).find(s => s.SKU === m.SKU && s.ID_Outlet === this.outlet);
                 let stokSistem = stokData ? parseInt(stokData.Stok_Toko || 0) : 0;
                 
-                let fisikStr = (inputDesk && inputDesk.value !== '') ? inputDesk.value : ((inputMob && inputMob.value !== '') ? inputMob.value : '');
+                // BACA INPUT BERDASARKAN LAYAR YANG SEDANG AKTIF
+                let fisikStr = '';
+                if (isMobile && inputMob) fisikStr = inputMob.value;
+                else if (!isMobile && inputDesk) fisikStr = inputDesk.value;
                 
                 let stokFisik = stokSistem;
                 if (fisikStr !== '') {
                     let parsed = parseInt(String(fisikStr).replace(/\D/g, ''));
-                    if (!isNaN(parsed)) stokFisik = parsed;
+                    if (!isNaN(parsed)) {
+                        stokFisik = parsed;
+                        totalDiisi++; // 🚀 DETEKSI: Kasir benar-benar mengetik angka di kotak ini
+                    }
                 }
                 
                 let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
                 let noteMob = document.getElementById(`opn-note-mob-${m.SKU}`);
-                let note = (noteDesk && noteDesk.value !== '') ? noteDesk.value : ((noteMob && noteMob.value !== '') ? noteMob.value : '');
+                
+                let note = '';
+                if (isMobile && noteMob) note = noteMob.value;
+                else if (!isMobile && noteDesk) note = noteDesk.value;
+
+                // Hitung valid jika kasir setidaknya mengisi keterangan fisik
+                if (note && note.trim() !== '') totalDiisi++; 
                 
                 let selisih = stokFisik - stokSistem;
 
@@ -5999,7 +6011,7 @@ openDetailStokOpname: function(sku) {
                 // Masukkan ke Array WA (Semua Barang)
                 allItems.push(itemObj);
 
-                // 🛑 FILTERING: HANYA MASUKKAN KE DB JIKA ADA SELISIH ATAU CATATAN
+                // FILTERING: HANYA MASUKKAN KE DB JIKA ADA SELISIH ATAU CATATAN
                 if (selisih !== 0 || (note && note.trim() !== '')) {
                     dbItems.push(itemObj);
                     if (selisih !== 0) countSelisih++;
@@ -6008,6 +6020,19 @@ openDetailStokOpname: function(sku) {
         });
 
         if (allItems.length === 0) return this.showToast("Database master produk kosong!", "error");
+
+        // ======================================================================
+        // 🚀 LAPISAN KEAMANAN ANTI-KASIR MALAS
+        // ======================================================================
+        if (totalDiisi === 0) {
+            return this.showToast("❌ LAPORAN DITOLAK: Anda belum mengetik sisa fisik satupun! Silakan hitung dan ketik sisa stok aktual di toko.", "error");
+        }
+
+        if (dbItems.length === 0) {
+            let peringatan = confirm("⚠️ LAPORAN MENCURIGAKAN:\n\nSistem mendeteksi 100% barang sama persis dengan komputer (Tidak ada selisih sama sekali).\n\nPadahal barang pendukung (cup, plastik, dll) biasanya PASTI selalu berkurang setiap hari.\n\nApakah Anda YAKIN sudah menghitung fisik dengan jujur?");
+            if (!peringatan) return; // Batalkan submit jika kasir tidak berani konfirmasi
+        }
+        // ======================================================================
 
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
@@ -10028,4 +10053,6 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
 
