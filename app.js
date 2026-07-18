@@ -5955,15 +5955,14 @@ openDetailStokOpname: function(sku) {
     },
     
   // =========================================================
-    // 🚀 ENGINE: SUBMIT OPNAME FISIK (ANTI-KASIR MALAS)
+    // 🚀 ENGINE: SUBMIT OPNAME FISIK (ANTI-KASIR MALAS V2.0)
     // =========================================================
     submitOpname: async function() {
         if (this.isProcessing) return;
         
         let allItems = []; 
         let dbItems = []; 
-        let countSelisih = 0;
-        let totalDiisi = 0; // 🚀 RADAR PENDETEKSI INPUT
+        let countSelisih = 0; // 🚀 INDIKATOR MUTLAK KEDISIPLINAN KASIR
 
         // Deteksi Layar: HP (< 768px) atau PC (>= 768px)
         let isMobile = window.innerWidth < 768;
@@ -5986,10 +5985,7 @@ openDetailStokOpname: function(sku) {
                 let stokFisik = stokSistem;
                 if (fisikStr !== '') {
                     let parsed = parseInt(String(fisikStr).replace(/\D/g, ''));
-                    if (!isNaN(parsed)) {
-                        stokFisik = parsed;
-                        totalDiisi++; // 🚀 DETEKSI: Kasir benar-benar mengetik angka di kotak ini
-                    }
+                    if (!isNaN(parsed)) stokFisik = parsed;
                 }
                 
                 let noteDesk = document.getElementById(`opn-note-${m.SKU}`); 
@@ -5998,9 +5994,6 @@ openDetailStokOpname: function(sku) {
                 let note = '';
                 if (isMobile && noteMob) note = noteMob.value;
                 else if (!isMobile && noteDesk) note = noteDesk.value;
-
-                // Hitung valid jika kasir setidaknya mengisi keterangan fisik
-                if (note && note.trim() !== '') totalDiisi++; 
                 
                 let selisih = stokFisik - stokSistem;
 
@@ -6008,13 +6001,16 @@ openDetailStokOpname: function(sku) {
                     sku: m.SKU, nama: m.Nama_Produk, sistem: stokSistem, fisik: stokFisik, selisih: selisih, catatan: note 
                 };
 
-                // Masukkan ke Array WA (Semua Barang)
                 allItems.push(itemObj);
 
-                // FILTERING: HANYA MASUKKAN KE DB JIKA ADA SELISIH ATAU CATATAN
+                // 🛑 FILTERING DATABASE & PENGHITUNG SELISIH
                 if (selisih !== 0 || (note && note.trim() !== '')) {
                     dbItems.push(itemObj);
-                    if (selisih !== 0) countSelisih++;
+                }
+                
+                // 🚀 HANYA MENGHITUNG JIKA ANGKA FISIK BENAR-BENAR BERBEDA DARI SISTEM
+                if (selisih !== 0) {
+                    countSelisih++;
                 }
             }
         });
@@ -6022,15 +6018,53 @@ openDetailStokOpname: function(sku) {
         if (allItems.length === 0) return this.showToast("Database master produk kosong!", "error");
 
         // ======================================================================
-        // 🚀 LAPISAN KEAMANAN ANTI-KASIR MALAS
+        // 🚨 LAPISAN KEAMANAN MUTLAK: POPUP MODERN ANTI-KASIR MALAS
         // ======================================================================
-        if (totalDiisi === 0) {
-            return this.showToast("❌ LAPORAN DITOLAK: Anda belum mengetik sisa fisik satupun! Silakan hitung dan ketik sisa stok aktual di toko.", "error");
-        }
+        if (countSelisih === 0) {
+            // Hapus popup lama jika tertumpuk
+            let existingAlert = document.getElementById('modern-alert-overlay');
+            if (existingAlert) existingAlert.remove();
 
-        if (dbItems.length === 0) {
-            let peringatan = confirm("⚠️ LAPORAN MENCURIGAKAN:\n\nSistem mendeteksi 100% barang sama persis dengan komputer (Tidak ada selisih sama sekali).\n\nPadahal barang pendukung (cup, plastik, dll) biasanya PASTI selalu berkurang setiap hari.\n\nApakah Anda YAKIN sudah menghitung fisik dengan jujur?");
-            if (!peringatan) return; // Batalkan submit jika kasir tidak berani konfirmasi
+            // Render Popup HTML Modern langsung dari JavaScript
+            let alertHtml = `
+            <div id="modern-alert-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+                <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300">
+                    <div class="bg-rose-500 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                        <div class="absolute inset-0 bg-rose-600 opacity-50" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px;"></div>
+                        <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl text-rose-500 mb-3 shadow-inner animate-bounce relative z-10">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h3 class="font-black text-white text-lg tracking-tight relative z-10">LAPORAN DITOLAK!</h3>
+                    </div>
+                    <div class="p-6 text-center">
+                        <p class="text-sm font-bold text-slate-600 leading-relaxed mb-4">
+                            Sistem mendeteksi <b class="text-rose-500">TIDAK ADA PERUBAHAN ANGKA</b> sama sekali antara stok laci dan komputer.
+                        </p>
+                        <div class="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-700 text-left shadow-inner flex gap-2.5 items-start">
+                            <i class="fas fa-info-circle mt-0.5 text-rose-500 text-sm shrink-0"></i> 
+                            <span>Hal ini tidak logis karena barang pendukung (Kotak, Plastik) <b>PASTI menyusut</b> setiap hari. Mengisi keterangan teks saja tidak cukup!</span>
+                        </div>
+                        <button onclick="document.getElementById('modern-alert-overlay').classList.remove('opacity-100'); setTimeout(()=>document.getElementById('modern-alert-overlay').remove(), 300)" class="mt-6 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-black shadow-md transition active:scale-95 flex items-center justify-center gap-2">
+                            <i class="fas fa-rotate-left"></i> Saya Mengerti, Hitung Ulang
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+            
+            document.body.insertAdjacentHTML('beforeend', alertHtml);
+            
+            // Trigger Animasi Transisi Halus
+            setTimeout(() => {
+                let alertEl = document.getElementById('modern-alert-overlay');
+                if(alertEl) {
+                    alertEl.classList.remove('opacity-0');
+                    alertEl.classList.add('opacity-100');
+                    alertEl.firstElementChild.classList.remove('scale-95');
+                    alertEl.firstElementChild.classList.add('scale-100');
+                }
+            }, 10);
+            
+            return; // 🛑 Hentikan seluruh proses pengiriman data!
         }
         // ======================================================================
 
@@ -6039,7 +6073,6 @@ openDetailStokOpname: function(sku) {
         let kasirName = this.currentUser ? this.currentUser.Username : 'Kasir';
         let waktuStr = d.toLocaleString('id-ID');
         
-        // Buat Teks WA Menggunakan "allItems" (100% Barang)
         let waTextFinal = this.buildOpnameWaText(this.outlet, kasirName, waktuStr, allItems);
 
         let sudahInputHariIni = (this.db.riwayatOpname || []).some(m => 
@@ -6080,10 +6113,10 @@ openDetailStokOpname: function(sku) {
         }
 
         const btnExecute = document.getElementById('btn-confirm-opname-execute');
-        // KUNCI PENTING: Melempar "dbItems" (yg sudah difilter) ke server, dan "waTextFinal" (Lengkap) ke WhatsApp
         if (btnExecute) btnExecute.onclick = () => {
-            // JIKA SEMUA AKURAT 100%, TIDAK PERLU PUSH KE DB! LANGSUNG MUNCUL WA!
             if (dbItems.length === 0) {
+                // Skrip ini sebenarnya sudah dijamin tidak akan tersentuh jika countSelisih 0, 
+                // tapi dibiarkan sebagai mekanisme fallback aman.
                 if (typeof this.closeModal === 'function') this.closeModal('modal-confirm-opname');
                 this.showToast("Semua stok akurat! Tidak ada yang diupload ke server.", "success");
                 if (typeof this.openWaShareModal === 'function') this.openWaShareModal(waTextFinal);
@@ -10053,6 +10086,8 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
 
 
 
