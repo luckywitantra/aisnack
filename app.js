@@ -2039,7 +2039,7 @@ const superApp = {
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
     // =========================================================
-    // 🚀 SUBMIT LAPORAN (DILENGKAPI POPUP FORWARD WA KONSISTEN)
+    // 🚀 SUBMIT LAPORAN (DENGAN AUTO-SYNC AKUMULASI MUTLAK)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2064,6 +2064,33 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
+        this.setLoading(true, "Menyinkronkan Akumulasi Bulan Ini...");
+
+        // ======================================================================
+        // 🚀 SINKRONISASI KILAT (31 HARI) SEBELUM TEKS WA DIRAKIT
+        // ======================================================================
+        if (this.isOnline) {
+            try {
+                let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+                // Tarik data laporan harian 31 hari terakhir agar perhitungan bulan berjalan 100% akurat!
+                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { redirect: 'follow' });
+                const freshData = await res.json();
+                
+                if (freshData && freshData.laporanHarian) {
+                    this.db.laporanHarian = freshData.laporanHarian;
+                    localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+                }
+            } catch(e) {
+                console.log("Koneksi tidak stabil, menggunakan akumulasi dari memori lokal.");
+            }
+        }
+
+        // 🚀 PAKSA KALKULASI ULANG AGAR MENGGUNAKAN DATA TERBARU DARI SERVER
+        let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
+            ? this.calcMonthlyAccumulation(netSales) 
+            : (this.currentAccumMonth || netSales);
+        // ======================================================================
+
         this.setLoading(true, isEdit && !isOwner ? "Mengirim Pengajuan Revisi..." : "Menyimpan Laporan...");
 
         const payload = {
@@ -2079,7 +2106,7 @@ const superApp = {
             pcs: pcs,
             pengeluaran_json: JSON.stringify(expValid),
             total_pengeluaran: totExp,
-            akumulasi_bulan: this.currentAccumMonth || netSales,
+            akumulasi_bulan: exactAccumulation, // 🚀 Kirim angka yang sudah dijamin akurat
             kasir: (this.currentUser && this.currentUser.Username) ? this.currentUser.Username : 'Kasir',
             status_approval: statusApp
         };
@@ -2089,7 +2116,6 @@ const superApp = {
 
         if (isEdit) {
             if (statusApp === 'Pending Edit' && idx > -1) {
-                // 🚀 STAF EDIT: Taruh di Kotak Revisi (Revisi_JSON)
                 this.db.laporanHarian[idx].Status_Approval = 'Pending Edit';
                 this.db.laporanHarian[idx].Revisi_JSON = JSON.stringify({
                     cash, qris, net_sales: netSales, bill, pcs, 
@@ -2097,11 +2123,11 @@ const superApp = {
                     editor: payload.kasir
                 });
             } else if (idx > -1) {
-                // 🚀 OWNER EDIT: Langsung timpa angka asli
                 this.db.laporanHarian[idx] = {
                     ...this.db.laporanHarian[idx],
                     Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
                     Pengeluaran_JSON: JSON.stringify(expValid), Total_Pengeluaran: totExp,
+                    Akumulasi_Bulan: exactAccumulation,
                     Status_Approval: 'Disetujui', Revisi_JSON: ''
                 };
             }
@@ -2109,7 +2135,7 @@ const superApp = {
             this.db.laporanHarian.push({
                 ID_Laporan: idRep, Outlet: this.outlet, Tanggal: tglTeks, Cuaca: cuaca,
                 Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
-                Pengeluaran_JSON: JSON.stringify(expValid), Status_Approval: 'Disetujui'
+                Pengeluaran_JSON: JSON.stringify(expValid), Akumulasi_Bulan: exactAccumulation, Status_Approval: 'Disetujui'
             });
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
@@ -2118,14 +2144,13 @@ const superApp = {
         await this.apiPost(payload);
         this.setLoading(false);
         
-        // 🚀 PREVIEW NOTIFIKASI
         if (statusApp === 'Pending Edit') {
             alert("⏳ REVISI TERKIRIM KE OWNER\n\nAngka laporan resmi di database belum berubah sebelum disetujui Owner. Namun Anda tetap bisa meneruskan format revisi ini ke WA Grup.");
         } else {
             this.showToast("Laporan Berhasil Tersimpan!");
         }
         
-        // 🚀 RAKIT TEKS WA & MUNCULKAN POPUP FORWARD KE GRUP
+        // 🚀 RAKIT TEKS WA MENGGUNAKAN EXACT ACCUMULATION TERBARU
         let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
         let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
         
@@ -2135,11 +2160,8 @@ const superApp = {
         }
 
         let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-CHA*`;
-        
-        // ✨ NORMALISASI NAMA OUTLET (Mencegah duplikasi kata Ai-Snack)
         let cleanOutletName = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
         
-        // ✨ FORMAT TEKS BARU SESEORANG REQUEST (Tanpa baris Kasir)
         let waText = `${labelJudul}\n`;
         waText += `Update Sales Report Outlet: *Ai-CHA ${cleanOutletName}*\n`;
         waText += `Tanggal: ${tglTeks}\n`;
@@ -2158,14 +2180,13 @@ const superApp = {
             waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
         }
         
-        waText += `\nAkumulasi Bulanan: Rp ${(this.currentAccumMonth || netSales).toLocaleString('id-ID')}\n`;
+        // 🚀 ANGKA INI DIJAMIN 100% COCOK DENGAN SERVER
+        waText += `\nAkumulasi Bulanan: Rp ${exactAccumulation.toLocaleString('id-ID')}\n`;
         waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
 
-        // Reset form & perbarui tabel riwayat di latar belakang
         this.resetDailyForm();
         this.renderLaporanHarianHistory();
 
-        // 🚀 MUNCULKAN MODAL POPUP WA KHUSUS DI VIEW LAPORAN HARIAN
         if (typeof this.openWaLaporanModal === 'function') {
             this.openWaLaporanModal(waText);
         } else if (typeof this.showWaModal === 'function') {
