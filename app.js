@@ -474,10 +474,43 @@ const superApp = {
     },
 
     
+   // =========================================================
+    // 🚀 ENGINE PENGIRIM DATA (MOBILE-SAFE & TIMEOUT PROTECTED)
+    // =========================================================
     apiPost: async function(payload) {
-        if (!this.isOnline) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
-        try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
-        catch (e) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
+        if (!this.isOnline) { 
+            this.offlineQueue.push(payload); 
+            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
+            this.updateNetworkUI(); 
+            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift || payload.id_laporan }; 
+        }
+        
+        // 🚀 PROTEKSI ANTI-HANG KHUSUS HP: Batasi tunggu maksimal 15 detik!
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        try { 
+            let targetUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+            const res = await fetch(targetUrl, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'text/plain' }, 
+                body: JSON.stringify(payload),
+                redirect: 'follow', // 🚀 WAJIB UNTUK BROWSER HP (Cegah hang saat 302 redirect dari GAS)
+                signal: controller.signal // Pasang pengaman timeout
+            }); 
+            clearTimeout(timeoutId); // Matikan pengaman jika sukses
+            return await res.json(); 
+        } catch (e) { 
+            clearTimeout(timeoutId);
+            console.warn("Koneksi HP terputus atau timeout (15 dtk). Mengalihkan ke Mode Offline:", e.message);
+            
+            // 🚀 JIKA HP HANG / SINYAL JELEK: Jangan biarkan layar loading macet! 
+            // Masukkan data ke antrean offline dan anggap sukses di layar kasir!
+            this.offlineQueue.push(payload); 
+            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
+            this.updateNetworkUI(); 
+            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift || payload.id_laporan }; 
+        }
     },
 
     // ... (fungsi-fungsi superApp lainnya di atas) ...
@@ -2038,7 +2071,7 @@ const superApp = {
     },
 
     // =========================================================
-    // 🚀 SUBMIT LAPORAN (SUPER FAST & ANTI-LAG DI HP)
+    // 🚀 SUBMIT LAPORAN (MOBILE-SAFE & AUTO-SYNC AKUMULASI)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2063,35 +2096,33 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
-        this.setLoading(true, "Membaca Akumulasi...");
+        this.setLoading(true, "Menyinkronkan Akumulasi...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT ANTI-LAG (< 0.2 DETIK KHUSUS LAPORAN SAJA)
+        // 🚀 SINKRONISASI KILAT (BATASI MAKSIMAL 3 DETIK DI HP AGAR TIDAK MACET)
         // ======================================================================
         if (this.isOnline) {
             try {
+                const syncController = new AbortController();
+                const syncTimeout = setTimeout(() => syncController.abort(), 3000); // 3 detik batas tunggu
+
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                // Tarik HANYA sheet Laporan_Harian (bukan seluruh database) dengan batas timeout aman
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // Maksimal tunggu 5 detik
-                
-                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only", { 
+                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { 
                     redirect: 'follow',
-                    signal: controller.signal 
+                    signal: syncController.signal
                 });
-                clearTimeout(timeoutId);
-                
+                clearTimeout(syncTimeout);
                 const freshData = await res.json();
+                
                 if (freshData && freshData.laporanHarian) {
                     this.db.laporanHarian = freshData.laporanHarian;
                     localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 }
             } catch(e) {
-                console.log("Koneksi seluler lambat, sinkronisasi dilewati agar tidak lag.");
+                console.log("Sinyal HP lambat, langsung gunakan akumulasi memori lokal.");
             }
         }
 
-        // 🚀 PAKSA KALKULASI ULANG AGAR MENGGUNAKAN DATA TERBARU DARI SERVER
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
@@ -2146,8 +2177,10 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // Kirim ke server di background
+        // 🚀 KIRIM KE SERVER (Dijamin tidak akan hang karena sudah dipasangi AbortController di apiPost)
         await this.apiPost(payload);
+        
+        // 🚀 MATIKAN LOADING AGAR LAYAR KEMBALI NORMAL
         this.setLoading(false);
         
         if (statusApp === 'Pending Edit') {
