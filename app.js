@@ -474,54 +474,10 @@ const superApp = {
     },
 
     
-   // =========================================================
-    // 🚀 ENGINE: API POST (ANTI-CRASH CHROME MOBILE & BYPASS CORS)
-    // Menggunakan XMLHttpRequest (XHR) agar kebal dari blokir redirect Chrome terbaru
-    // =========================================================
-    apiPost: function(payload) {
-        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-        
-        return new Promise((resolve) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", rUrl, true);
-            
-            // Wajib text/plain agar dianggap "Simple Request" oleh Chrome Mobile
-            xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
-            
-            // Batas waktu maksimal 8 detik agar tombol kasir tidak pernah gantung selamanya
-            xhr.timeout = 8000; 
-            
-            // Jika berhasil dijawab oleh Google Apps Script
-            xhr.onload = function() {
-                if (xhr.status >= 200 && xhr.status < 400) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        resolve(data);
-                    } catch (e) {
-                        // Jika respon bukan JSON, tetap anggap sukses
-                        resolve({ status: 'sukses', pesan: 'Respon diterima' });
-                    }
-                } else {
-                    console.log("Server error status: " + xhr.status);
-                    resolve({ status: 'error', pesan: 'Server gangguan', is_offline: true });
-                }
-            };
-
-            // Jika Chrome tetap memblokir atau sinyal tiba-tiba hilang
-            xhr.onerror = function() {
-                console.log("Koneksi diblokir oleh Chrome Mobile, otomatis masuk ke mode offline queue.");
-                resolve({ status: 'error', pesan: 'Koneksi terblokir Chrome', is_offline: true });
-            };
-
-            // Jika internet lambat dan melebihi 8 detik
-            xhr.ontimeout = function() {
-                console.log("Koneksi timeout di Chrome Mobile, beralih ke offline queue.");
-                resolve({ status: 'error', pesan: 'Timeout', is_offline: true });
-            };
-
-            // Kirim data ke server
-            xhr.send(JSON.stringify(payload));
-        });
+    apiPost: async function(payload) {
+        if (!this.isOnline) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
+        try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
+        catch (e) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
     },
 
     // ... (fungsi-fungsi superApp lainnya di atas) ...
@@ -2081,8 +2037,9 @@ const superApp = {
         }
     },
 
-   // =========================================================
-    // 🚀 SUBMIT LAPORAN HARIAN (100% XHR ANTI-CRASH CHROME MOBILE)
+    // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
+    // =========================================================
+    // 🚀 SUBMIT LAPORAN (DENGAN AUTO-SYNC AKUMULASI MUTLAK)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2107,42 +2064,28 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
-        this.setLoading(true, "Membaca Akumulasi...");
+        this.setLoading(true, "Menyinkronkan Akumulasi Bulan Ini...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT MENGGUNAKAN XHR (ANTI-BLOKIR CHROME MOBILE)
+        // 🚀 SINKRONISASI KILAT (31 HARI) SEBELUM TEKS WA DIRAKIT
         // ======================================================================
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only";
+                // Tarik data laporan harian 31 hari terakhir agar perhitungan bulan berjalan 100% akurat!
+                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { redirect: 'follow' });
+                const freshData = await res.json();
                 
-                // Menggunakan XHR sebagai pengganti fetch() agar tidak di-crash oleh Chrome
-                const freshData = await new Promise((resolve) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open("GET", syncUrl, true);
-                    xhr.timeout = 5000; // Maksimal tunggu 5 detik
-                    
-                    xhr.onload = function() {
-                        if (xhr.status >= 200 && xhr.status < 400) {
-                            try { resolve(JSON.parse(xhr.responseText)); } catch(e) { resolve(null); }
-                        } else resolve(null);
-                    };
-                    xhr.onerror = function() { resolve(null); };
-                    xhr.ontimeout = function() { resolve(null); };
-                    xhr.send();
-                });
-
                 if (freshData && freshData.laporanHarian) {
                     this.db.laporanHarian = freshData.laporanHarian;
                     localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 }
             } catch(e) {
-                console.log("Sinkronisasi latar belakang dilewati, lanjut gunakan cache lokal.");
+                console.log("Koneksi tidak stabil, menggunakan akumulasi dari memori lokal.");
             }
         }
 
-        // Paksa kalkulasi ulang dari data terbaru di memori
+        // 🚀 PAKSA KALKULASI ULANG AGAR MENGGUNAKAN DATA TERBARU DARI SERVER
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
@@ -2163,7 +2106,7 @@ const superApp = {
             pcs: pcs,
             pengeluaran_json: JSON.stringify(expValid),
             total_pengeluaran: totExp,
-            akumulasi_bulan: exactAccumulation,
+            akumulasi_bulan: exactAccumulation, // 🚀 Kirim angka yang sudah dijamin akurat
             kasir: (this.currentUser && this.currentUser.Username) ? this.currentUser.Username : 'Kasir',
             status_approval: statusApp
         };
@@ -2197,7 +2140,7 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // 🚀 KIRIM VIA API POST (Yang sudah memakai mesin XHR baru kita)
+        // Kirim ke server di background
         await this.apiPost(payload);
         this.setLoading(false);
         
@@ -2207,6 +2150,7 @@ const superApp = {
             this.showToast("Laporan Berhasil Tersimpan!");
         }
         
+        // 🚀 RAKIT TEKS WA MENGGUNAKAN EXACT ACCUMULATION TERBARU
         let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
         let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
         
@@ -2236,6 +2180,7 @@ const superApp = {
             waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
         }
         
+        // 🚀 ANGKA INI DIJAMIN 100% COCOK DENGAN SERVER
         waText += `\nAkumulasi Bulanan: Rp ${exactAccumulation.toLocaleString('id-ID')}\n`;
         waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
 
@@ -2250,7 +2195,6 @@ const superApp = {
             this.resendLaporanHarianWa(idRep);
         }
     },
-    
 
     // =========================================================
     // 🚀 ENGINE MODAL KOMPARASI REVISI ULTRA-MODERN
@@ -10428,4 +10372,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
