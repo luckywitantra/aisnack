@@ -459,6 +459,8 @@ const superApp = {
         }
     },
 
+   
+
     toggleDarkMode: function() { 
         document.documentElement.classList.toggle('dark'); 
         let ic = document.getElementById('dark-icon'); 
@@ -703,28 +705,45 @@ const superApp = {
         } else { ind.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 transition'; dot.className = 'w-2 h-2 rounded-full bg-red-500'; txt.className = 'text-[10px] font-bold text-red-600 hidden md:inline'; txt.innerText = `Offline (${this.offlineQueue.length} Pending)`; }
     },
 
-    // CFD DUAL MONITOR SMART SYNC + ANTRIAN
+   // CFD DUAL MONITOR SMART SYNC + ANTRIAN
     cfdSuccessTimeout: null, // Tambahkan variabel global untuk menyimpan memori waktu
 
     openCFD: async function(isAutoRestore = false) {
         localStorage.setItem('cfd_wants_open', 'true');
+        
+        // 🚀 KUNCI PERBAIKAN: Gunakan origin + pathname murni agar bebas dari bug tanda tanya ganda (?v= / ?nocache=)
+        let cfdUrl = window.location.origin + window.location.pathname + '?mode=cfd';
+
         try { 
             if ('getScreenDetails' in window) { 
                 const screens = await window.getScreenDetails(); 
                 const extScreen = screens.screens.find(s => s !== screens.currentScreen); 
-                if (extScreen) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW_AISNACK', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); return; } 
+                if (extScreen) { 
+                    // Gunakan variabel cfdUrl yang sudah dibersihkan
+                    this.cfdWindow = window.open(cfdUrl, 'CFD_WINDOW_AISNACK', `left=${extScreen.availLeft},top=${extScreen.availTop},width=${extScreen.availWidth},height=${extScreen.availHeight},fullscreen=yes`); 
+                    return; 
+                } 
             } 
         } catch (e) {}
         
-        if (!this.cfdWindow || this.cfdWindow.closed) { this.cfdWindow = window.open(window.location.href + '?mode=cfd', 'CFD_WINDOW_AISNACK', `left=${window.screen.width},top=0,width=1024,height=768`); }
+        if (!this.cfdWindow || this.cfdWindow.closed) { 
+            // Gunakan variabel cfdUrl yang sudah dibersihkan
+            this.cfdWindow = window.open(cfdUrl, 'CFD_WINDOW_AISNACK', `left=${window.screen.width},top=0,width=1024,height=768`); 
+        }
+        
         if (this.cfdWindow) {
             this.cfdWindow.focus();
             if (!this.cfdFocusHandlerAdded) {
-                window.addEventListener('focus', () => { if (this.cfdWindow && !this.cfdWindow.closed && localStorage.getItem('cfd_wants_open') === 'true') { this.syncStorage(); } });
+                window.addEventListener('focus', () => { 
+                    if (this.cfdWindow && !this.cfdWindow.closed && localStorage.getItem('cfd_wants_open') === 'true') { 
+                        this.syncStorage(); 
+                    } 
+                });
                 this.cfdFocusHandlerAdded = true;
             }
         }
     },
+    
    changePromoImage: function(type) {
         let fileInput = document.createElement('input'); 
         fileInput.type = 'file'; 
@@ -943,34 +962,44 @@ const superApp = {
         }
     },
   
-    // STARTUP & LOGIN
+   // STARTUP & LOGIN
     init: async function() {
         // =========================================================================
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE CHROME HP JARAK JAUH)
         // =========================================================================
-        // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v551"; 
+        const CURRENT_VER = "v557"; // Naikkan versi agar HP toko ter-reset
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         if (savedVer !== CURRENT_VER) {
-            console.log("Versi baru terdeteksi! Membersihkan cache lama di HP...");
+            console.warn("Versi baru terdeteksi! Membersihkan cache lama di HP...");
             localStorage.setItem('aisnack_sys_version', CURRENT_VER);
             
-            // Hapus semua Cache Storage HTML/JS lawas di HP
             if ('caches' in window) {
-                caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                try {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(name => caches.delete(name)));
+                } catch(e) {}
             }
-            // Cabut Service Worker lawas yang bandel
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+                try {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for(let reg of regs) { await reg.unregister(); }
+                } catch(e) {}
             }
-            // Paksa reload browser HP langsung dari server jaringan
             setTimeout(() => {
-                window.location.href = window.location.pathname + "?v=" + Date.now();
-            }, 500);
-            return; // Hentikan proses init karena halaman akan segera di-reload
+                window.location.replace(window.location.pathname + "?v=" + Date.now());
+            }, 600);
+            return; 
         }
+
         // =========================================================================
+        // 🚀 0.5 URL CLEANER: Hapus angka ?v= atau ?nocache= dari Address Bar (NEW!)
+        // =========================================================================
+        // Membersihkan alamat web secara senyap tanpa mereload halaman
+        if (window.location.search.includes('v=') || window.location.search.includes('nocache=')) {
+            let cleanUrl = window.location.pathname + (window.location.search.includes('mode=cfd') ? '?mode=cfd' : '');
+            window.history.replaceState(null, '', cleanUrl);
+        }
 
         // --- 🚀 1. RADAR UPDATE APLIKASI (SERVICE WORKER) ---
         if ('serviceWorker' in navigator) {
@@ -989,24 +1018,25 @@ const superApp = {
                             
                             const btn = document.getElementById('btn-update-app');
                             if (btn) {
-                                // 🚀 UPGRADE: Nuclear Reset pada tombol Update Banner
-                                btn.onclick = () => {
+                                btn.onclick = async () => {
                                     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Memperbarui...';
                                     btn.disabled = true;
+                                    btn.classList.add('opacity-75', 'cursor-not-allowed');
                                     
-                                    // Bersihkan cache dan SW sebelum reload
                                     if ('caches' in window) {
-                                        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                                        const names = await caches.keys();
+                                        await Promise.all(names.map(name => caches.delete(name)));
                                     }
                                     if ('serviceWorker' in navigator) {
-                                        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+                                        const regs = await navigator.serviceWorker.getRegistrations();
+                                        for(let reg of regs) { await reg.unregister(); }
                                     }
                                     newWorker.postMessage({ action: 'skipWaiting' });
                                     
                                     localStorage.setItem('aisnack_sys_version', CURRENT_VER);
                                     setTimeout(() => {
-                                        window.location.href = window.location.pathname + "?nocache=" + Date.now();
-                                    }, 500);
+                                        window.location.replace(window.location.pathname + "?nocache=" + Date.now());
+                                    }, 600);
                                 };
                             }
                         }
@@ -1014,8 +1044,7 @@ const superApp = {
                 });
             }).catch(err => console.log('SW Reg Error:', err));
 
-            // Eksekusi muat ulang (reload) saat mesin PWA berhasil diperbarui
-            let refreshing;
+            let refreshing = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 if (refreshing) return;
                 refreshing = true;
@@ -5267,34 +5296,36 @@ refreshData: function() {
     // 🚀 MODAL WHATSAPP DENGAN SAFE CLIPBOARD COPY
     // =========================================================
     showWaModal: async function(text, customNumber = '') {
-        // 1. Coba salin ke clipboard dengan proteksi Try-Catch & Fallback
+        // 1. Coba salin ke clipboard dengan proteksi ganda (Modern API -> Classic Fallback)
+        let isCopied = false;
         try {
             if (navigator.clipboard && window.isSecureContext && document.hasFocus()) {
                 await navigator.clipboard.writeText(text);
-                this.showToast("Teks laporan otomatis disalin ke clipboard!");
-            } else {
-                // Fallback tradisional untuk browser HP / saat kehilangan fokus
+                isCopied = true;
+            }
+        } catch (err) {}
+
+        if (!isCopied) {
+            try {
                 let textArea = document.createElement("textarea");
                 textArea.value = text;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-999999px";
-                textArea.style.top = "-999999px";
+                textArea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-                try {
-                    document.execCommand('copy');
-                    this.showToast("Teks laporan berhasil disalin!");
-                } catch (err) {
-                    console.warn("Fallback copy gagal, pengguna harus salin manual.");
-                }
+                document.execCommand('copy');
                 textArea.remove();
-            }
-        } catch (err) {
-            console.warn("Clipboard API dicegah browser: ", err.message);
+                isCopied = true;
+            } catch (err) {}
         }
 
-        // 2. Tampilkan Pop-Up Modal WA seperti biasa
+        if (isCopied) {
+            this.showToast("Teks laporan otomatis disalin ke clipboard!");
+        } else {
+            this.showToast("Silakan salin manual dari kotak teks di bawah.", "warning");
+        }
+
+        // 2. Tampilkan Pop-Up Modal WA
         let modal = document.getElementById('modal-wa');
         let textAreaModal = document.getElementById('wa-preview-text');
         
@@ -5314,6 +5345,7 @@ refreshData: function() {
             }, 10);
         }
     },
+    
  // =========================================================
     // 🚀 ENGINE: MODAL RIWAYAT WA (DENGAN NAVIGASI BULAN)
     // =========================================================
@@ -8177,16 +8209,14 @@ openDetailStokOpname: function(sku) {
                          ? (this.currentUser && String(this.currentUser.Role).toLowerCase().includes('admin') ? "Semua Cabang" : this.outlet) 
                          : outletFilterEl.options[outletFilterEl.selectedIndex].text.replace('Hanya: ', '').replace('📍 ', '');
 
-        // 3. Ambil Ringkasan Angka Utama
-        let totTrx = document.getElementById('rep-total-trx').innerText; // Ini angka jumlah struk
-        let totTunai = document.getElementById('rep-total-tunai').innerText;
-        let totQris = document.getElementById('rep-total-qris').innerText;
-        let totKas = document.getElementById('rep-total-kas').innerText;
+        // 3. Ambil Ringkasan Angka Utama dengan Fallback
+        let totTrx = document.getElementById('rep-total-trx')?.innerText || '0'; 
+        let totTunai = document.getElementById('rep-total-tunai')?.innerText || 'Rp 0';
+        let totQris = document.getElementById('rep-total-qris')?.innerText || 'Rp 0';
+        let totKas = document.getElementById('rep-total-kas')?.innerText || 'Rp 0';
 
-        // KALKULASI TOTAL PENDAPATAN (TUNAI + QRIS)
-        // Bersihkan teks "Rp" dan titik, lalu ubah ke angka murni untuk dijumlahkan
-        let numTunai = Number(totTunai.replace(/[^0-9]/g, '')) || 0;
-        let numQris = Number(totQris.replace(/[^0-9]/g, '')) || 0;
+        let numTunai = Number(String(totTunai).replace(/[^0-9]/g, '')) || 0;
+        let numQris = Number(String(totQris).replace(/[^0-9]/g, '')) || 0;
         let totalOmset = numTunai + numQris;
         let totOmsetStr = `Rp ${totalOmset.toLocaleString('id-ID')}`;
 
@@ -10127,10 +10157,10 @@ executeVoidTrx: async function(trxId) {
         });
     },
     
-    
-    connectBluetooth: async function(isAuto = false) {
-        if (this.isBluetoothSearching) return;
+   connectBluetooth: async function(isAuto = false) {
+        if (this.isBluetoothSearching || this._gattLock) return;
         this.isBluetoothSearching = true; 
+        this._gattLock = true;
         
         const btnPrinter = document.getElementById('btn-printer');
         const statusPrinter = document.getElementById('printer-status');
@@ -10140,6 +10170,7 @@ executeVoidTrx: async function(trxId) {
         try {
             if (this.printerDevice && this.printerDevice.gatt.connected) {
                 try { this.printerDevice.gatt.disconnect(); } catch(e) {}
+                await new Promise(r => setTimeout(r, 400)); // Beri waktu printer bernapas
             }
             this.printerDevice = null;
             this.printerCharacteristic = null;
@@ -10147,7 +10178,6 @@ executeVoidTrx: async function(trxId) {
             let device = null;
             let server = null;
 
-            // 1. CEK INGATAN BROWSER
             if (navigator.bluetooth && navigator.bluetooth.getDevices) {
                 const devices = await navigator.bluetooth.getDevices();
                 if (devices.length > 0) {
@@ -10155,30 +10185,27 @@ executeVoidTrx: async function(trxId) {
                     try {
                         server = await device.gatt.connect(); 
                     } catch (e) {
-                        server = null; // Gagal diam-diam (printer mungkin masih tidur)
+                        server = null;
                     }
                 }
             }
 
-            // 2. JIKA GAGAL NYAMBUNG KE INGATAN LAMA
             if (!server) {
                 if (isAuto) {
                     this.isBluetoothSearching = false;
-                    return; // Jika auto-connect gagal, batalkan tanpa error
+                    this._gattLock = false;
+                    return; 
                 }
 
-                // Jika Kasir klik manual, coba bangunkan paksa dulu
                 if (device) {
                     this.setLoading(true, "Membangunkan printer tersimpan...");
                     try { server = await device.gatt.connect(); } catch(e) { server = null; }
                 }
 
-                // 🚀 PENCEGAH SCAN MEMBABI BUTA
                 if (!server) {
                     let mauScan = true;
                     if (device) {
                         this.setLoading(false);
-                        // Beri kasir pilihan, jangan langsung paksa scan baru!
                         mauScan = confirm("Printer tersimpan gagal merespons otomatis.\n\nKlik [OK] jika Anda ingin SCAN ULANG / Pairing Baru.\nKlik [BATAL] lalu tekan ikon Printer lagi untuk sekadar memancing sambungan.");
                     }
 
@@ -10196,23 +10223,21 @@ executeVoidTrx: async function(trxId) {
                         server = await device.gatt.connect();
                     } else {
                         this.isBluetoothSearching = false;
-                        return; // Kasir memilih batal scan
+                        this._gattLock = false;
+                        return; 
                     }
                 }
             }
 
-            // 3. DETEKSI SERVICE PRINTER
             let service;
             const serviceUUIDs = ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '0000e700-0000-1000-8000-00805f9b34fb', '0000fee7-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
             for (let uuid of serviceUUIDs) { try { service = await server.getPrimaryService(uuid); if(service) break; } catch(e) {} }
             if(!service) throw new Error("Service Printer tidak ditemukan");
 
-            // 4. DETEKSI CHARACTERISTIC PRINTER
             const charUUIDs = ['00002af1-0000-1000-8000-00805f9b34fb', '0000ff02-0000-1000-8000-00805f9b34fb', '0000e701-0000-1000-8000-00805f9b34fb', '0000fec8-0000-1000-8000-00805f9b34fb', 'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'];
             for (let uuid of charUUIDs) { try { this.printerCharacteristic = await service.getCharacteristic(uuid); if(this.printerCharacteristic) break; } catch(e) {} }
             if(!this.printerCharacteristic) throw new Error("Characteristic gagal diakses");
 
-            // --- SUKSES MENYAMBUNG ---
             this.printerDevice = device;
             if (btnPrinter) {
                 btnPrinter.classList.replace('text-slate-600', 'text-green-600');
@@ -10237,7 +10262,6 @@ executeVoidTrx: async function(trxId) {
         } catch (error) {
             if (!isAuto) this.setLoading(false);
             this.printerCharacteristic = null;
-            
             if (!isAuto) {
                 if (error.name === 'NotFoundError' || error.message.includes('cancelled')) {
                     this.showToast("Pencarian dibatalkan.", "warning");
@@ -10246,7 +10270,10 @@ executeVoidTrx: async function(trxId) {
                 }
             }
         } finally {
-            setTimeout(() => { this.isBluetoothSearching = false; }, 2000);
+            setTimeout(() => { 
+                this.isBluetoothSearching = false; 
+                this._gattLock = false;
+            }, 1500);
         }
     },
     
@@ -10472,8 +10499,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
-
-
-
-
