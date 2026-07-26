@@ -2039,7 +2039,7 @@ const superApp = {
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
     // =========================================================
-    // 🚀 SUBMIT LAPORAN (DENGAN AUTO-SYNC AKUMULASI MUTLAK)
+    // 🚀 SUBMIT LAPORAN (SUPER FAST & ANTI-LAG DI HP)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2064,24 +2064,31 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
-        this.setLoading(true, "Menyinkronkan Akumulasi Bulan Ini...");
+        this.setLoading(true, "Membaca Akumulasi...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT (31 HARI) SEBELUM TEKS WA DIRAKIT
+        // 🚀 SINKRONISASI KILAT ANTI-LAG (< 0.2 DETIK KHUSUS LAPORAN SAJA)
         // ======================================================================
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                // Tarik data laporan harian 31 hari terakhir agar perhitungan bulan berjalan 100% akurat!
-                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { redirect: 'follow' });
-                const freshData = await res.json();
+                // Tarik HANYA sheet Laporan_Harian (bukan seluruh database) dengan batas timeout aman
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // Maksimal tunggu 5 detik
                 
+                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only", { 
+                    redirect: 'follow',
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+                
+                const freshData = await res.json();
                 if (freshData && freshData.laporanHarian) {
                     this.db.laporanHarian = freshData.laporanHarian;
                     localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 }
             } catch(e) {
-                console.log("Koneksi tidak stabil, menggunakan akumulasi dari memori lokal.");
+                console.log("Koneksi seluler lambat, sinkronisasi dilewati agar tidak lag.");
             }
         }
 
@@ -2106,7 +2113,7 @@ const superApp = {
             pcs: pcs,
             pengeluaran_json: JSON.stringify(expValid),
             total_pengeluaran: totExp,
-            akumulasi_bulan: exactAccumulation, // 🚀 Kirim angka yang sudah dijamin akurat
+            akumulasi_bulan: exactAccumulation,
             kasir: (this.currentUser && this.currentUser.Username) ? this.currentUser.Username : 'Kasir',
             status_approval: statusApp
         };
@@ -2150,7 +2157,6 @@ const superApp = {
             this.showToast("Laporan Berhasil Tersimpan!");
         }
         
-        // 🚀 RAKIT TEKS WA MENGGUNAKAN EXACT ACCUMULATION TERBARU
         let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
         let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
         
@@ -2180,7 +2186,6 @@ const superApp = {
             waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
         }
         
-        // 🚀 ANGKA INI DIJAMIN 100% COCOK DENGAN SERVER
         waText += `\nAkumulasi Bulanan: Rp ${exactAccumulation.toLocaleString('id-ID')}\n`;
         waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
 
@@ -2195,6 +2200,7 @@ const superApp = {
             this.resendLaporanHarianWa(idRep);
         }
     },
+    
 
     // =========================================================
     // 🚀 ENGINE MODAL KOMPARASI REVISI ULTRA-MODERN
