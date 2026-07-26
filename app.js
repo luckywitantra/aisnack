@@ -2037,7 +2037,6 @@ const superApp = {
         }
     },
 
-    // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
     // =========================================================
     // 🚀 SUBMIT LAPORAN (SUPER FAST & ANTI-LAG DI HP)
     // =========================================================
