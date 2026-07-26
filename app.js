@@ -475,29 +475,53 @@ const superApp = {
 
     
    // =========================================================
-    // 🚀 ENGINE: API POST (ANTI-BLOKIR CHROME MOBILE & CORS)
+    // 🚀 ENGINE: API POST (ANTI-CRASH CHROME MOBILE & BYPASS CORS)
+    // Menggunakan XMLHttpRequest (XHR) agar kebal dari blokir redirect Chrome terbaru
     // =========================================================
-    apiPost: async function(payload) {
+    apiPost: function(payload) {
         let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
         
-        try {
-            // 🚀 TRIK JITU: Gunakan 'text/plain' agar Chrome Mobile tidak memblokir redirect GAS (Bypass CORS Preflight)
-            const response = await fetch(rUrl, {
-                method: 'POST',
-                redirect: 'follow', // Wajib 'follow' untuk Google Apps Script
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8', // 🛑 JANGAN PAKAI application/json DI SINI!
-                },
-                body: JSON.stringify(payload)
-            });
+        return new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", rUrl, true);
             
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.log("Koneksi langsung terblokir/offline, mengalihkan ke mode antrean...");
-            // Kembalikan status error agar sistem offline-queue aplikasi Anda mengambil alih
-            return { status: 'error', pesan: error.message, is_offline: true };
-        }
+            // Wajib text/plain agar dianggap "Simple Request" oleh Chrome Mobile
+            xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+            
+            // Batas waktu maksimal 8 detik agar tombol kasir tidak pernah gantung selamanya
+            xhr.timeout = 8000; 
+            
+            // Jika berhasil dijawab oleh Google Apps Script
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 400) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        resolve(data);
+                    } catch (e) {
+                        // Jika respon bukan JSON, tetap anggap sukses
+                        resolve({ status: 'sukses', pesan: 'Respon diterima' });
+                    }
+                } else {
+                    console.log("Server error status: " + xhr.status);
+                    resolve({ status: 'error', pesan: 'Server gangguan', is_offline: true });
+                }
+            };
+
+            // Jika Chrome tetap memblokir atau sinyal tiba-tiba hilang
+            xhr.onerror = function() {
+                console.log("Koneksi diblokir oleh Chrome Mobile, otomatis masuk ke mode offline queue.");
+                resolve({ status: 'error', pesan: 'Koneksi terblokir Chrome', is_offline: true });
+            };
+
+            // Jika internet lambat dan melebihi 8 detik
+            xhr.ontimeout = function() {
+                console.log("Koneksi timeout di Chrome Mobile, beralih ke offline queue.");
+                resolve({ status: 'error', pesan: 'Timeout', is_offline: true });
+            };
+
+            // Kirim data ke server
+            xhr.send(JSON.stringify(payload));
+        });
     },
 
     // ... (fungsi-fungsi superApp lainnya di atas) ...
