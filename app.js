@@ -2081,8 +2081,8 @@ const superApp = {
         }
     },
 
-    // =========================================================
-    // 🚀 SUBMIT LAPORAN (MOBILE-SAFE & AUTO-SYNC AKUMULASI)
+   // =========================================================
+    // 🚀 SUBMIT LAPORAN HARIAN (100% XHR ANTI-CRASH CHROME MOBILE)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2107,33 +2107,42 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
-        this.setLoading(true, "Menyinkronkan Akumulasi...");
+        this.setLoading(true, "Membaca Akumulasi...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT (BATASI MAKSIMAL 3 DETIK DI HP AGAR TIDAK MACET)
+        // 🚀 SINKRONISASI KILAT MENGGUNAKAN XHR (ANTI-BLOKIR CHROME MOBILE)
         // ======================================================================
         if (this.isOnline) {
             try {
-                const syncController = new AbortController();
-                const syncTimeout = setTimeout(() => syncController.abort(), 3000); // 3 detik batas tunggu
-
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { 
-                    redirect: 'follow',
-                    signal: syncController.signal
-                });
-                clearTimeout(syncTimeout);
-                const freshData = await res.json();
+                let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only";
                 
+                // Menggunakan XHR sebagai pengganti fetch() agar tidak di-crash oleh Chrome
+                const freshData = await new Promise((resolve) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("GET", syncUrl, true);
+                    xhr.timeout = 5000; // Maksimal tunggu 5 detik
+                    
+                    xhr.onload = function() {
+                        if (xhr.status >= 200 && xhr.status < 400) {
+                            try { resolve(JSON.parse(xhr.responseText)); } catch(e) { resolve(null); }
+                        } else resolve(null);
+                    };
+                    xhr.onerror = function() { resolve(null); };
+                    xhr.ontimeout = function() { resolve(null); };
+                    xhr.send();
+                });
+
                 if (freshData && freshData.laporanHarian) {
                     this.db.laporanHarian = freshData.laporanHarian;
                     localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 }
             } catch(e) {
-                console.log("Sinyal HP lambat, langsung gunakan akumulasi memori lokal.");
+                console.log("Sinkronisasi latar belakang dilewati, lanjut gunakan cache lokal.");
             }
         }
 
+        // Paksa kalkulasi ulang dari data terbaru di memori
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
@@ -2188,17 +2197,9 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-       // 🚀 KUNCI PENGAMAN: Kirim ke server dengan batas waktu maksimal 8 detik
-        try {
-            const postPromise = this.apiPost(payload);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
-            await Promise.race([postPromise, timeoutPromise]);
-        } catch(err) {
-            console.log("Server lambat merespons, data disimpan di memori lokal HP.");
-        } finally {
-            // Wajib dimatikan loading-nya apapun yang terjadi!
-            this.setLoading(false);
-        }
+        // 🚀 KIRIM VIA API POST (Yang sudah memakai mesin XHR baru kita)
+        await this.apiPost(payload);
+        this.setLoading(false);
         
         if (statusApp === 'Pending Edit') {
             alert("⏳ REVISI TERKIRIM KE OWNER\n\nAngka laporan resmi di database belum berubah sebelum disetujui Owner. Namun Anda tetap bisa meneruskan format revisi ini ke WA Grup.");
