@@ -527,7 +527,6 @@ const superApp = {
         });
     },
 
-    // ... (fungsi-fungsi superApp lainnya di atas) ...
 
     openSyncCenter: function() {
         this.renderSyncQueue();
