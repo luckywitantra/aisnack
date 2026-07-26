@@ -475,41 +475,28 @@ const superApp = {
 
     
    // =========================================================
-    // 🚀 ENGINE PENGIRIM DATA (MOBILE-SAFE & TIMEOUT PROTECTED)
+    // 🚀 ENGINE: API POST (ANTI-BLOKIR CHROME MOBILE & CORS)
     // =========================================================
     apiPost: async function(payload) {
-        if (!this.isOnline) { 
-            this.offlineQueue.push(payload); 
-            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
-            this.updateNetworkUI(); 
-            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift || payload.id_laporan }; 
-        }
+        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
         
-        // 🚀 PROTEKSI ANTI-HANG KHUSUS HP: Batasi tunggu maksimal 15 detik!
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        try { 
-            let targetUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-            const res = await fetch(targetUrl, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'text/plain' }, 
-                body: JSON.stringify(payload),
-                redirect: 'follow', // 🚀 WAJIB UNTUK BROWSER HP (Cegah hang saat 302 redirect dari GAS)
-                signal: controller.signal // Pasang pengaman timeout
-            }); 
-            clearTimeout(timeoutId); // Matikan pengaman jika sukses
-            return await res.json(); 
-        } catch (e) { 
-            clearTimeout(timeoutId);
-            console.warn("Koneksi HP terputus atau timeout (15 dtk). Mengalihkan ke Mode Offline:", e.message);
+        try {
+            // 🚀 TRIK JITU: Gunakan 'text/plain' agar Chrome Mobile tidak memblokir redirect GAS (Bypass CORS Preflight)
+            const response = await fetch(rUrl, {
+                method: 'POST',
+                redirect: 'follow', // Wajib 'follow' untuk Google Apps Script
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', // 🛑 JANGAN PAKAI application/json DI SINI!
+                },
+                body: JSON.stringify(payload)
+            });
             
-            // 🚀 JIKA HP HANG / SINYAL JELEK: Jangan biarkan layar loading macet! 
-            // Masukkan data ke antrean offline dan anggap sukses di layar kasir!
-            this.offlineQueue.push(payload); 
-            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
-            this.updateNetworkUI(); 
-            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift || payload.id_laporan }; 
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.log("Koneksi langsung terblokir/offline, mengalihkan ke mode antrean...");
+            // Kembalikan status error agar sistem offline-queue aplikasi Anda mengambil alih
+            return { status: 'error', pesan: error.message, is_offline: true };
         }
     },
 
@@ -2177,11 +2164,17 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // 🚀 KIRIM KE SERVER (Dijamin tidak akan hang karena sudah dipasangi AbortController di apiPost)
-        await this.apiPost(payload);
-        
-        // 🚀 MATIKAN LOADING AGAR LAYAR KEMBALI NORMAL
-        this.setLoading(false);
+       // 🚀 KUNCI PENGAMAN: Kirim ke server dengan batas waktu maksimal 8 detik
+        try {
+            const postPromise = this.apiPost(payload);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
+            await Promise.race([postPromise, timeoutPromise]);
+        } catch(err) {
+            console.log("Server lambat merespons, data disimpan di memori lokal HP.");
+        } finally {
+            // Wajib dimatikan loading-nya apapun yang terjadi!
+            this.setLoading(false);
+        }
         
         if (statusApp === 'Pending Edit') {
             alert("⏳ REVISI TERKIRIM KE OWNER\n\nAngka laporan resmi di database belum berubah sebelum disetujui Owner. Namun Anda tetap bisa meneruskan format revisi ini ke WA Grup.");
