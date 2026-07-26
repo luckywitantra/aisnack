@@ -475,10 +475,9 @@ const superApp = {
 
     
     // =========================================================
-    // 🚀 ENGINE: API POST (XHR ANTI-GANTUNG & ANTI-CRASH CHROME HP)
+    // 🚀 ENGINE: API POST (XHR ANTI-GANTUNG & ANTI-CRASH DI HP)
     // =========================================================
     apiPost: async function(payload) {
-        // 1. Cek mode offline sejak awal
         if (!this.isOnline) { 
             this.offlineQueue.push(payload); 
             localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
@@ -488,15 +487,14 @@ const superApp = {
 
         let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
 
-        // 2. Gunakan XMLHttpRequest (XHR) dengan batas waktu maksimal 8 detik
         return new Promise((resolve) => {
             const xhr = new XMLHttpRequest();
             xhr.open("POST", rUrl, true);
             
-            // Wajib text/plain agar dianggap "Simple Request" oleh Chrome Mobile
+            // Wajib text/plain agar tidak diblokir oleh keamanan CORS Chrome Mobile
             xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
             
-            // 🛑 KUNCI ANTI-GANTUNG: Jika Google Sheets > 100 baris dan melambat > 8 detik, otomatis putus!
+            // Batas maksimal 8 detik. Jika sinyal HP jelek/lemot, otomatis putus ke mode offline!
             xhr.timeout = 8000; 
 
             xhr.onload = () => {
@@ -511,9 +509,8 @@ const superApp = {
                 }
             };
 
-            // Fungsi penyelamat jika koneksi error, diblokir Chrome, atau timeout (> 8 detik)
             const handleOfflineFallback = () => {
-                console.log("Server lambat/terblokir Chrome HP, otomatis mengalihkan ke antrean offline.");
+                console.log("Koneksi HP melambat/terblokir, mengalihkan otomatis ke antrean offline.");
                 this.offlineQueue.push(payload); 
                 localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
                 if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI(); 
@@ -948,7 +945,34 @@ const superApp = {
   
     // STARTUP & LOGIN
     init: async function() {
-        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
+        // =========================================================================
+        // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE CHROME HP JARAK JAUH)
+        // =========================================================================
+        // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
+        const CURRENT_VER = "v551"; 
+        const savedVer = localStorage.getItem('aisnack_sys_version');
+        
+        if (savedVer !== CURRENT_VER) {
+            console.log("Versi baru terdeteksi! Membersihkan cache lama di HP...");
+            localStorage.setItem('aisnack_sys_version', CURRENT_VER);
+            
+            // Hapus semua Cache Storage HTML/JS lawas di HP
+            if ('caches' in window) {
+                caches.keys().then(names => names.forEach(name => caches.delete(name)));
+            }
+            // Cabut Service Worker lawas yang bandel
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+            }
+            // Paksa reload browser HP langsung dari server jaringan
+            setTimeout(() => {
+                window.location.href = window.location.pathname + "?v=" + Date.now();
+            }, 500);
+            return; // Hentikan proses init karena halaman akan segera di-reload
+        }
+        // =========================================================================
+
+        // --- 🚀 1. RADAR UPDATE APLIKASI (SERVICE WORKER) ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
                 registration.addEventListener('updatefound', () => {
@@ -965,9 +989,24 @@ const superApp = {
                             
                             const btn = document.getElementById('btn-update-app');
                             if (btn) {
+                                // 🚀 UPGRADE: Nuclear Reset pada tombol Update Banner
                                 btn.onclick = () => {
-                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Memperbarui...';
+                                    btn.disabled = true;
+                                    
+                                    // Bersihkan cache dan SW sebelum reload
+                                    if ('caches' in window) {
+                                        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+                                    }
+                                    if ('serviceWorker' in navigator) {
+                                        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+                                    }
                                     newWorker.postMessage({ action: 'skipWaiting' });
+                                    
+                                    localStorage.setItem('aisnack_sys_version', CURRENT_VER);
+                                    setTimeout(() => {
+                                        window.location.href = window.location.pathname + "?nocache=" + Date.now();
+                                    }, 500);
                                 };
                             }
                         }
@@ -2085,7 +2124,7 @@ const superApp = {
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
    // =========================================================
-    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-CRASH 1000+ BARIS DI CHROME HP)
+    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-LAG & ANTI-CRASH DI HP)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2110,24 +2149,20 @@ const superApp = {
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
-        this.setLoading(true, "Menyinkronkan Akumulasi Bulan Ini...");
+        this.setLoading(true, "Membaca Akumulasi...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT ANTI-CRASH (MAKSIMAL TUNGGU 3.5 DETIK)
-        // Menggunakan XHR agar RAM Chrome HP tidak kelebihan beban saat baris > 100
+        // 🚀 SINKRONISASI KILAT (Maksimal tunggu 3 detik di HP)
         // ======================================================================
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&history=31";
+                let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only";
                 
                 await new Promise((resolve) => {
                     const xhr = new XMLHttpRequest();
                     xhr.open("GET", syncUrl, true);
-                    
-                    // 🛑 ATURAN BESI: Jika database terlalu besar & lambat dibaca,
-                    // batal otomatis dalam 3.5 detik agar HP kasir tidak macet/freeze!
-                    xhr.timeout = 3500; 
+                    xhr.timeout = 3000; // Putus otomatis dalam 3 detik jika koneksi HP lambat!
                     
                     xhr.onload = () => {
                         if (xhr.status >= 200 && xhr.status < 400) {
@@ -2143,17 +2178,16 @@ const superApp = {
                     };
                     xhr.onerror = () => resolve();
                     xhr.ontimeout = () => {
-                        console.log("Database > 100 baris melambat, sinkronisasi dilewati demi kenyamanan kasir.");
+                        console.log("Koneksi HP lambat, sinkronisasi dilompati agar tidak lag.");
                         resolve();
                     };
                     xhr.send();
                 });
             } catch(e) {
-                console.log("Koneksi tidak stabil, menggunakan akumulasi dari memori lokal.");
+                console.log("Koneksi offline, menggunakan data lokal.");
             }
         }
 
-        // 🚀 PAKSA KALKULASI ULANG AGAR MENGGUNAKAN DATA TERBARU DARI SERVER
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
@@ -2174,7 +2208,7 @@ const superApp = {
             pcs: pcs,
             pengeluaran_json: JSON.stringify(expValid),
             total_pengeluaran: totExp,
-            akumulasi_bulan: exactAccumulation, // 🚀 Kirim angka yang sudah dijamin akurat
+            akumulasi_bulan: exactAccumulation,
             kasir: (this.currentUser && this.currentUser.Username) ? this.currentUser.Username : 'Kasir',
             status_approval: statusApp
         };
@@ -2208,7 +2242,7 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // Kirim ke server di background menggunakan fungsi apiPost (yang sudah kita ganti ke XHR sebelumnya)
+        // Kirim menggunakan apiPost XHR yang baru
         await this.apiPost(payload);
         this.setLoading(false);
         
@@ -2218,7 +2252,6 @@ const superApp = {
             this.showToast("Laporan Berhasil Tersimpan!");
         }
         
-        // 🚀 RAKIT TEKS WA MENGGUNAKAN EXACT ACCUMULATION TERBARU
         let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
         let amountPcs = pcs > 0 ? Math.round(netSales / pcs) : 0;
         
@@ -2248,7 +2281,6 @@ const superApp = {
             waText += `*Net Cash Laci: Rp ${(cash - totExp).toLocaleString('id-ID')}*\n`;
         }
         
-        // 🚀 ANGKA INI DIJAMIN 100% COCOK DENGAN SERVER
         waText += `\nAkumulasi Bulanan: Rp ${exactAccumulation.toLocaleString('id-ID')}\n`;
         waText += `Target Bulanan: Rp ${this.targetBulanan.toLocaleString('id-ID')}`;
 
@@ -10440,6 +10472,8 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
 
 
 
