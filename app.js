@@ -474,10 +474,57 @@ const superApp = {
     },
 
     
+    // =========================================================
+    // 🚀 ENGINE: API POST (XHR ANTI-GANTUNG & ANTI-CRASH CHROME HP)
+    // =========================================================
     apiPost: async function(payload) {
-        if (!this.isOnline) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
-        try { const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }); return await res.json(); } 
-        catch (e) { this.offlineQueue.push(payload); localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); this.updateNetworkUI(); return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; }
+        // 1. Cek mode offline sejak awal
+        if (!this.isOnline) { 
+            this.offlineQueue.push(payload); 
+            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
+            if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI(); 
+            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; 
+        }
+
+        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+
+        // 2. Gunakan XMLHttpRequest (XHR) dengan batas waktu maksimal 8 detik
+        return new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", rUrl, true);
+            
+            // Wajib text/plain agar dianggap "Simple Request" oleh Chrome Mobile
+            xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+            
+            // 🛑 KUNCI ANTI-GANTUNG: Jika Google Sheets > 100 baris dan melambat > 8 detik, otomatis putus!
+            xhr.timeout = 8000; 
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 400) {
+                    try {
+                        resolve(JSON.parse(xhr.responseText));
+                    } catch (e) {
+                        resolve({ status: 'sukses', pesan: 'Respon diterima' });
+                    }
+                } else {
+                    handleOfflineFallback();
+                }
+            };
+
+            // Fungsi penyelamat jika koneksi error, diblokir Chrome, atau timeout (> 8 detik)
+            const handleOfflineFallback = () => {
+                console.log("Server lambat/terblokir Chrome HP, otomatis mengalihkan ke antrean offline.");
+                this.offlineQueue.push(payload); 
+                localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
+                if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI(); 
+                resolve({ status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift });
+            };
+
+            xhr.onerror = handleOfflineFallback;
+            xhr.ontimeout = handleOfflineFallback;
+
+            xhr.send(JSON.stringify(payload));
+        });
     },
 
     // ... (fungsi-fungsi superApp lainnya di atas) ...
@@ -2038,8 +2085,8 @@ const superApp = {
     },
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
-    // =========================================================
-    // 🚀 SUBMIT LAPORAN (DENGAN AUTO-SYNC AKUMULASI MUTLAK)
+   // =========================================================
+    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-CRASH 1000+ BARIS DI CHROME HP)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2067,19 +2114,41 @@ const superApp = {
         this.setLoading(true, "Menyinkronkan Akumulasi Bulan Ini...");
 
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT (31 HARI) SEBELUM TEKS WA DIRAKIT
+        // 🚀 SINKRONISASI KILAT ANTI-CRASH (MAKSIMAL TUNGGU 3.5 DETIK)
+        // Menggunakan XHR agar RAM Chrome HP tidak kelebihan beban saat baris > 100
         // ======================================================================
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-                // Tarik data laporan harian 31 hari terakhir agar perhitungan bulan berjalan 100% akurat!
-                const res = await fetch(rUrl + "?ts=" + new Date().getTime() + "&history=31", { redirect: 'follow' });
-                const freshData = await res.json();
+                let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&history=31";
                 
-                if (freshData && freshData.laporanHarian) {
-                    this.db.laporanHarian = freshData.laporanHarian;
-                    localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
-                }
+                await new Promise((resolve) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("GET", syncUrl, true);
+                    
+                    // 🛑 ATURAN BESI: Jika database terlalu besar & lambat dibaca,
+                    // batal otomatis dalam 3.5 detik agar HP kasir tidak macet/freeze!
+                    xhr.timeout = 3500; 
+                    
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 400) {
+                            try {
+                                const freshData = JSON.parse(xhr.responseText);
+                                if (freshData && freshData.laporanHarian) {
+                                    this.db.laporanHarian = freshData.laporanHarian;
+                                    localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+                                }
+                            } catch(e) {}
+                        }
+                        resolve();
+                    };
+                    xhr.onerror = () => resolve();
+                    xhr.ontimeout = () => {
+                        console.log("Database > 100 baris melambat, sinkronisasi dilewati demi kenyamanan kasir.");
+                        resolve();
+                    };
+                    xhr.send();
+                });
             } catch(e) {
                 console.log("Koneksi tidak stabil, menggunakan akumulasi dari memori lokal.");
             }
@@ -2140,7 +2209,7 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // Kirim ke server di background
+        // Kirim ke server di background menggunakan fungsi apiPost (yang sudah kita ganti ke XHR sebelumnya)
         await this.apiPost(payload);
         this.setLoading(false);
         
@@ -10372,3 +10441,6 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
