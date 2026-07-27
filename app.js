@@ -962,16 +962,33 @@ const superApp = {
         }
     },
   
-   // STARTUP & LOGIN
+    // STARTUP & LOGIN
     init: async function() {
         // =========================================================================
-        // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE CHROME HP JARAK JAUH)
+        // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
-        const CURRENT_VER = "v557"; // Naikkan versi agar HP toko ter-reset
+        // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
+        const CURRENT_VER = "v560"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
+        // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
         if (savedVer !== CURRENT_VER) {
-            console.warn("Versi baru terdeteksi! Membersihkan cache lama di HP...");
+            console.warn("Versi baru terdeteksi! Mengunci layar & membersihkan cache...");
+            this.isSystemUpdating = true; // 🔒 Kunci variabel satpam
+            
+            // 🔒 GEMBOK FISIK: Matikan semua tombol angka PIN agar kasir tidak bisa mengetik!
+            document.querySelectorAll('#pin-numpad-container button').forEach(b => {
+                b.disabled = true;
+                b.classList.add('opacity-40', 'cursor-not-allowed');
+            });
+
+            // Ubah teks status di bawah layar login menjadi merah berkedip
+            const statusEl = document.getElementById('login-status');
+            if (statusEl) {
+                statusEl.innerText = "⚡ MENGINSTAL VERSI TERBARU, MOHON TUNGGU...";
+                statusEl.className = "text-xs font-black text-rose-500 animate-pulse text-center";
+            }
+
             localStorage.setItem('aisnack_sys_version', CURRENT_VER);
             
             if ('caches' in window) {
@@ -989,25 +1006,57 @@ const superApp = {
             setTimeout(() => {
                 window.location.replace(window.location.pathname + "?v=" + Date.now());
             }, 600);
-            return; 
+            return; // 🛑 Hentikan seluruh eksekusi agar tidak bisa login
         }
 
         // =========================================================================
-        // 🚀 0.5 URL CLEANER: Hapus angka ?v= atau ?nocache= dari Address Bar (NEW!)
+        // 🚀 0.5 URL CLEANER: Hapus angka ?v= atau ?nocache= dari Address Bar
         // =========================================================================
-        // Membersihkan alamat web secara senyap tanpa mereload halaman
         if (window.location.search.includes('v=') || window.location.search.includes('nocache=')) {
             let cleanUrl = window.location.pathname + (window.location.search.includes('mode=cfd') ? '?mode=cfd' : '');
             window.history.replaceState(null, '', cleanUrl);
         }
 
-        // --- 🚀 1. RADAR UPDATE APLIKASI (SERVICE WORKER) ---
+        // --- 🚀 1. RADAR UPDATE ASINKRONUS (SERVICE WORKER) ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
+                    newWorker.addEventListener('statechange', async () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            
+                            // 🛑 SATPAM KHUSUS HP / LAYAR LOGIN: FORCE UPDATE OTOMATIS!
+                            // Jika layar di HP (< 1024px) atau belum login, LANGSUNG EKSEKUSI TANPA BANNER!
+                            if (!this.currentUser || window.innerWidth < 1024) {
+                                console.log("⚡ Update otomatis dipicu untuk HP / Layar Login...");
+                                this.isSystemUpdating = true; // Kunci sistem
+                                
+                                // Gembok numpad PIN saat itu juga
+                                document.querySelectorAll('#pin-numpad-container button').forEach(b => {
+                                    b.disabled = true;
+                                    b.classList.add('opacity-40', 'cursor-not-allowed');
+                                });
+                                
+                                const statusEl = document.getElementById('login-status');
+                                if (statusEl) {
+                                    statusEl.innerText = "⚡ MEMPERBARUI SISTEM KE VERSI BARU...";
+                                    statusEl.className = "text-xs font-black text-rose-500 animate-pulse text-center";
+                                }
+
+                                if ('caches' in window) {
+                                    const names = await caches.keys();
+                                    await Promise.all(names.map(name => caches.delete(name)));
+                                }
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                                localStorage.setItem('aisnack_sys_version', CURRENT_VER);
+                                
+                                setTimeout(() => {
+                                    window.location.replace(window.location.pathname + "?nocache=" + Date.now());
+                                }, 600);
+                                return;
+                            }
+
+                            // Jika di PC dan sedang melayani pelanggan (sudah login), baru munculkan banner
                             const banner = document.getElementById('update-banner');
                             if (banner) {
                                 banner.classList.remove('hidden');
@@ -1051,7 +1100,6 @@ const superApp = {
                 window.location.reload();
             });
         }
-        // ----------------------------------------------
 
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
 
@@ -1156,10 +1204,30 @@ const superApp = {
         }
     },
     
-    addPin: function(num) {
-        if (!this.db || !this.db.users) { this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); return; }
-        if (this.pinBuffer.length < 4) { this.pinBuffer += num; const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('border-slate-300', 'bg-brand-500'); dot.classList.replace('border-2', 'border-0'); } }
-        if (this.pinBuffer.length === 4) setTimeout(() => this.processLogin(), 200);
+   addPin: function(num) {
+        // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
+        if (this.isSystemUpdating) {
+            this.showToast('⚡ Sistem sedang menginstal pembaruan, mohon tunggu...', 'warning');
+            return;
+        }
+
+        if (!this.db || !this.db.users) { 
+            this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); 
+            return; 
+        }
+        
+        if (this.pinBuffer.length < 4) { 
+            this.pinBuffer += num; 
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`); 
+            if (dot) { 
+                dot.classList.replace('border-slate-300', 'bg-brand-500'); 
+                dot.classList.replace('border-2', 'border-0'); 
+            } 
+        }
+        
+        if (this.pinBuffer.length === 4) {
+            setTimeout(() => this.processLogin(), 200);
+        }
     },
     delPin: function() {
         if (this.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } this.pinBuffer = this.pinBuffer.slice(0, -1); }
@@ -2153,7 +2221,7 @@ const superApp = {
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
    // =========================================================
-    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-LAG & ANTI-CRASH DI HP)
+    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-DUPLIKAT & GEMBOK TOMBOL)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2172,17 +2240,43 @@ const superApp = {
         let tglTeks = document.getElementById('daily-form-date')?.innerText || "Hari Ini";
         let cuaca = this.currentDailyWeather || "31°C";
 
-        let isEdit = (this.editReportId !== null);
-        let idRep = isEdit ? this.editReportId : ('REP-' + Date.now());
-        
+        // ======================================================================
+        // 🛑 1. PROTEKSI AUTO-MERGE (CEGAH DATA GANDA TANGGAL & OUTLET SAMA)
+        // ======================================================================
+        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+        let cleanCurrTanggal = String(tglTeks).trim().toLowerCase();
+
+        // Cari apakah di database memori sudah ada laporan untuk Toko & Tanggal ini
+        let existingRep = (this.db.laporanHarian || []).find(x => {
+            if (x.Status_Approval === 'Ditolak') return false;
+            let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+            let xTgl = String(x.Tanggal || '').trim().toLowerCase();
+            return xOut === cleanCurrOutlet && xTgl === cleanCurrTanggal;
+        });
+
+        // Jika sudah ada, PAKSA masuk ke mode Edit menggunakan ID lama!
+        let isEdit = (this.editReportId !== null) || (existingRep !== undefined);
+        let idRep = isEdit ? (this.editReportId || existingRep.ID_Laporan) : ('REP-' + Date.now());
+        // ======================================================================
+
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
 
+        // ======================================================================
+        // 🔒 2. GEMBOK TOMBOL SECARA VISUAL AGAR TIDAK DI-SPAM KLIK KASIR
+        // ======================================================================
+        const btnSubmit = document.querySelector('#lapharian-sec-input button[onclick="superApp.submitLaporanHarian()"]');
+        let origBtnHtml = '';
+        if (btnSubmit) {
+            origBtnHtml = btnSubmit.innerHTML;
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Menyimpan...';
+            btnSubmit.classList.add('opacity-70', 'cursor-not-allowed');
+        }
+
         this.setLoading(true, "Membaca Akumulasi...");
 
-        // ======================================================================
-        // 🚀 SINKRONISASI KILAT (Maksimal tunggu 3 detik di HP)
-        // ======================================================================
+        // Sinkronisasi Kilat (Maksimal tunggu 3 detik)
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
@@ -2191,7 +2285,7 @@ const superApp = {
                 await new Promise((resolve) => {
                     const xhr = new XMLHttpRequest();
                     xhr.open("GET", syncUrl, true);
-                    xhr.timeout = 3000; // Putus otomatis dalam 3 detik jika koneksi HP lambat!
+                    xhr.timeout = 3000; 
                     
                     xhr.onload = () => {
                         if (xhr.status >= 200 && xhr.status < 400) {
@@ -2206,21 +2300,15 @@ const superApp = {
                         resolve();
                     };
                     xhr.onerror = () => resolve();
-                    xhr.ontimeout = () => {
-                        console.log("Koneksi HP lambat, sinkronisasi dilompati agar tidak lag.");
-                        resolve();
-                    };
+                    xhr.ontimeout = () => resolve();
                     xhr.send();
                 });
-            } catch(e) {
-                console.log("Koneksi offline, menggunakan data lokal.");
-            }
+            } catch(e) {}
         }
 
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
-        // ======================================================================
 
         this.setLoading(true, isEdit && !isOwner ? "Mengirim Pengajuan Revisi..." : "Menyimpan Laporan...");
 
@@ -2245,15 +2333,15 @@ const superApp = {
         if (!this.db.laporanHarian) this.db.laporanHarian = [];
         let idx = this.db.laporanHarian.findIndex(x => x.ID_Laporan === idRep);
 
-        if (isEdit) {
-            if (statusApp === 'Pending Edit' && idx > -1) {
+        if (isEdit && idx > -1) {
+            if (statusApp === 'Pending Edit') {
                 this.db.laporanHarian[idx].Status_Approval = 'Pending Edit';
                 this.db.laporanHarian[idx].Revisi_JSON = JSON.stringify({
                     cash, qris, net_sales: netSales, bill, pcs, 
                     pengeluaran_json: JSON.stringify(expValid), total_pengeluaran: totExp,
                     editor: payload.kasir
                 });
-            } else if (idx > -1) {
+            } else {
                 this.db.laporanHarian[idx] = {
                     ...this.db.laporanHarian[idx],
                     Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
@@ -2271,14 +2359,22 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-        // Kirim menggunakan apiPost XHR yang baru
-        await this.apiPost(payload);
-        this.setLoading(false);
+        try {
+            await this.apiPost(payload);
+        } finally {
+            this.setLoading(false);
+            // 🔓 BUKA KEMBALI GEMBOK TOMBOL SETELAH PROSES SELESAI
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = origBtnHtml;
+                btnSubmit.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
         
         if (statusApp === 'Pending Edit') {
             alert("⏳ REVISI TERKIRIM KE OWNER\n\nAngka laporan resmi di database belum berubah sebelum disetujui Owner. Namun Anda tetap bisa meneruskan format revisi ini ke WA Grup.");
         } else {
-            this.showToast("Laporan Berhasil Tersimpan!");
+            this.showToast(isEdit ? "Laporan Berhasil Diperbarui!" : "Laporan Berhasil Tersimpan!");
         }
         
         let amountPaid = bill > 0 ? Math.round(netSales / bill) : 0;
@@ -10499,3 +10595,6 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
