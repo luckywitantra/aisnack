@@ -2182,89 +2182,7 @@ const superApp = {
         this.calcMonthlyAccumulation(netSales);
     },
 
-    // =========================================================
-    // 🚀 ENGINE AKUMULASI PRESISI (BATAS TANGGAL 1 s/d TANGGAL LAPORAN)
-    // =========================================================
-    calcMonthlyAccumulation: function(liveNetSales) {
-        // 1. Ambil tanggal yang sedang aktif di form input (misal: "Senin, 05-07-2026")
-        let tglTeks = document.getElementById('daily-form-date')?.innerText || '';
-        let targetDate = new Date();
-        
-        // Ekstrak Hari, Bulan, dan Tahun dari teks tanggal form
-        let match = tglTeks.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-        let targetDay = targetDate.getDate();
-        let targetMonth = targetDate.getMonth() + 1;
-        let targetYear = targetDate.getFullYear();
-
-        if (match) {
-            targetDay = parseInt(match[1], 10);
-            targetMonth = parseInt(match[2], 10);
-            targetYear = parseInt(match[3], 10);
-        }
-
-        let accumPreviousDays = 0;
-        let activeReportId = this.editReportId; // ID laporan jika sedang mode Edit
-
-        // 🚀 2. DETEKSI MODE KONSOLIDASI ('Semua' atau 'Pusat')
-        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
-
-        // 🚀 3. TENTUKAN TARGET BULANAN SECARA AKURAT
-        // Jika sedang lihat 'Semua Cabang', gabungkan seluruh target cabang yang tersimpan
-        let targetPerhitungan = this.targetBulanan || 180000000;
-        if (isConsolidated && this.db && this.db.outlets) {
-            let totalTargetSemua = 0;
-            this.db.outlets.forEach(o => {
-                if (o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua') {
-                    let t = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
-                    totalTargetSemua += (t && !isNaN(t)) ? Number(t) : 180000000;
-                }
-            });
-            if (totalTargetSemua > 0) targetPerhitungan = totalTargetSemua;
-        }
-
-        // 4. Jumlahkan HANYA laporan masa lalu sebelum tanggal target (Tanggal 1 s/d H-1)
-        (this.db.laporanHarian || []).forEach(rep => {
-            // 🚀 Kunci Sinkronisasi: Izinkan masuk jika mode konsolidasi ATAU outletnya cocok
-            if (isConsolidated || rep.Outlet === this.outlet) {
-                
-                // Abaikan laporan yang sedang diedit agar tidak hitung ganda (double-count)
-                if (activeReportId && rep.ID_Laporan === activeReportId) return;
-
-                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
-                let repMatch = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                if (repMatch) {
-                    let rDay = parseInt(repMatch[1], 10);
-                    let rMonth = parseInt(repMatch[2], 10);
-                    let rYear = parseInt(repMatch[3], 10);
-
-                    // KUNCI PRESISI: Bulan & Tahun sama, DAN Hari lebih kecil dari tanggal laporan
-                    // Abaikan juga laporan jika statusnya 'Ditolak'
-                    if (rYear === targetYear && rMonth === targetMonth && rDay < targetDay) {
-                        if (rep.Status_Approval !== 'Ditolak') {
-                            accumPreviousDays += Number(rep.Net_Sales || 0);
-                        }
-                    }
-                }
-            }
-        });
-
-        // 5. Total Akumulasi = (Jumlah Tanggal 1 s/d H-1) + Omset Hari H di Form
-        let totalAccumUpToDate = accumPreviousDays + Number(liveNetSales || 0);
-        
-        let pct = Math.min(Math.round((totalAccumUpToDate / targetPerhitungan) * 100), 100);
-        let kurang = Math.max(targetPerhitungan - totalAccumUpToDate, 0);
-
-        // Update Radar UI di layar
-        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totalAccumUpToDate.toLocaleString('id-ID')}`;
-        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetPerhitungan.toLocaleString('id-ID')}`;
-        if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pct}%`;
-        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pct}%`;
-        if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${kurang.toLocaleString('id-ID')}`;
-
-        this.currentAccumMonth = totalAccumUpToDate;
-        return totalAccumUpToDate;
-    },
-
+   
     setTargetBulanan: function() {
         let val = prompt(`Masukkan Target Penjualan Bulanan untuk Cabang ${this.outlet} (Angka saja):`, this.targetBulanan);
         if (val !== null && !isNaN(val) && Number(val) > 0) {
@@ -2277,7 +2195,7 @@ const superApp = {
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
    // =========================================================
-    // 🚀 SUBMIT LAPORAN HARIAN (ANTI-DUPLIKAT & GEMBOK TOMBOL)
+    // 🚀 SUBMIT LAPORAN HARIAN (SMART MERGE & GEMBOK TOMBOL AMAN)
     // =========================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
@@ -2299,18 +2217,16 @@ const superApp = {
         // ======================================================================
         // 🛑 1. PROTEKSI AUTO-MERGE (CEGAH DATA GANDA TANGGAL & OUTLET SAMA)
         // ======================================================================
-        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
         let cleanCurrTanggal = String(tglTeks).trim().toLowerCase();
 
-        // Cari apakah di database memori sudah ada laporan untuk Toko & Tanggal ini
         let existingRep = (this.db.laporanHarian || []).find(x => {
             if (x.Status_Approval === 'Ditolak') return false;
-            let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+            let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
             let xTgl = String(x.Tanggal || '').trim().toLowerCase();
             return xOut === cleanCurrOutlet && xTgl === cleanCurrTanggal;
         });
 
-        // Jika sudah ada, PAKSA masuk ke mode Edit menggunakan ID lama!
         let isEdit = (this.editReportId !== null) || (existingRep !== undefined);
         let idRep = isEdit ? (this.editReportId || existingRep.ID_Laporan) : ('REP-' + Date.now());
         // ======================================================================
@@ -2332,7 +2248,9 @@ const superApp = {
 
         this.setLoading(true, "Membaca Akumulasi...");
 
-        // Sinkronisasi Kilat (Maksimal tunggu 3 detik)
+        // ======================================================================
+        // 🚀 3. SINKRONISASI KILAT DENGAN "SMART MERGE" (ANTI-DROP AKUMULASI)
+        // ======================================================================
         if (this.isOnline) {
             try {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
@@ -2347,8 +2265,15 @@ const superApp = {
                         if (xhr.status >= 200 && xhr.status < 400) {
                             try {
                                 const freshData = JSON.parse(xhr.responseText);
-                                if (freshData && freshData.laporanHarian) {
-                                    this.db.laporanHarian = freshData.laporanHarian;
+                                if (freshData && freshData.laporanHarian && freshData.laporanHarian.length > 0) {
+                                    if (!this.db.laporanHarian) this.db.laporanHarian = [];
+                                    
+                                    // 🛡️ SMART MERGE: Gabungkan data server tanpa menghapus riwayat awal bulan di HP!
+                                    freshData.laporanHarian.forEach(fRep => {
+                                        let idx = this.db.laporanHarian.findIndex(r => String(r.ID_Laporan).trim() === String(fRep.ID_Laporan).trim());
+                                        if (idx > -1) this.db.laporanHarian[idx] = fRep;
+                                        else this.db.laporanHarian.push(fRep);
+                                    });
                                     localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                                 }
                             } catch(e) {}
@@ -2362,6 +2287,7 @@ const superApp = {
             } catch(e) {}
         }
 
+        // Hitung akumulasi setelah Smart Merge selesai dan data lokal dijamin utuh
         let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
             ? this.calcMonthlyAccumulation(netSales) 
             : (this.currentAccumMonth || netSales);
@@ -2387,7 +2313,7 @@ const superApp = {
         };
 
         if (!this.db.laporanHarian) this.db.laporanHarian = [];
-        let idx = this.db.laporanHarian.findIndex(x => x.ID_Laporan === idRep);
+        let idx = this.db.laporanHarian.findIndex(x => String(x.ID_Laporan).trim() === String(idRep).trim());
 
         if (isEdit && idx > -1) {
             if (statusApp === 'Pending Edit') {
@@ -2415,11 +2341,13 @@ const superApp = {
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
+        // ======================================================================
+        // 🔒 4. TRY...FINALLY: PASTIKAN TOMBOL TERBUKA KEMBALI APAPUN YANG TERJADI
+        // ======================================================================
         try {
             await this.apiPost(payload);
         } finally {
             this.setLoading(false);
-            // 🔓 BUKA KEMBALI GEMBOK TOMBOL SETELAH PROSES SELESAI
             if (btnSubmit) {
                 btnSubmit.disabled = false;
                 btnSubmit.innerHTML = origBtnHtml;
@@ -2442,7 +2370,7 @@ const superApp = {
         }
 
         let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-CHA*`;
-        let cleanOutletName = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+        let cleanOutletName = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
         
         let waText = `${labelJudul}\n`;
         waText += `Update Sales Report Outlet: *Ai-CHA ${cleanOutletName}*\n`;
@@ -2475,6 +2403,79 @@ const superApp = {
         } else if (typeof this.resendLaporanHarianWa === 'function') {
             this.resendLaporanHarianWa(idRep);
         }
+    },
+
+    // =========================================================
+    // 🚀 ENGINE AKUMULASI PRESISI (KEBAL FORMAT TANGGAL & PREFIX OUTLET)
+    // =========================================================
+    calcMonthlyAccumulation: function(liveNetSales) {
+        let tglTeks = document.getElementById('daily-form-date')?.innerText || '';
+        
+        // Helper Parser Tanggal Universal (Aman untuk DD-MM-YYYY maupun YYYY-MM-DD)
+        const parseAnyDate = (str) => {
+            if (!str) return null;
+            let s = String(str).split(',').pop().trim();
+            let m = s.match(/(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
+            if (m) {
+                let p1 = parseInt(m[1], 10), p2 = parseInt(m[2], 10), p3 = parseInt(m[3], 10);
+                if (p1 > 1000) return { y: p1, m: p2, d: p3 }; // Format YYYY-MM-DD
+                else return { y: p3, m: p2, d: p1 };         // Format DD-MM-YYYY
+            }
+            let d = new Date(s);
+            return isNaN(d.getTime()) ? null : { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+        };
+
+        let targetDate = parseAnyDate(tglTeks) || { y: new Date().getFullYear(), m: new Date().getMonth() + 1, d: new Date().getDate() };
+        let accumPreviousDays = 0;
+        let activeReportId = this.editReportId; 
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
+
+        // Tentukan Target Bulanan secara Akurat
+        let targetPerhitungan = this.targetBulanan || 180000000;
+        if (isConsolidated && this.db && this.db.outlets) {
+            let totalTargetSemua = 0;
+            this.db.outlets.forEach(o => {
+                if (o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua') {
+                    let t = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
+                    totalTargetSemua += (t && !isNaN(t)) ? Number(t) : 180000000;
+                }
+            });
+            if (totalTargetSemua > 0) targetPerhitungan = totalTargetSemua;
+        }
+
+        // Jumlahkan HANYA laporan masa lalu sebelum tanggal target (Tanggal 1 s/d H-1)
+        (this.db.laporanHarian || []).forEach(rep => {
+            let repOutClean = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
+            
+            if (isConsolidated || repOutClean === cleanCurrOutlet) {
+                if (activeReportId && String(rep.ID_Laporan).trim() === String(activeReportId).trim()) return;
+                if (rep.Status_Approval === 'Ditolak') return;
+
+                let rDate = parseAnyDate(rep.Tanggal);
+                if (rDate) {
+                    // KUNCI PRESISI: Bulan & Tahun sama, DAN Hari lebih kecil (Tanggal 1 s/d H-1)
+                    if (rDate.y === targetDate.y && rDate.m === targetDate.m && rDate.d < targetDate.d) {
+                        accumPreviousDays += Number(rep.Net_Sales || 0);
+                    }
+                }
+            }
+        });
+
+        let totalAccumUpToDate = accumPreviousDays + Number(liveNetSales || 0);
+        let pct = Math.min(Math.round((totalAccumUpToDate / targetPerhitungan) * 100), 100);
+        let kurang = Math.max(targetPerhitungan - totalAccumUpToDate, 0);
+
+        // Update Radar UI di layar
+        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totalAccumUpToDate.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetPerhitungan.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pct}%`;
+        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pct}%`;
+        if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${kurang.toLocaleString('id-ID')}`;
+
+        this.currentAccumMonth = totalAccumUpToDate;
+        return totalAccumUpToDate;
     },
 
     // =========================================================
