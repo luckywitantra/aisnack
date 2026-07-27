@@ -1,3 +1,59 @@
+// =========================================================================
+// 🚀 ENGINE: SMART LOCALSTORAGE COMPRESSOR (ANTI-5MB QUOTA EXCEEDED)
+// =========================================================================
+(function() {
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        try {
+            originalSetItem.apply(this, [key, value]);
+        } catch (e) {
+            // Jika error karena kuota memori browser HP penuh (5MB Limit)
+            if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.message.toLowerCase().includes('quota') || e.code === 22 || e.code === 1014) {
+                console.warn(`⚠️ Memori LocalStorage HP penuh saat menyimpan "${key}"! Melakukan kompresi otomatis...`);
+                
+                if (key === 'aisnack_db_cache') {
+                    try {
+                        let dbObj = JSON.parse(value);
+                        
+                        // Pangkas riwayat lama khusus untuk cadangan offline di HP (Sisakan data terbaru saja)
+                        if (dbObj.transactions && dbObj.transactions.length > 150) dbObj.transactions = dbObj.transactions.slice(-150);
+                        if (dbObj.laporanHarian && dbObj.laporanHarian.length > 60) dbObj.laporanHarian = dbObj.laporanHarian.slice(-60);
+                        if (dbObj.shifts && dbObj.shifts.length > 40) dbObj.shifts = dbObj.shifts.slice(-40);
+                        if (dbObj.kasKeluar && dbObj.kasKeluar.length > 50) dbObj.kasKeluar = dbObj.kasKeluar.slice(-50);
+                        if (dbObj.riwayatOpname && dbObj.riwayatOpname.length > 40) dbObj.riwayatOpname = dbObj.riwayatOpname.slice(-40);
+                        if (dbObj.barangMasuk && dbObj.barangMasuk.length > 40) dbObj.barangMasuk = dbObj.barangMasuk.slice(-40);
+                        if (dbObj.mutasi && dbObj.mutasi.length > 50) dbObj.mutasi = dbObj.mutasi.slice(-50);
+                        
+                        originalSetItem.apply(this, [key, JSON.stringify(dbObj)]);
+                        console.log("✅ Berhasil menyimpan cache setelah kompresi riwayat!");
+                        return;
+                    } catch (err2) {
+                        // Darurat mutlak: Jika masih penuh, simpan Master Produk & Outlet saja agar POS tetap bisa jualan offline!
+                        try {
+                            let dbObj = JSON.parse(value);
+                            let minimalDb = {
+                                status: 'sukses',
+                                masterProduk: dbObj.masterProduk || [],
+                                outlets: dbObj.outlets || [],
+                                hargaStokOutlet: dbObj.hargaStokOutlet || [],
+                                users: dbObj.users || [],
+                                pengaturan: dbObj.pengaturan || []
+                            };
+                            originalSetItem.apply(this, [key, JSON.stringify(minimalDb)]);
+                            console.log("✅ Berhasil menyimpan cache minimalis!");
+                            return;
+                        } catch(err3) {}
+                    }
+                }
+                // Cegah aplikasi crash/hang (Uncaught Promise Error) jika penyimpanan cache gagal
+                console.error(`❌ Gagal menyimpan "${key}" ke LocalStorage karena batas fisik memori HP.`);
+            } else {
+                throw e; // Lempar error lain jika bukan masalah kuota memori
+            }
+        }
+    };
+})();
+
 const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
 
 /* ========================================== */
@@ -968,7 +1024,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v560"; 
+        const CURRENT_VER = "v562"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
