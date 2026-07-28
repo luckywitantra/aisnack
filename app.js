@@ -305,9 +305,306 @@ const superApp = {
         let fPart = s.split(' ')[0]; let d2 = new Date(fPart); if (!isNaN(d2.getTime())) { d2.setHours(0, 0, 0, 0); return d2; }
         return new Date(0);
     },
+
+    // STARTUP & LOGIN
+    init: async function() {
+        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(registration => {
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            const banner = document.getElementById('update-banner');
+                            if (banner) {
+                                banner.classList.remove('hidden');
+                                setTimeout(() => {
+                                    banner.classList.remove('translate-y-20', 'opacity-0');
+                                }, 100);
+                            }
+                            
+                            const btn = document.getElementById('btn-update-app');
+                            if (btn) {
+                                btn.onclick = () => {
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                                    newWorker.postMessage({ action: 'skipWaiting' });
+                                };
+                            }
+                        }
+                    });
+                });
+            }).catch(err => console.log('SW Reg Error:', err));
+
+            let refreshing;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+        }
+        // ----------------------------------------------
+
+        if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
+
+        document.addEventListener("visibilitychange", () => { if (document.hidden && this.cfdWindow && !this.cfdWindow.closed) { this.cfdWindow.close(); } });
+        document.addEventListener("click", () => { if (this.currentUser && localStorage.getItem('cfd_wants_open') === 'true') { if (!this.cfdWindow || this.cfdWindow.closed) { this.openCFD(true); } } });
+        window.addEventListener('beforeunload', () => { if (this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
+        window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
+        window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
+        this.initAutoSync();
+        
+        try { 
+            let queue = localStorage.getItem('aisnack_offline_queue'); 
+            this.offlineQueue = queue ? JSON.parse(queue) : []; 
+        } catch (e) { 
+            this.offlineQueue = []; 
+        }
+
+        try {
+            const logStat = document.getElementById('login-status');
+            let cacheDb = localStorage.getItem('aisnack_db_cache');
+            
+            if (cacheDb) { 
+                this.db = JSON.parse(cacheDb); 
+                if (logStat) { 
+                    logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; 
+                    logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
+                } 
+            } else { 
+                if (logStat) { 
+                    logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; 
+                    logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
+                } 
+            }
+
+            // =====================================================================
+            // 🚀 ENGINE PENARIK DATA STABIL (ADAPTASE DARI KODE LAWAS YANG KUAT)
+            // =====================================================================
+            let performFetch = async () => {
+                let data = null;
+                // Menggunakan 3x percobaan tanpa AbortController agar tidak diputus paksa
+                for (let i = 0; i < 3; i++) {
+                    try { 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
+                            method: 'GET',
+                            redirect: 'follow',
+                            cache: 'no-store'
+                        }); 
+                        data = await res.json(); 
+                        if (data && data.status === 'sukses') break; 
+                    } catch (e) { 
+                        console.warn(`Percobaan ke-${i+1} gagal:`, e.message);
+                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
+                        await new Promise(r => setTimeout(r, 2000)); 
+                    }
+                }
+                
+                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
+
+                // --- PROSES DATA SUKSES ---
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                
+                let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
+                if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
+                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
+                if (pStandby) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
+                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
+                if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
+
+                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
+                let todayStr = `${yyyy}-${mm}-${dd}`; 
+                const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
+                if (fs && !fs.value) fs.value = todayStr; 
+                if (fe && !fe.value) fe.value = todayStr;
+
+                if (logStat) { 
+                    logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
+                    logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
+                }
+
+                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis jika kasir sudah login terlebih dahulu
+                if (this.currentUser) {
+                    this.refreshData();
+                    this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
+                }
+            };
+
+            // Logika eksekusi latar belakang vs pemblokiran layar
+            if (!cacheDb) {
+                await performFetch();
+            } else {
+                performFetch().catch(err => {
+                    console.warn("Sinkronisasi latar belakang terhenti:", err.message);
+                    if (logStat) { 
+                        logStat.innerText = 'Mode Lokal Aktif (Server Lambat/Offline)'; 
+                        logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
+                    }
+                }); 
+            }
+
+        } catch (err) {
+            const logStat = document.getElementById('login-status');
+            if (logStat && this.db) { 
+                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
+                logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
+            } else if (logStat) { 
+                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server.</span>
+                                     <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-[10px] font-black shadow-md active:scale-95 transition-all">
+                                         <i class="fas fa-rotate-right mr-1"></i> Klik untuk Coba Lagi
+                                     </button>`; 
+                logStat.className = 'text-[10px] font-bold tracking-wider text-center';
+            }
+        }
+    },
     
+   addPin: function(num) {
+        // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
+        if (this.isSystemUpdating) {
+            this.showToast('⚡ Sistem sedang menginstal pembaruan, mohon tunggu...', 'warning');
+            return;
+        }
+
+        if (!this.db || !this.db.users) { 
+            this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); 
+            return; 
+        }
+        
+        if (this.pinBuffer.length < 4) { 
+            this.pinBuffer += num; 
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`); 
+            if (dot) { 
+                dot.classList.replace('border-slate-300', 'bg-brand-500'); 
+                dot.classList.replace('border-2', 'border-0'); 
+            } 
+        }
+        
+        if (this.pinBuffer.length === 4) {
+            setTimeout(() => this.processLogin(), 200);
+        }
+    },
+    delPin: function() {
+        if (this.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } this.pinBuffer = this.pinBuffer.slice(0, -1); }
+    },
+    clearPin: function() {
+        this.pinBuffer = ''; for (let i = 1; i <= 4; i++) { const dot = document.getElementById(`dot-${i}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } }
+    },
+    processLogin: function() {
+        if (this.isProcessing) return; this.isProcessing = true;
+        if (!this.db || !this.db.users) { 
+            this.showToast('Koneksi ke Database belum siap.', 'error'); 
+            this.clearPin(); this.isProcessing = false; return; 
+        }
+
+        // 🚀 Cek PIN Kasir
+        let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
+        
+        if (user) {
+            this.currentUser = user; 
+            
+            const sbRole = document.getElementById('sb-role'); if (sbRole) sbRole.innerText = user.Role;
+            const hInit = document.getElementById('header-initial'); if (hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
+
+            let roleStr = String(user.Role).toLowerCase();
+            let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+            this.userRole = roleStr.includes('owner') ? 'owner' : (roleStr.includes('admin') ? 'admin' : 'kasir');
+            
+            // =====================================================================
+            // 🚀 NORMALISASI MUTLAK: BERSIHKAN TEKS CABANG DARI AWALAN "AI-SNACK"
+            // =====================================================================
+            let cleanUserOutlet = String(user.Outlet || 'Penajam').replace(/^Ai\-Snack\s+/i, '').trim();
+
+            if (!isAdmin) {
+                // 🔒 KUNCI MUTLAK KASIR: Paksa sistem hanya menggunakan cabang penugasan kasir
+                this.outlet = cleanUserOutlet;
+            } else {
+                // 👑 OWNER / ADMIN: Gunakan cabang terakhir atau default
+                if (cleanUserOutlet === 'Pusat' || cleanUserOutlet === 'Semua') {
+                    let savedOutlet = localStorage.getItem('aisnack_active_outlet');
+                    this.outlet = savedOutlet || ((this.db.outlets || [])[0]?.ID_Outlet || 'Penajam');
+                } else {
+                    this.outlet = cleanUserOutlet;
+                }
+            }
+
+            // Normalisasi sekali lagi agar tidak ada spasi sisa
+            this.outlet = String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+
+            // Kunci ke memori browser
+            localStorage.setItem('aisnack_active_outlet', this.outlet);
+            localStorage.setItem('aicha_active_outlet', this.outlet);
+
+            // Kontrol Tampilan Menu UI
+            const adminMenus = document.getElementById('admin-menus'); 
+            const selOut = document.getElementById('select-outlet'); 
+            const repOut = document.getElementById('report-outlet-filter');
+            const premiumCards = ['setting-card-standby', 'setting-card-transaksi', 'setting-card-logo', 'setting-card-struk'];
+
+            if (isAdmin) {
+                if (adminMenus) adminMenus.classList.remove('hidden'); 
+                if (selOut) selOut.classList.remove('hidden'); 
+                if (repOut) repOut.classList.remove('hidden');
+                
+                let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
+                (this.db.outlets || []).forEach(o => { 
+                    let idClean = String(o.ID_Outlet || o.Nama_Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+                    outOptions += `<option value="${idClean}">📍 Ai-CHA ${idClean}</option>`; 
+                    outFilters += `<option value="${idClean}">Hanya: Ai-CHA ${idClean}</option>`; 
+                });
+                if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
+                if (repOut) repOut.innerHTML = outFilters;
+                
+                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
+            } else {
+                if (adminMenus) adminMenus.classList.add('hidden');
+                if (selOut) { 
+                    selOut.classList.add('hidden'); 
+                    selOut.innerHTML = `<option value="${this.outlet}">📍 Ai-CHA ${this.outlet}</option>`; 
+                    selOut.value = this.outlet; selOut.disabled = true; 
+                }
+                if (repOut) repOut.classList.add('hidden');
+                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+            }
+
+            const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
+            const sbar = document.getElementById('sidebar'); if (sbar) sbar.classList.remove('hidden');
+            const mainApp = document.getElementById('main-app'); if (mainApp) mainApp.classList.remove('hidden');
+
+            // 🚀 PERBAIKAN KRITIS: Panggil refreshData() langsung agar Produk & Header 100% tersinkronisasi!
+            this.refreshData(); 
+            this.updateNetworkUI(); 
+            this.syncOfflineQueue(); 
+            this.checkShiftStatus(); 
+            
+            this.showToast(`Selamat datang, ${user.Username}! (Cabang: ${this.outlet})`);
+            
+            this.updateCFDGreeting(); 
+            if (!this.cfdTimer) {
+                this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
+            }
+            this.autoConnectPrinter();
+
+        } else { 
+            this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
+        }
+
+        // 🚀 RADAR OTOMATIS TUTUP SHIFT JAM 12 MALAM (00:00)
+            if (!this.midnightTimer) {
+                this.midnightTimer = setInterval(() => {
+                    let now = new Date();
+                    // Jika tepat jam 00:00 malam (antara 00:00 s/d 00:01)
+                    if (now.getHours() === 0 && now.getMinutes() === 0) {
+                        if (this.activeShiftId) {
+                            console.log("⏰ Jam 12 Malam tiba! Memicu Auto-Close Shift...");
+                            this.checkShiftStatus();
+                        }
+                    }
+                }, 45000); // Cek setiap 45 detik
+            }
+        this.isProcessing = false;
+    },
     
-  // =========================================================================
+    // =========================================================================
     // 🚀 1. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI & ADA TIMEOUT AMAN)
     // =========================================================================
     pullBackgroundData: async function() {
@@ -1126,303 +1423,7 @@ const superApp = {
         }
     },
   
-    // STARTUP & LOGIN
-    init: async function() {
-        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(registration => {
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            const banner = document.getElementById('update-banner');
-                            if (banner) {
-                                banner.classList.remove('hidden');
-                                setTimeout(() => {
-                                    banner.classList.remove('translate-y-20', 'opacity-0');
-                                }, 100);
-                            }
-                            
-                            const btn = document.getElementById('btn-update-app');
-                            if (btn) {
-                                btn.onclick = () => {
-                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                                    newWorker.postMessage({ action: 'skipWaiting' });
-                                };
-                            }
-                        }
-                    });
-                });
-            }).catch(err => console.log('SW Reg Error:', err));
-
-            let refreshing;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
-            });
-        }
-        // ----------------------------------------------
-
-        if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
-
-        document.addEventListener("visibilitychange", () => { if (document.hidden && this.cfdWindow && !this.cfdWindow.closed) { this.cfdWindow.close(); } });
-        document.addEventListener("click", () => { if (this.currentUser && localStorage.getItem('cfd_wants_open') === 'true') { if (!this.cfdWindow || this.cfdWindow.closed) { this.openCFD(true); } } });
-        window.addEventListener('beforeunload', () => { if (this.cfdWindow && !this.cfdWindow.closed) this.cfdWindow.close(); });
-        window.addEventListener('online', () => { this.isOnline = true; this.syncOfflineQueue(); });
-        window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
-        this.initAutoSync();
-        
-        try { 
-            let queue = localStorage.getItem('aisnack_offline_queue'); 
-            this.offlineQueue = queue ? JSON.parse(queue) : []; 
-        } catch (e) { 
-            this.offlineQueue = []; 
-        }
-
-        try {
-            const logStat = document.getElementById('login-status');
-            let cacheDb = localStorage.getItem('aisnack_db_cache');
-            
-            if (cacheDb) { 
-                this.db = JSON.parse(cacheDb); 
-                if (logStat) { 
-                    logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; 
-                    logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
-                } 
-            } else { 
-                if (logStat) { 
-                    logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; 
-                    logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
-                } 
-            }
-
-            // =====================================================================
-            // 🚀 ENGINE PENARIK DATA STABIL (ADAPTASE DARI KODE LAWAS YANG KUAT)
-            // =====================================================================
-            let performFetch = async () => {
-                let data = null;
-                // Menggunakan 3x percobaan tanpa AbortController agar tidak diputus paksa
-                for (let i = 0; i < 3; i++) {
-                    try { 
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
-                            method: 'GET',
-                            redirect: 'follow',
-                            cache: 'no-store'
-                        }); 
-                        data = await res.json(); 
-                        if (data && data.status === 'sukses') break; 
-                    } catch (e) { 
-                        console.warn(`Percobaan ke-${i+1} gagal:`, e.message);
-                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
-                        await new Promise(r => setTimeout(r, 2000)); 
-                    }
-                }
-                
-                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
-
-                // --- PROSES DATA SUKSES ---
-                this.db = data; 
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                
-                let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
-                if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
-                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
-                if (pStandby) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
-                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
-                if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
-
-                let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
-                let todayStr = `${yyyy}-${mm}-${dd}`; 
-                const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
-                if (fs && !fs.value) fs.value = todayStr; 
-                if (fe && !fe.value) fe.value = todayStr;
-
-                if (logStat) { 
-                    logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
-                    logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
-                }
-
-                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis jika kasir sudah login terlebih dahulu
-                if (this.currentUser) {
-                    this.refreshData();
-                    this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
-                }
-            };
-
-            // Logika eksekusi latar belakang vs pemblokiran layar
-            if (!cacheDb) {
-                await performFetch();
-            } else {
-                performFetch().catch(err => {
-                    console.warn("Sinkronisasi latar belakang terhenti:", err.message);
-                    if (logStat) { 
-                        logStat.innerText = 'Mode Lokal Aktif (Server Lambat/Offline)'; 
-                        logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
-                    }
-                }); 
-            }
-
-        } catch (err) {
-            const logStat = document.getElementById('login-status');
-            if (logStat && this.db) { 
-                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
-                logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
-            } else if (logStat) { 
-                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server.</span>
-                                     <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-[10px] font-black shadow-md active:scale-95 transition-all">
-                                         <i class="fas fa-rotate-right mr-1"></i> Klik untuk Coba Lagi
-                                     </button>`; 
-                logStat.className = 'text-[10px] font-bold tracking-wider text-center';
-            }
-        }
-    },
     
-   addPin: function(num) {
-        // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
-        if (this.isSystemUpdating) {
-            this.showToast('⚡ Sistem sedang menginstal pembaruan, mohon tunggu...', 'warning');
-            return;
-        }
-
-        if (!this.db || !this.db.users) { 
-            this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); 
-            return; 
-        }
-        
-        if (this.pinBuffer.length < 4) { 
-            this.pinBuffer += num; 
-            const dot = document.getElementById(`dot-${this.pinBuffer.length}`); 
-            if (dot) { 
-                dot.classList.replace('border-slate-300', 'bg-brand-500'); 
-                dot.classList.replace('border-2', 'border-0'); 
-            } 
-        }
-        
-        if (this.pinBuffer.length === 4) {
-            setTimeout(() => this.processLogin(), 200);
-        }
-    },
-    delPin: function() {
-        if (this.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } this.pinBuffer = this.pinBuffer.slice(0, -1); }
-    },
-    clearPin: function() {
-        this.pinBuffer = ''; for (let i = 1; i <= 4; i++) { const dot = document.getElementById(`dot-${i}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } }
-    },
-    processLogin: function() {
-        if (this.isProcessing) return; this.isProcessing = true;
-        if (!this.db || !this.db.users) { 
-            this.showToast('Koneksi ke Database belum siap.', 'error'); 
-            this.clearPin(); this.isProcessing = false; return; 
-        }
-
-        // 🚀 Cek PIN Kasir
-        let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
-        
-        if (user) {
-            this.currentUser = user; 
-            
-            const sbRole = document.getElementById('sb-role'); if (sbRole) sbRole.innerText = user.Role;
-            const hInit = document.getElementById('header-initial'); if (hInit) hInit.innerText = user.Username.charAt(0).toUpperCase();
-
-            let roleStr = String(user.Role).toLowerCase();
-            let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
-            this.userRole = roleStr.includes('owner') ? 'owner' : (roleStr.includes('admin') ? 'admin' : 'kasir');
-            
-            // =====================================================================
-            // 🚀 NORMALISASI MUTLAK: BERSIHKAN TEKS CABANG DARI AWALAN "AI-SNACK"
-            // =====================================================================
-            let cleanUserOutlet = String(user.Outlet || 'Penajam').replace(/^Ai\-Snack\s+/i, '').trim();
-
-            if (!isAdmin) {
-                // 🔒 KUNCI MUTLAK KASIR: Paksa sistem hanya menggunakan cabang penugasan kasir
-                this.outlet = cleanUserOutlet;
-            } else {
-                // 👑 OWNER / ADMIN: Gunakan cabang terakhir atau default
-                if (cleanUserOutlet === 'Pusat' || cleanUserOutlet === 'Semua') {
-                    let savedOutlet = localStorage.getItem('aisnack_active_outlet');
-                    this.outlet = savedOutlet || ((this.db.outlets || [])[0]?.ID_Outlet || 'Penajam');
-                } else {
-                    this.outlet = cleanUserOutlet;
-                }
-            }
-
-            // Normalisasi sekali lagi agar tidak ada spasi sisa
-            this.outlet = String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim();
-
-            // Kunci ke memori browser
-            localStorage.setItem('aisnack_active_outlet', this.outlet);
-            localStorage.setItem('aicha_active_outlet', this.outlet);
-
-            // Kontrol Tampilan Menu UI
-            const adminMenus = document.getElementById('admin-menus'); 
-            const selOut = document.getElementById('select-outlet'); 
-            const repOut = document.getElementById('report-outlet-filter');
-            const premiumCards = ['setting-card-standby', 'setting-card-transaksi', 'setting-card-logo', 'setting-card-struk'];
-
-            if (isAdmin) {
-                if (adminMenus) adminMenus.classList.remove('hidden'); 
-                if (selOut) selOut.classList.remove('hidden'); 
-                if (repOut) repOut.classList.remove('hidden');
-                
-                let outOptions = ''; let outFilters = '<option value="Semua">Semua Outlet</option>';
-                (this.db.outlets || []).forEach(o => { 
-                    let idClean = String(o.ID_Outlet || o.Nama_Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
-                    outOptions += `<option value="${idClean}">📍 Ai-CHA ${idClean}</option>`; 
-                    outFilters += `<option value="${idClean}">Hanya: Ai-CHA ${idClean}</option>`; 
-                });
-                if (selOut) { selOut.innerHTML = outOptions; selOut.value = this.outlet; selOut.disabled = false; }
-                if (repOut) repOut.innerHTML = outFilters;
-                
-                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
-            } else {
-                if (adminMenus) adminMenus.classList.add('hidden');
-                if (selOut) { 
-                    selOut.classList.add('hidden'); 
-                    selOut.innerHTML = `<option value="${this.outlet}">📍 Ai-CHA ${this.outlet}</option>`; 
-                    selOut.value = this.outlet; selOut.disabled = true; 
-                }
-                if (repOut) repOut.classList.add('hidden');
-                premiumCards.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
-            }
-
-            const ls = document.getElementById('login-screen'); if (ls) ls.classList.add('hidden');
-            const sbar = document.getElementById('sidebar'); if (sbar) sbar.classList.remove('hidden');
-            const mainApp = document.getElementById('main-app'); if (mainApp) mainApp.classList.remove('hidden');
-
-            // 🚀 PERBAIKAN KRITIS: Panggil refreshData() langsung agar Produk & Header 100% tersinkronisasi!
-            this.refreshData(); 
-            this.updateNetworkUI(); 
-            this.syncOfflineQueue(); 
-            this.checkShiftStatus(); 
-            
-            this.showToast(`Selamat datang, ${user.Username}! (Cabang: ${this.outlet})`);
-            
-            this.updateCFDGreeting(); 
-            if (!this.cfdTimer) {
-                this.cfdTimer = setInterval(() => { this.updateCFDGreeting(); }, 60000); 
-            }
-            this.autoConnectPrinter();
-
-        } else { 
-            this.showToast('PIN Tidak Dikenali', 'error'); this.clearPin(); 
-        }
-
-        // 🚀 RADAR OTOMATIS TUTUP SHIFT JAM 12 MALAM (00:00)
-            if (!this.midnightTimer) {
-                this.midnightTimer = setInterval(() => {
-                    let now = new Date();
-                    // Jika tepat jam 00:00 malam (antara 00:00 s/d 00:01)
-                    if (now.getHours() === 0 && now.getMinutes() === 0) {
-                        if (this.activeShiftId) {
-                            console.log("⏰ Jam 12 Malam tiba! Memicu Auto-Close Shift...");
-                            this.checkShiftStatus();
-                        }
-                    }
-                }, 45000); // Cek setiap 45 detik
-            }
-        this.isProcessing = false;
-    },
 
     updateHeaderOutletName: function() {
         const outletNameEl = document.getElementById('header-outlet-name');
