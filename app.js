@@ -317,10 +317,11 @@ const superApp = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            // 🚀 PERBAIKAN: Ganti history=all menjadi history=90 (3 Bulan terakhir)
-            // Ini memotong beban server Google hingga 80% dan mencegah lag di device lain!
+            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' agar webview PWA selalu minta data baru
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=90", { 
+                method: 'GET',
                 redirect: 'follow',
+                cache: 'no-store',
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -335,6 +336,13 @@ const superApp = {
                 // 2. Refresh elemen-elemen senyap jika diperlukan
                 if (typeof this.updatePendingNotifications === 'function') this.updatePendingNotifications();
                 
+                // 🚀 PERBAIKAN: Jika kasir/owner sedang membuka aplikasi, perbarui layar secara otomatis!
+                if (this.currentUser) {
+                    if (this.cart.length === 0) this.refreshData();
+                    if (typeof this.renderReport === 'function' && !document.getElementById('view-report')?.classList.contains('hidden')) this.renderReport();
+                    if (typeof this.generateAIReport === 'function' && !document.getElementById('view-ai')?.classList.contains('hidden')) this.generateAIReport();
+                }
+
                 console.log("✅ Sinkronisasi latar belakang selesai! (Memuat riwayat 90 hari)");
             }
         } catch (e) {
@@ -356,10 +364,11 @@ const superApp = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            // 🚀 PERBAIKAN: Ganti history=all menjadi history=60 (2 Bulan terakhir)
-            // Cukup untuk operasional POS kasir sehari-hari tanpa membuat HP berat/crash!
+            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' dan method: 'GET'
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=60", { 
+                method: 'GET',
                 redirect: 'follow',
+                cache: 'no-store',
                 signal: controller.signal
             }); 
             clearTimeout(timeoutId);
@@ -420,7 +429,8 @@ const superApp = {
         } catch (e) { 
             console.warn("Fetch Error pullFreshData:", e.message);
             if (!silent) {
-                if (e.name === 'AbortError' || e.message.includes('aborted')) {
+                // 🚀 PERBAIKAN: Pengecekan error timeout yang lebih komprehensif
+                if (e.name === 'AbortError' || e.name === 'TimeoutError' || e.message.includes('aborted')) {
                     this.showToast("Server Google sedang sibuk, coba tekan tombol Tarik Data lagi.", "warning");
                 } else {
                     this.showToast("Gagal menarik data. Cek koneksi internet Anda.", "error"); 
@@ -449,9 +459,11 @@ const superApp = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-            // Memanggil parameter history=all ke server Google Sheets
+            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' agar tidak mengambil dari cache webview
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { 
+                method: 'GET',
                 redirect: 'follow',
+                cache: 'no-store',
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -475,7 +487,7 @@ const superApp = {
             }
         } catch (e) {
             console.error("Deep Archive Error:", e);
-            if (e.name === 'AbortError' || e.message.includes('aborted')) {
+            if (e.name === 'AbortError' || e.name === 'TimeoutError' || e.message.includes('aborted')) {
                 this.showToast("Server Google terlalu sibuk memproses data tahunan. Coba lagi beberapa saat.", "warning");
             } else {
                 this.showToast("Gagal mengunduh arsip lawas: " + e.message, "error");
@@ -1293,22 +1305,23 @@ const superApp = {
             }
 
             // =====================================================================
-            // 🚀 ENGINE PENARIK DATA (DENGAN AUTO-TIMEOUT 8 DETIK & SELF-HEALING UI)
+            // 🚀 ENGINE PENARIK DATA (ANTI-CACHE HTTP & AUTO RE-RENDER LAYAR)
             // =====================================================================
             let performFetch = async () => {
                 let data = null;
-                // Kurangi menjadi 2x percobaan agar kasir tidak lama menunggu jika sinyal jelek
                 for (let i = 0; i < 2; i++) {
                     try { 
-                        // ⏰ Pasang bom waktu 15 detik! Jika Google lambat/down, langsung putus.
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+                        // 🚀 PERBAIKAN 1: Wajib tambahkan cache: 'no-store' agar browser tidak memberi data bekas!
                         const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { 
+                            method: 'GET',
                             redirect: 'follow',
+                            cache: 'no-store', // <-- KUNCI ANTI-CACHE HTTP WEBVIEW
                             signal: controller.signal 
                         }); 
-                        clearTimeout(timeoutId); // Batalkan bom waktu jika server menjawab
+                        clearTimeout(timeoutId);
                         
                         data = await res.json(); 
                         if (data && data.status === 'sukses') break; 
@@ -1325,7 +1338,6 @@ const superApp = {
                 this.db = data; 
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
                 
-                // Set Logo & Promo CFD
                 let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
                 if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
                 let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
@@ -1333,20 +1345,24 @@ const superApp = {
                 let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
                 if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
-                // Set Tanggal Filter Report
                 let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
                 let todayStr = `${yyyy}-${mm}-${dd}`; 
                 const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
                 if (fs && !fs.value) fs.value = todayStr; 
                 if (fe && !fe.value) fe.value = todayStr;
 
-                // 🟢 BERHASIL: Ubah teks menjadi hijau statis!
                 if (logStat) { 
                     logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
-                // 🚀 TRIGGER BACKGROUND SYNC (Tarik data historis lengkap setelah 3 detik)
+                // 🚀 PERBAIKAN 2: JIKA KASIR SUDAH LOGIN SAAT BACKGROUND FETCH SELESAI, RE-RENDER LAYAR SECARA OTOMATIS!
+                if (this.currentUser) {
+                    console.log("⚡ Background fetch selesai! Memperbarui tampilan layar kasir secara otomatis...");
+                    this.refreshData();
+                    this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
+                }
+
                 setTimeout(() => {
                     if (typeof this.pullBackgroundData === 'function') {
                         this.pullBackgroundData();
