@@ -3151,7 +3151,7 @@ const superApp = {
     },
 
     // =========================================================
-    // 🚀 ENGINE EDIT DATA (SINKRONISASI REVISI & TANGGAL PRESISI)
+    // 🚀 ENGINE EDIT DATA (SINKRONISASI REVISI & ANTI-CRASH)
     // =========================================================
     editLaporanHarian: function(idRep) {
         let rep = (this.db.laporanHarian || []).find(x => x.ID_Laporan === idRep);
@@ -3167,10 +3167,12 @@ const superApp = {
         if (titleEl) titleEl.innerText = "📝 Ajukan Revisi Laporan";
         if (btnCancel) btnCancel.classList.remove('hidden');
 
-        // Standarisasi Tanggal
-        let targetDateObj = this.normalizeDateObj(rep.Tanggal);
-        if (dateEl) dateEl.innerText = this.formatToIndoDate(targetDateObj);
-        if (picker) picker.value = this.formatToInputDate(targetDateObj);
+        // Standarisasi Tanggal dengan Proteksi (Null Safety)
+        let targetDateObj = typeof this.normalizeDateObj === 'function' ? this.normalizeDateObj(rep.Tanggal) : new Date(rep.Tanggal);
+        if (isNaN(targetDateObj.getTime())) targetDateObj = new Date(); // Fallback jika tanggal rusak
+
+        if (dateEl) dateEl.innerText = typeof this.formatToIndoDate === 'function' ? this.formatToIndoDate(targetDateObj) : rep.Tanggal;
+        if (picker) picker.value = typeof this.formatToInputDate === 'function' ? this.formatToInputDate(targetDateObj) : targetDateObj.toISOString().split('T')[0];
 
         // 🚀 KUNCI: Ekstrak data Revisi_JSON jika laporan sedang "Pending Edit"
         let cashVal = rep.Cash;
@@ -3181,35 +3183,51 @@ const superApp = {
 
         if (rep.Status_Approval === 'Pending Edit' && rep.Revisi_JSON) {
             try {
-                let rev = JSON.parse(rep.Revisi_JSON);
-                if (rev.net_sales !== undefined) {
+                // 🛡️ PARSING AMAN: Cek apakah sudah berupa object atau masih string
+                let revObj = rep.Revisi_JSON;
+                let rev = typeof revObj === 'string' ? JSON.parse(revObj || '{}') : (revObj || {});
+                
+                if (rev && rev.net_sales !== undefined) {
                     cashVal = rev.cash; qrisVal = rev.qris;
                     billVal = rev.bill; pcsVal = rev.pcs;
                     expJson = rev.pengeluaran_json;
                     this.showToast("Menampilkan draf revisi yang belum disetujui", "warning");
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.warn("Gagal membaca Revisi_JSON saat edit, menggunakan angka asli:", e);
+            }
         } else {
-            this.showToast(`Memuat data tanggal ${this.formatToIndoDate(targetDateObj)} untuk diperbaiki.`);
+            let tglTampil = typeof this.formatToIndoDate === 'function' ? this.formatToIndoDate(targetDateObj) : rep.Tanggal;
+            this.showToast(`Memuat data tanggal ${tglTampil} untuk diperbaiki.`);
         }
 
-        // Isi form dengan angka yang tepat
+        // Isi form dengan angka yang tepat & hindari NaN
         if (document.getElementById('daily-cash')) document.getElementById('daily-cash').value = Number(cashVal || 0).toLocaleString('id-ID');
         if (document.getElementById('daily-qris')) document.getElementById('daily-qris').value = Number(qrisVal || 0).toLocaleString('id-ID');
         if (document.getElementById('daily-bill')) document.getElementById('daily-bill').value = billVal || 0;
         if (document.getElementById('daily-pcs')) document.getElementById('daily-pcs').value = pcsVal || 0;
 
-        // Muat pengeluaran
+        // Muat pengeluaran dengan Proteksi Parsing
         this.dailyExpensesList = [];
         try {
-            let expArr = JSON.parse(expJson || '[]');
-            expArr.forEach(x => this.addDailyExpenseRow(x.nama, x.nominal));
-        } catch(e) {}
-        if (this.dailyExpensesList.length === 0) this.addDailyExpenseRow();
+            let expArr = typeof expJson === 'string' ? JSON.parse(expJson || '[]') : (expJson || []);
+            if (Array.isArray(expArr)) {
+                expArr.forEach(x => {
+                    if (typeof this.addDailyExpenseRow === 'function') this.addDailyExpenseRow(x.nama, x.nominal);
+                });
+            }
+        } catch(e) {
+            console.warn("Gagal memuat rincian pengeluaran saat edit:", e);
+        }
+        
+        // Jika kosong atau gagal muat, beri 1 baris input kosong
+        if (!this.dailyExpensesList || this.dailyExpensesList.length === 0) {
+            if (typeof this.addDailyExpenseRow === 'function') this.addDailyExpenseRow();
+        }
 
         // Kalkulasi ulang & alihkan ke tab Input
-        this.calcDailyReportLive();
-        this.switchLapHarianSubTab('input');
+        if (typeof this.calcDailyReportLive === 'function') this.calcDailyReportLive();
+        if (typeof this.switchLapHarianSubTab === 'function') this.switchLapHarianSubTab('input');
     },
 
     // =========================================================
