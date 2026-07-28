@@ -1128,105 +1128,13 @@ const superApp = {
   
     // STARTUP & LOGIN
     init: async function() {
-        // =========================================================================
-        // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
-        // =========================================================================
-        // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v586"; 
-        const savedVer = localStorage.getItem('aisnack_sys_version');
-        
-        // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
-        if (savedVer !== CURRENT_VER) {
-            console.warn("Versi baru terdeteksi! Mengunci layar & membersihkan cache...");
-            this.isSystemUpdating = true; // 🔒 Kunci variabel satpam
-            
-            // 🔒 GEMBOK FISIK: Matikan semua tombol angka PIN agar kasir tidak bisa mengetik!
-            document.querySelectorAll('#pin-numpad-container button').forEach(b => {
-                b.disabled = true;
-                b.classList.add('opacity-40', 'cursor-not-allowed');
-            });
-
-            // Ubah teks status di bawah layar login menjadi merah berkedip
-            const statusEl = document.getElementById('login-status');
-            if (statusEl) {
-                statusEl.innerText = "⚡ MENGINSTAL VERSI TERBARU, MOHON TUNGGU...";
-                statusEl.className = "text-xs font-black text-rose-500 animate-pulse text-center";
-            }
-
-            localStorage.setItem('aisnack_sys_version', CURRENT_VER);
-            
-            if ('caches' in window) {
-                try {
-                    const names = await caches.keys();
-                    await Promise.all(names.map(name => caches.delete(name)));
-                } catch(e) {}
-            }
-            if ('serviceWorker' in navigator) {
-                try {
-                    const regs = await navigator.serviceWorker.getRegistrations();
-                    for(let reg of regs) { await reg.unregister(); }
-                } catch(e) {}
-            }
-            setTimeout(() => {
-                window.location.replace(window.location.pathname + "?v=" + Date.now());
-            }, 600);
-            return; // 🛑 Hentikan seluruh eksekusi agar tidak bisa login
-        }
-
-        // --- 🚀 PULIHKAN TEMA GELAP DARI MEMORI HP (CEGAH FLASH PUTIH) ---
-        if (localStorage.getItem('aisnack_theme') === 'dark') {
-            document.documentElement.classList.add('dark');
-        }
-        // -----------------------------------------------------------------
-
-        // =========================================================================
-        // 🚀 0.5 URL CLEANER: Hapus angka ?v= atau ?nocache= dari Address Bar
-        // =========================================================================
-        if (window.location.search.includes('v=') || window.location.search.includes('nocache=')) {
-            let cleanUrl = window.location.pathname + (window.location.search.includes('mode=cfd') ? '?mode=cfd' : '');
-            window.history.replaceState(null, '', cleanUrl);
-        }
-
-        // --- 🚀 1. RADAR UPDATE ASINKRONUS (SERVICE WORKER) ---
+        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', async () => {
+                    newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            
-                            // 🛑 SATPAM KHUSUS HP / LAYAR LOGIN: FORCE UPDATE OTOMATIS!
-                            // Jika layar di HP (< 1024px) atau belum login, LANGSUNG EKSEKUSI TANPA BANNER!
-                            if (!this.currentUser || window.innerWidth < 1024) {
-                                console.log("⚡ Update otomatis dipicu untuk HP / Layar Login...");
-                                this.isSystemUpdating = true; // Kunci sistem
-                                
-                                // Gembok numpad PIN saat itu juga
-                                document.querySelectorAll('#pin-numpad-container button').forEach(b => {
-                                    b.disabled = true;
-                                    b.classList.add('opacity-40', 'cursor-not-allowed');
-                                });
-                                
-                                const statusEl = document.getElementById('login-status');
-                                if (statusEl) {
-                                    statusEl.innerText = "⚡ MEMPERBARUI SISTEM KE VERSI BARU...";
-                                    statusEl.className = "text-xs font-black text-rose-500 animate-pulse text-center";
-                                }
-
-                                if ('caches' in window) {
-                                    const names = await caches.keys();
-                                    await Promise.all(names.map(name => caches.delete(name)));
-                                }
-                                newWorker.postMessage({ action: 'skipWaiting' });
-                                localStorage.setItem('aisnack_sys_version', CURRENT_VER);
-                                
-                                setTimeout(() => {
-                                    window.location.replace(window.location.pathname + "?nocache=" + Date.now());
-                                }, 600);
-                                return;
-                            }
-
-                            // Jika di PC dan sedang melayani pelanggan (sudah login), baru munculkan banner
                             const banner = document.getElementById('update-banner');
                             if (banner) {
                                 banner.classList.remove('hidden');
@@ -1237,25 +1145,9 @@ const superApp = {
                             
                             const btn = document.getElementById('btn-update-app');
                             if (btn) {
-                                btn.onclick = async () => {
-                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Memperbarui...';
-                                    btn.disabled = true;
-                                    btn.classList.add('opacity-75', 'cursor-not-allowed');
-                                    
-                                    if ('caches' in window) {
-                                        const names = await caches.keys();
-                                        await Promise.all(names.map(name => caches.delete(name)));
-                                    }
-                                    if ('serviceWorker' in navigator) {
-                                        const regs = await navigator.serviceWorker.getRegistrations();
-                                        for(let reg of regs) { await reg.unregister(); }
-                                    }
+                                btn.onclick = () => {
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                                     newWorker.postMessage({ action: 'skipWaiting' });
-                                    
-                                    localStorage.setItem('aisnack_sys_version', CURRENT_VER);
-                                    setTimeout(() => {
-                                        window.location.replace(window.location.pathname + "?nocache=" + Date.now());
-                                    }, 600);
                                 };
                             }
                         }
@@ -1263,13 +1155,14 @@ const superApp = {
                 });
             }).catch(err => console.log('SW Reg Error:', err));
 
-            let refreshing = false;
+            let refreshing;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 if (refreshing) return;
                 refreshing = true;
                 window.location.reload();
             });
         }
+        // ----------------------------------------------
 
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
 
@@ -1305,41 +1198,28 @@ const superApp = {
             }
 
             // =====================================================================
-            // 🚀 ENGINE PENARIK DATA (ADAPTIVE TIMEOUT & AUTO-RETRY AWAL)
+            // 🚀 ENGINE PENARIK DATA STABIL (ADAPTASE DARI KODE LAWAS YANG KUAT)
             // =====================================================================
             let performFetch = async () => {
                 let data = null;
-                
-                // 🚀 JURUS ADAPTIVE: Jika baru pertama kali buka (!cacheDb), beri 3x percobaan & waktu 35 detik!
-                // Jika sudah ada cache harian, cukup 2x percobaan & 25 detik.
-                let maxAttempts = cacheDb ? 2 : 3;
-                let timeoutLimit = cacheDb ? 25000 : 35000;
-
-                for (let i = 0; i < maxAttempts; i++) {
+                // Menggunakan 3x percobaan tanpa AbortController agar tidak diputus paksa
+                for (let i = 0; i < 3; i++) {
                     try { 
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), timeoutLimit);
-
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=14", { 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { 
                             method: 'GET',
                             redirect: 'follow',
-                            cache: 'no-store',
-                            signal: controller.signal 
+                            cache: 'no-store'
                         }); 
-                        clearTimeout(timeoutId);
-                        
                         data = await res.json(); 
                         if (data && data.status === 'sukses') break; 
                     } catch (e) { 
-                        console.warn(`[Init Fetch] Percobaan ke-${i+1}/${maxAttempts} gagal:`, e.message);
-                        if (logStat && !this.db) {
-                            logStat.innerText = `Mencoba hubungkan ulang (${i+1}/${maxAttempts})...`;
-                        }
-                        await new Promise(r => setTimeout(r, 2000)); // Beri jeda 2 detik sebelum coba lagi
+                        console.warn(`Percobaan ke-${i+1} gagal:`, e.message);
+                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
+                        await new Promise(r => setTimeout(r, 2000)); 
                     }
                 }
                 
-                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout / Offline");
+                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
 
                 // --- PROSES DATA SUKSES ---
                 this.db = data; 
@@ -1363,54 +1243,37 @@ const superApp = {
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
+                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis jika kasir sudah login terlebih dahulu
                 if (this.currentUser) {
                     this.refreshData();
                     this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
                 }
-
-                setTimeout(() => {
-                    if (typeof this.pullBackgroundData === 'function') {
-                        this.pullBackgroundData();
-                    }
-                }, 3000);
             };
 
-            // =====================================================================
-            // 🚀 LOGIKA EKSEKUSI (DENGAN PENANGKAP ERROR LATAR BELAKANG)
-            // =====================================================================
-            if (cacheDb) {
+            // Logika eksekusi latar belakang vs pemblokiran layar
+            if (!cacheDb) {
+                await performFetch();
+            } else {
                 performFetch().catch(err => {
                     console.warn("Sinkronisasi latar belakang terhenti:", err.message);
                     if (logStat) { 
                         logStat.innerText = 'Mode Lokal Aktif (Server Lambat/Offline)'; 
                         logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
                     }
-                });
-            } else {
-                await performFetch(); // Blokir layar karena belum ada cadangan lokal sama sekali
+                }); 
             }
 
         } catch (err) {
-            // 🚀 PERBAIKAN: Penanganan error interaktif untuk instalasi pertama kali
             const logStat = document.getElementById('login-status');
             if (logStat && this.db) { 
-                logStat.innerText = 'Mode Lokal Aktif (Gunakan PIN Anda)'; 
+                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
                 logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
             } else if (logStat) { 
-                // Ubah teks error menjadi tombol klik interaktif & coba ulang otomatis setelah 4 detik
-                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server Google.</span>
+                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server.</span>
                                      <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-[10px] font-black shadow-md active:scale-95 transition-all">
                                          <i class="fas fa-rotate-right mr-1"></i> Klik untuk Coba Lagi
                                      </button>`; 
                 logStat.className = 'text-[10px] font-bold tracking-wider text-center';
-                
-                // Coba muat ulang otomatis dalam 4 detik tanpa merepotkan kasir
-                setTimeout(() => {
-                    if (!this.db) {
-                        console.log("Mencoba muat ulang otomatis untuk pertama kali instal...");
-                        window.location.reload(true);
-                    }
-                }, 4000);
             }
         }
     },
