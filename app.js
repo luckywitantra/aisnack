@@ -800,6 +800,83 @@ const superApp = {
             return fallback;
         }
     },
+
+    // =========================================================================
+    // 🎨 ENGINE POP-UP KONFIRMASI MODERN (PROMISE-BASED & DYNAMIC UI)
+    // =========================================================================
+    customConfirm: function({ title, message, icon = 'fa-database', theme = 'amber', btnText = 'Lanjutkan' }) {
+        return new Promise((resolve) => {
+            // Hapus modal lama jika masih ada
+            let oldModal = document.getElementById('custom-confirm-modal');
+            if (oldModal) oldModal.remove();
+
+            // Setup Warna Tema (Gradient Tailwind)
+            const themes = {
+                amber: { bg: 'from-amber-400 to-orange-500', shadow: 'shadow-orange-500/30', text: 'text-amber-600', btnBg: 'from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' },
+                blue: { bg: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/30', text: 'text-blue-600', btnBg: 'from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700' },
+                rose: { bg: 'from-rose-500 to-red-600', shadow: 'shadow-rose-500/30', text: 'text-rose-600', btnBg: 'from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700' }
+            };
+            const t = themes[theme] || themes.amber;
+
+            // Buat elemen Backdrop & Box Modal
+            const backdrop = document.createElement('div');
+            backdrop.id = 'custom-confirm-modal';
+            backdrop.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 ease-out';
+            
+            backdrop.innerHTML = `
+                <div id="custom-confirm-box" class="bg-white dark:bg-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-700 transform scale-90 opacity-0 transition-all duration-300 ease-out text-center relative overflow-hidden">
+                    <!-- Efek Cahaya Latar (Glow) -->
+                    <div class="absolute -top-12 -left-12 w-28 h-28 bg-gradient-to-br ${t.bg} rounded-full blur-2xl opacity-20 pointer-events-none"></div>
+                    
+                    <!-- Ikon Utama -->
+                    <div class="w-16 h-16 bg-gradient-to-tr ${t.bg} rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg ${t.shadow} mb-4 transform -rotate-6 animate-bounce">
+                        <i class="fas ${icon}"></i>
+                    </div>
+
+                    <!-- Judul & Deskripsi -->
+                    <h3 class="text-base font-black text-slate-800 dark:text-white mb-2 tracking-tight">${title}</h3>
+                    <div class="text-xs text-slate-500 dark:text-slate-300 leading-relaxed mb-6 font-semibold">${message}</div>
+
+                    <!-- Tombol Aksi -->
+                    <div class="flex gap-2.5">
+                        <button id="btn-confirm-no" type="button" class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-extrabold text-xs transition active:scale-95">
+                            Batal
+                        </button>
+                        <button id="btn-confirm-yes" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r ${t.btnBg} text-white font-black text-xs shadow-md ${t.shadow} transition active:scale-95 flex items-center justify-center gap-1.5">
+                            <i class="fas fa-check"></i> ${btnText}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(backdrop);
+
+            // Animasi Masuk (Slide & Fade-in)
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                const box = document.getElementById('custom-confirm-box');
+                if (box) box.classList.remove('scale-90', 'opacity-0');
+            }, 10);
+
+            // Fungsi Tutup & Hapus DOM
+            const close = (result) => {
+                backdrop.classList.add('opacity-0');
+                const box = document.getElementById('custom-confirm-box');
+                if (box) box.classList.add('scale-90', 'opacity-0');
+                setTimeout(() => {
+                    backdrop.remove();
+                    resolve(result);
+                }, 250);
+            };
+
+            // Event Listeners Tombol
+            document.getElementById('btn-confirm-yes').onclick = () => close(true);
+            document.getElementById('btn-confirm-no').onclick = () => close(false);
+            
+            // Tutup jika klik area kosong (Backdrop)
+            backdrop.onclick = (e) => { if (e.target === backdrop) close(false); };
+        });
+    },
     
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
