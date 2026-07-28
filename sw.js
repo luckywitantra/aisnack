@@ -1,10 +1,14 @@
 // 🛑 ATURAN EMAS 1: Setiap upload versi baru ke GitHub/Server, NAIKKAN ANGKA VERSI INI!
 const CACHE_NAME = 'aisnack-erp-v581';
 
+// 🚀 PERBAIKAN 2: Masukkan app.js dan Ikon PWA ke dalam daftar instalasi wajib
 const urlsToCache = [
   './index.html',
+  './app.js',
+  './style.css',
   './manifest.json',
-  './style.css'
+  './logo-192.png',
+  './logo-512.png'
 ];
 
 const externalUrls = [
@@ -13,27 +17,30 @@ const externalUrls = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
-// 1. INSTALASI: Simpan file-file utama ke Cache Storage
+// 1. INSTALASI: Simpan file-file utama ke Cache Storage secara berurutan & aman
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Cache file lokal
-      cache.addAll(urlsToCache);
+      // 🚀 PERBAIKAN 1: Gunakan Promise.all untuk menggabungkan cache lokal & eksternal agar selesai bersamaan!
+      const cacheLocal = cache.addAll(urlsToCache).catch(err => {
+        console.warn('SW: Ada file lokal yang gagal di-cache awal:', err);
+      });
       
-      // Cache file eksternal (CDN) dengan mode no-cors
-      return Promise.all(
+      const cacheExternal = Promise.all(
         externalUrls.map(url => {
           return fetch(url, { mode: 'no-cors' }).then(response => {
             return cache.put(url, response);
-          }).catch(() => console.warn('Bypass Cache eksternal untuk:', url));
+          }).catch(() => console.warn('SW: Bypass Cache eksternal untuk:', url));
         })
       );
+
+      return Promise.all([cacheLocal, cacheExternal]);
     })
   );
-  // 🚀 PERBAIKAN: self.skipWaiting() DIHAPUS dari sini agar radar di app.js bisa bekerja mengunci layar!
+  // self.skipWaiting() sengaja tidak dipanggil di sini agar dikendalikan oleh radar app.js
 });
 
-// 2. AKTIVASI: Bersihkan cache versi lawas (v560 ke bawah akan otomatis dimusnahkan)
+// 2. AKTIVASI: Bersihkan cache versi lawas secara otomatis
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -49,15 +56,14 @@ self.addEventListener('activate', event => {
   );
 });
 
-// 3. FETCH STRATEGY: Network-First untuk HTML/JS, Cache-First untuk Gambar/CDN
+// 3. FETCH STRATEGY: Network-First untuk HTML/JS/CSS, Cache-First untuk Gambar/CDN
 self.addEventListener('fetch', event => {
   const reqUrl = event.request.url;
 
-  // Abaikan API Google Sheets agar database selalu real-time
+  // Abaikan API Google Sheets & Google Drive agar database selalu real-time
   if (reqUrl.includes('script.google.com') || reqUrl.includes('googleusercontent.com')) return;
 
-  // 🚀 JURUS NETWORK-FIRST KHUSUS FILE SISTEM (HTML, JS, CSS)
-  // HP akan SELALU mengecek ke server GitHub terlebih dahulu. Jika online -> dapat versi baru! Jika offline -> ambil dari cache!
+  // 🚀 JURUS NETWORK-FIRST KHUSUS FILE SISTEM (HTML, JS, CSS, Navigasi)
   if (reqUrl.includes('.html') || reqUrl.includes('.js') || reqUrl.includes('.css') || event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -70,23 +76,32 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         })
         .catch(() => {
-          // Jika HP kasir offline/sinyal jelek, baru ambil dari memori cache
-          return caches.match(event.request);
+          // 🚀 PERBAIKAN 3: Tambahkan { ignoreSearch: true } agar tetap ketemu saat offline
+          // meskipun URL-nya mengandung buntut parameter seperti ?v=581 atau ?mode=cfd
+          return caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
+            if (cachedResponse) return cachedResponse;
+            // Fallback terakhir jika offline dan file tidak ada: kembalikan ke index.html
+            if (event.request.mode === 'navigate') {
+              return caches.match('./index.html', { ignoreSearch: true });
+            }
+          });
         })
     );
     return;
   }
 
-  // 🚀 JURUS CACHE-FIRST UNTUK CDN & ASSETS (FontAwesome, Tailwind, Flaticon)
-  // Agar aplikasi loading super kilat dan menghemat kuota internet kasir
+  // 🚀 JURUS CACHE-FIRST UNTUK CDN & ASSETS (FontAwesome, Tailwind, Flaticon, Gambar)
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
+    caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
       return cachedResponse || fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200) {
+        // 🚀 PERBAIKAN 4: Izinkan status 0 (opaque response) untuk CDN pihak ketiga
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         }
         return networkResponse;
+      }).catch(() => {
+        console.warn('SW: Gagal mengambil aset eksternal dalam mode offline ->', reqUrl);
       });
     })
   );
