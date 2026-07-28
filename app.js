@@ -794,6 +794,19 @@ const superApp = {
             this.setLoading(false);
         }
     },
+
+    // =========================================================================
+    // 🛡️ PARSER JSON AMAN (ANTI-CRASH & ANTI-FREEZE LAYAR)
+    // =========================================================================
+    safeParseJSON: function(jsonString, fallback = {}) {
+        if (!jsonString || typeof jsonString !== 'string' || jsonString.trim() === '') return fallback;
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.warn("Gagal memparsing JSON dari server, menggunakan fallback:", jsonString);
+            return fallback;
+        }
+    },
     
     getEmptyState: function(icon, title, desc) { return `<div class="flex flex-col items-center justify-center h-full p-8 text-center opacity-70"><div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl text-slate-300 mb-4 mx-auto"><i class="fas ${icon}"></i></div><h4 class="font-black text-slate-600 text-lg mb-1">${title}</h4><p class="text-xs font-bold text-slate-400">${desc}</p></div>`; },
     showToast: function(msg, type = 'success') {
@@ -2635,48 +2648,7 @@ const superApp = {
         this.closeApprovalModal();
     },
 
-    // =========================================================
-    // 🚀 EKSEKUSI APPROVAL OWNER (SETUJUI / TOLAK)
-    // =========================================================
-    eksekusiApprovalEdit: async function(idRep, keputusan) {
-        
-
-        this.setLoading(true, "Memproses persetujuan...");
-        
-        let idx = (this.db.laporanHarian || []).findIndex(x => x.ID_Laporan === idRep);
-        if (idx > -1) {
-            if (keputusan === 'Disetujui') {
-                // 🚀 JIKA DISETUJUI: Pindahkan angka dari kotak revisi ke angka asli!
-                try {
-                    let rev = JSON.parse(this.db.laporanHarian[idx].Revisi_JSON || '{}');
-                    if (rev.net_sales !== undefined) {
-                        this.db.laporanHarian[idx].Cash = rev.cash;
-                        this.db.laporanHarian[idx].QRIS = rev.qris;
-                        this.db.laporanHarian[idx].Net_Sales = rev.net_sales;
-                        this.db.laporanHarian[idx].Bill = rev.bill;
-                        this.db.laporanHarian[idx].Pcs = rev.pcs;
-                        this.db.laporanHarian[idx].Pengeluaran_JSON = rev.pengeluaran_json;
-                        this.db.laporanHarian[idx].Total_Pengeluaran = rev.total_pengeluaran;
-                    }
-                } catch(e) {}
-            }
-            this.db.laporanHarian[idx].Status_Approval = 'Disetujui';
-            this.db.laporanHarian[idx].Revisi_JSON = '';
-            localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
-        }
-
-        await this.apiPost({
-            action: 'approve_edit_laporan',
-            id_laporan: idRep,
-            keputusan: keputusan
-        });
-
-        this.setLoading(false);
-        this.showToast(`Revisi telah ${keputusan}! Angka pembukuan diperbarui.`, 'success');
-        this.renderLaporanHarianHistory();
-    },
-
-   
+    
     resetDailyForm: function(skipDateReset = false) {
         // Reset memori edit
         this.editReportId = null;
@@ -2704,8 +2676,8 @@ const superApp = {
         this.calcDailyReportLive();
     },
 
-    // =========================================================
-    // 🚀 2. RIWAYAT LAPORAN HARIAN (DEFAULT RANGE BULAN BERJALAN)
+   // =========================================================
+    // 🚀 2. RIWAYAT LAPORAN HARIAN (ANTI-CRASH & RESPONSIF)
     // =========================================================
     renderLaporanHarianHistory: function() {
         const tbody = document.getElementById('laporan-harian-tbody');
@@ -2772,11 +2744,14 @@ const superApp = {
                 badgeStatus = `<span class="mt-1 inline-block bg-rose-100 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] font-black"><i class="fas fa-xmark mr-1"></i>Revisi Ditolak</span>`;
             }
 
+            // 🛡️ PARSING AMAN: Mencegah crash jika string JSON rusak atau kosong
             let infoRevisi = '';
             if (status === 'Pending Edit') {
                 try {
-                    let rev = JSON.parse(item.Revisi_JSON || '{}');
-                    if (rev.net_sales !== undefined) {
+                    let revObj = item.Revisi_JSON;
+                    let rev = typeof revObj === 'string' ? JSON.parse(revObj || '{}') : (revObj || {});
+                    
+                    if (rev && rev.net_sales !== undefined) {
                         // Cek apakah item pengeluaran diubah
                         let expChanged = (item.Pengeluaran_JSON !== rev.pengeluaran_json);
                         let expBadge = expChanged ? `<div class="mt-1.5 bg-amber-200/60 text-amber-800 px-2 py-1 rounded-md border border-amber-300 inline-block text-[9px] shadow-sm"><i class="fas fa-receipt mr-1"></i> Rincian Pengeluaran Diubah</div>` : '';
@@ -2784,12 +2759,14 @@ const superApp = {
                         infoRevisi = `
                         <div class="mt-1.5 p-2.5 bg-amber-100/90 border border-amber-300 rounded-lg text-[10px] text-amber-900 leading-tight">
                             <b>📌 Ajuan Revisi (${rev.editor || 'Staf'}):</b><br>
-                            Sales Baru: <b class="text-rose-600">Rp ${Number(rev.net_sales).toLocaleString('id-ID')}</b><br>
+                            Sales Baru: <b class="text-rose-600">Rp ${Number(rev.net_sales || 0).toLocaleString('id-ID')}</b><br>
                             C: Rp ${Number(rev.cash||0).toLocaleString('id-ID')} | Q: Rp ${Number(rev.qris||0).toLocaleString('id-ID')}
                             <br>${expBadge}
                         </div>`;
                     }
-                } catch(e){}
+                } catch(e) {
+                    console.warn("Gagal memparsing Revisi_JSON pada ID:", item.ID_Laporan);
+                }
             }
 
             let tombolOwnerDesk = (status === 'Pending Edit' && isOwner) ? `
@@ -2855,6 +2832,63 @@ const superApp = {
         if (tbody) tbody.innerHTML = deskHtml || `<tr><td colspan="5" class="py-10 text-center text-slate-400 font-bold text-xs">Belum ada riwayat laporan pada rentang tanggal ini</td></tr>`;
         if (mobCont) mobCont.innerHTML = mobHtml || `<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada riwayat laporan pada rentang tanggal ini</div>`;
         if (document.getElementById('laporan-harian-count')) document.getElementById('laporan-harian-count').innerText = `${count} Laporan`;
+    },
+
+    // =========================================================
+    // 🚀 EKSEKUSI APPROVAL OWNER (SETUJUI / TOLAK)
+    // =========================================================
+    eksekusiApprovalEdit: async function(idRep, keputusan) {
+        // 🛡️ KONFIRMASI AMAN: Mencegah salah klik di layar HP
+        if (!confirm(`Apakah Anda yakin ingin ${keputusan.toUpperCase()} pengajuan revisi pada laporan ini?`)) return;
+
+        this.setLoading(true, "Memproses persetujuan...");
+        
+        try {
+            let idx = (this.db.laporanHarian || []).findIndex(x => x.ID_Laporan === idRep);
+            if (idx > -1) {
+                if (keputusan === 'Disetujui') {
+                    // 🚀 JIKA DISETUJUI: Pindahkan angka dari kotak revisi ke angka asli secara aman!
+                    try {
+                        let revObj = this.db.laporanHarian[idx].Revisi_JSON;
+                        let rev = typeof revObj === 'string' ? JSON.parse(revObj || '{}') : (revObj || {});
+                        
+                        if (rev && rev.net_sales !== undefined) {
+                            this.db.laporanHarian[idx].Cash = Number(rev.cash || 0);
+                            this.db.laporanHarian[idx].QRIS = Number(rev.qris || 0);
+                            this.db.laporanHarian[idx].Net_Sales = Number(rev.net_sales || 0);
+                            this.db.laporanHarian[idx].Bill = Number(rev.bill || 0);
+                            this.db.laporanHarian[idx].Pcs = Number(rev.pcs || 0);
+                            this.db.laporanHarian[idx].Pengeluaran_JSON = rev.pengeluaran_json || '[]';
+                            this.db.laporanHarian[idx].Total_Pengeluaran = Number(rev.total_pengeluaran || 0);
+                        }
+                    } catch(e) {
+                        console.warn("Gagal memproses parsing revisi lokal:", e);
+                    }
+                }
+                this.db.laporanHarian[idx].Status_Approval = keputusan;
+                this.db.laporanHarian[idx].Revisi_JSON = '';
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+            }
+
+            await this.apiPost({
+                action: 'approve_edit_laporan',
+                id_laporan: idRep,
+                keputusan: keputusan
+            });
+
+            this.showToast(`Revisi telah ${keputusan}! Angka pembukuan diperbarui.`, 'success');
+            
+            // 🚀 SINKRONISASI TOTAL: Segarkan tabel DAN kartu total dasbor
+            this.renderLaporanHarianHistory();
+            if (typeof this.renderReport === 'function') this.renderReport();
+            if (typeof this.refreshData === 'function') this.refreshData();
+
+        } catch (err) {
+            console.error("Gagal mengeksekusi approval:", err);
+            this.showToast("Gagal memproses otorisasi: " + err.message, "error");
+        } finally {
+            this.setLoading(false);
+        }
     },
 
     
