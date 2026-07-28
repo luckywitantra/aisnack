@@ -307,138 +307,96 @@ const superApp = {
     },
     
     
-   // =========================================================================
-    // 🚀 1. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI Tanpa Pemutus Paksa)
-    // =========================================================================
-    pullBackgroundData: async function() {
-        console.log("Memulai sinkronisasi data latar belakang...");
-        try {
-            // 🚀 SINKRONISASI: Dihilangkan AbortController agar proses belakang layar
-            // bisa berhalan santai menyelesaikan unduhan 90 hari tanpa takut diputus paksa.
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=90", { 
-                method: 'GET',
-                redirect: 'follow',
-                cache: 'no-store'
-            });
-
-            const data = await res.json();
-            
-            if (data && data.status === 'sukses') {
-                // 1. Timpa database memori lokal dengan data yang lebih lengkap
-                this.db = data;
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-                
-                // 2. Refresh elemen-elemen senyap jika diperlukan
-                if (typeof this.updatePendingNotifications === 'function') this.updatePendingNotifications();
-                
-                // 🚀 PERBAIKAN: Jika kasir/owner sedang membuka aplikasi, perbarui layar secara otomatis!
-                if (this.currentUser) {
-                    if (this.cart.length === 0) this.refreshData();
-                    if (typeof this.renderReport === 'function' && !document.getElementById('view-report')?.classList.contains('hidden')) this.renderReport();
-                    if (typeof this.generateAIReport === 'function' && !document.getElementById('view-ai')?.classList.contains('hidden')) this.generateAIReport();
-                }
-
-                console.log("✅ Sinkronisasi latar belakang selesai! (Memuat riwayat 90 hari)");
-            }
-        } catch (e) {
-            console.warn("Sinkronisasi latar belakang dilewati (Server Offline/Gangguan).", e.message);
-        }
-    },
-
-    // =========================================================================
-    // 🚀 2. TARIK DATA MANUAL (TOMBOL TARIK DATA - STABIL & AUTO-RETRY)
+  // =========================================================================
+    // 🚀 TARIK DATA MANUAL (STABILITAS LAWAS + OPTIMASI ENTERPRISE 31 HARI)
     // =========================================================================
     pullFreshData: async function(silent = false) {
         if (this.isProcessing && !silent) return; 
+        if (!silent) this.setLoading(true, "Menarik Data Terbaru...");
         
-        if (!silent) this.setLoading(true, "Menyinkronkan Database Terkini...");
-        this.isProcessing = true; 
-
-        let data = null;
-
         try {
-            // 🚀 SINKRONISASI: Menggunakan 3x pengulangan alami seperti pada init
-            for (let i = 0; i < 3; i++) {
-                try {
-                    // 🚀 DIET PAYLOAD: Diganti menjadi history=31
-                    // Agar tombol tarik data manual melesat super kilat (< 2 detik)!
-                    const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
-                        method: 'GET',
-                        redirect: 'follow',
-                        cache: 'no-store'
-                    }); 
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
+                method: 'GET',
+                redirect: 'follow',
+                cache: 'no-store'
+            }); 
+            
+            const data = await res.json();
+            
+            if (data && data.status === 'sukses') { 
+                
+                // --- 🚀 RADAR PENDETEKSI UPDATE VERSI KODINGAN ---
+                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+                if (serverVersion) {
+                    let localVersion = localStorage.getItem('app_version');
                     
-                    data = await res.json();
-                    if (data && data.status === 'sukses') break; 
-                } catch (e) {
-                    console.warn(`[Tarik Data] Percobaan ke-${i+1}/3 gagal:`, e.message);
-                    if (!silent && i < 2) {
-                        this.setLoading(true, `Mencoba ulang koneksi (${i+2}/3)...`);
-                        await new Promise(r => setTimeout(r, 1500));
+                    // Jika baru pertama kali buka, simpan versinya
+                    if (!localVersion) {
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                    } 
+                    // JIKA VERSI DI GOOGLE SHEETS BERBEDA DENGAN DI HP KASIR
+                    else if (localVersion !== serverVersion.Nilai) {
+                        
+                        // 1. Tampilkan Pop-up Pembaruan Paksa
+                        alert(`🚀 UPDATE SISTEM TERSEDIA!\n\nKodingan versi baru (${serverVersion.Nilai}) telah dirilis oleh Owner.\n\nSistem akan dimuat ulang (Refresh) secara otomatis untuk menerapkan pembaruan.`);
+                        
+                        // 2. Perbarui ingatan memori versi di HP
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                        
+                        // 3. Paksa Service Worker PWA untuk memeriksa pembaruan file cache
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                                for(let registration of registrations) { registration.update(); }
+                            });
+                        }
+                        
+                        // 4. Paksa aplikasi memuat ulang (reload) detik itu juga
+                        window.location.reload(true);
+                        return; // Hentikan fungsi ke bawah agar data lama tidak ditimpa
                     }
                 }
-            }
-            
-            if (!data || data.status === 'error') {
-                throw new Error(data ? data.pesan : "Gagal mengunduh dari server");
-            }
+                // ------------------------------------------------
                 
-            // --- RADAR PENDETEKSI UPDATE VERSI ---
-            let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
-            if (serverVersion) {
-                let localVersion = localStorage.getItem('app_version');
+                this.db = data; 
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); 
+
+                // ========================================================
+                // 🚀 JEMBATAN SINKRONISASI PENGATURAN PERSONALISASI (BARU)
+                // ========================================================
                 
-                if (!localVersion) {
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                } 
-                else if (localVersion !== serverVersion.Nilai) {
-                    console.log("Versi baru ditemukan, memuat ulang...");
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                    
-                    if ('serviceWorker' in navigator) {
-                        const regs = await navigator.serviceWorker.getRegistrations();
-                        for(let reg of regs) { reg.update(); }
-                    }
-                    
-                    window.location.reload(true);
-                    return; 
+                // 1. Set Logo Aplikasi Global
+                let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
+                if (logoData && logoData.Nilai) {
+                    localStorage.setItem('app_logo_url', logoData.Nilai);
+                    if(typeof this.updateAppLogos === 'function') this.updateAppLogos(logoData.Nilai); 
                 }
-            }
-            
-            // Simpan database ke memori
-            this.db = data; 
-            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                
+                // 2. Set DUAL Promo Layar CFD
+                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
+                if (pStandby && pStandby.Nilai) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
+                
+                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
+                if (pTransaksi && pTransaksi.Nilai) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
-            // JEMBATAN PENGATURAN PERSONALISASI
-            let configs = [
-                { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
-                { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
-                { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
-                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
-            ];
-
-            configs.forEach(c => {
-                let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
-                if (item && item.Nilai) {
-                    localStorage.setItem(c.storage, item.Nilai);
-                    if (c.callback) c.callback(item.Nilai);
+                // 3. TARIK KEMBALI TEMPLATE STRUK DARI SERVER
+                let tStruk = (this.db.pengaturan || []).find(x => x.Pengaturan === 'aisnack_receipt_template');
+                if (tStruk && tStruk.Nilai) {
+                    localStorage.setItem('aisnack_receipt_template', tStruk.Nilai);
                 }
-            });
-            
-            // Refresh layar jika tidak sedang melayani pelanggan
-            if (this.cart.length === 0) this.refreshData(); 
-            
-            if (!silent) this.showToast("Database berhasil disinkronkan! (14 Hari Terakhir)"); 
-            
+                // ========================================================
+                
+                // Hanya perbarui layar jika keranjang kosong (tidak mengganggu transaksi)
+                if (this.cart.length === 0) {
+                    this.refreshData(); 
+                }
+                
+                if (!silent) this.showToast("Data diperbarui!"); 
+            } 
         } catch (e) { 
-            console.warn("Fetch Error pullFreshData:", e.message);
-            if (!silent) {
-                this.showToast("Gagal menarik data. Cek koneksi internet Anda.", "error"); 
-            }
-        } finally {
-            this.isProcessing = false;
-            if (!silent) this.setLoading(false);
+            if (!silent) this.showToast("Gagal menarik data.", "error"); 
         }
+        
+        if (!silent) this.setLoading(false);
     },
 
     // =========================================================================
