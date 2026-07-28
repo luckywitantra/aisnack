@@ -1,5 +1,5 @@
 // 🛑 ATURAN EMAS 1: Setiap upload versi baru ke GitHub/Server, NAIKKAN ANGKA VERSI INI!
-const CACHE_NAME = 'aisnack-erp-v596';
+const CACHE_NAME = 'aisnack-erp-v597';
 
 // 🚀 PERBAIKAN 2: Masukkan app.js dan Ikon PWA ke dalam daftar instalasi wajib
 const urlsToCache = [
