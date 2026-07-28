@@ -515,19 +515,30 @@ const superApp = {
         }
     },
 
-   
-
+    // =========================================================
+    // 🚀 ENGINE: TOGGLE DARK MODE (DENGAN MEMORI PERMANEN)
+    // =========================================================
     toggleDarkMode: function() { 
         document.documentElement.classList.toggle('dark'); 
+        let isDark = document.documentElement.classList.contains('dark');
+        
+        // Simpan pilihan tema kasir ke memori HP/PC
+        localStorage.setItem('aisnack_theme', isDark ? 'dark' : 'light');
+        
         let ic = document.getElementById('dark-icon'); 
         if (ic) { 
-            if (document.documentElement.classList.contains('dark')) { 
+            if (isDark) { 
                 ic.classList.replace('fa-moon', 'fa-sun'); 
                 ic.classList.replace('text-slate-600', 'text-yellow-400'); 
             } else { 
                 ic.classList.replace('fa-sun', 'fa-moon'); 
                 ic.classList.replace('text-yellow-400', 'text-slate-600'); 
             } 
+        }
+        
+        // Beri notifikasi kecil agar kasir tahu tema telah disimpan
+        if (typeof this.showToast === 'function') {
+            this.showToast(isDark ? '🌙 Tema Gelap (Dark Mode) Diaktifkan' : '☀️ Tema Terang (Light Mode) Diaktifkan');
         }
     },
 
@@ -1024,7 +1035,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v568"; 
+        const CURRENT_VER = "v570"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
@@ -1064,6 +1075,12 @@ const superApp = {
             }, 600);
             return; // 🛑 Hentikan seluruh eksekusi agar tidak bisa login
         }
+
+        // --- 🚀 PULIHKAN TEMA GELAP DARI MEMORI HP (CEGAH FLASH PUTIH) ---
+        if (localStorage.getItem('aisnack_theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+        // -----------------------------------------------------------------
 
         // =========================================================================
         // 🚀 0.5 URL CLEANER: Hapus angka ?v= atau ?nocache= dari Address Bar
@@ -1190,22 +1207,34 @@ const superApp = {
                 } 
             }
 
-            // Fungsi penarik data yang dirapikan
+            // =====================================================================
+            // 🚀 ENGINE PENARIK DATA (DENGAN AUTO-TIMEOUT 8 DETIK & SELF-HEALING UI)
+            // =====================================================================
             let performFetch = async () => {
                 let data = null;
-                for (let i = 0; i < 3; i++) {
+                // Kurangi menjadi 2x percobaan agar kasir tidak lama menunggu jika sinyal jelek
+                for (let i = 0; i < 2; i++) {
                     try { 
-                        // 🚀 AWAL BUKA: Tarik 30 hari agar super cepat!
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { redirect: 'follow' }); 
+                        // ⏰ Pasang bom waktu 8 detik! Jika Google lambat/down, langsung putus.
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { 
+                            redirect: 'follow',
+                            signal: controller.signal 
+                        }); 
+                        clearTimeout(timeoutId); // Batalkan bom waktu jika server menjawab
+                        
                         data = await res.json(); 
                         if (data && data.status === 'sukses') break; 
                     } catch (e) { 
-                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
-                        await new Promise(r => setTimeout(r, 2000)); 
+                        console.warn(`Percobaan ke-${i+1} ke server gagal:`, e.message);
+                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/2)...`; 
+                        await new Promise(r => setTimeout(r, 1500)); 
                     }
                 }
                 
-                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
+                if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout / Offline");
 
                 // --- PROSES DATA SUKSES ---
                 this.db = data; 
@@ -1226,13 +1255,13 @@ const superApp = {
                 if (fs && !fs.value) fs.value = todayStr; 
                 if (fe && !fe.value) fe.value = todayStr;
 
+                // 🟢 BERHASIL: Ubah teks menjadi hijau statis!
                 if (logStat) { 
                     logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
-                // 🚀 TRIGGER BACKGROUND SYNC
-                // Setelah 3 detik aplikasi jalan, secara diam-diam tarik semua historis tahunan
+                // 🚀 TRIGGER BACKGROUND SYNC (Tarik data historis lengkap setelah 3 detik)
                 setTimeout(() => {
                     if (typeof this.pullBackgroundData === 'function') {
                         this.pullBackgroundData();
@@ -1240,18 +1269,28 @@ const superApp = {
                 }, 3000);
             };
 
-            // Logika Pembacaan Data
+            // =====================================================================
+            // 🚀 LOGIKA EKSEKUSI (DENGAN PENANGKAP ERROR LATAR BELAKANG)
+            // =====================================================================
             if (cacheDb) {
-                performFetch(); // Biarkan proses di belakang layar, kasir sudah bisa masuk pakai PIN
+                // Biarkan di latar belakang, TAPI pasang .catch agar teks loading tidak macet abadi!
+                performFetch().catch(err => {
+                    console.warn("Sinkronisasi latar belakang terhenti:", err.message);
+                    if (logStat) { 
+                        // 🟠 GAGAL/TIMEOUT: Ubah teks menjadi orange statis (berhenti berkedip)
+                        logStat.innerText = 'Mode Lokal Aktif (Server Lambat/Offline)'; 
+                        logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
+                    }
+                });
             } else {
-                await performFetch(); // Blokir layar karena ini instalasi pertama kali
+                await performFetch(); // Blokir layar karena belum ada cadangan lokal sama sekali
             }
 
         } catch (err) {
-            // 🚀 INI ADALAH BLOK CATCH YANG TERHAPUS SEBELUMNYA
+            // Penanganan error untuk instalasi pertama kali (belum ada cache)
             const logStat = document.getElementById('login-status');
             if (logStat && this.db) { 
-                logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
+                logStat.innerText = 'Mode Lokal Aktif (Gunakan PIN Anda)'; 
                 logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
             } else if (logStat) { 
                 logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; 
