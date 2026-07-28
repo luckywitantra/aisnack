@@ -748,13 +748,23 @@ const superApp = {
         }
     },
 
-    // =========================================================================
-    // 🚀 ENGINE KHUSUS ARSIP LAWAS (TARIK SEMUA DATA > 90 HARI / TAHUNAN)
+   // =========================================================================
+    // 🚀 ENGINE KHUSUS ARSIP LAWAS (DENGAN POP-UP KONFIRMASI CANTIK)
     // =========================================================================
     pullDeepArchiveData: async function() {
         if (this.isProcessing) return;
         
-        if (!confirm("Proses ini akan mengunduh SELURUH riwayat transaksi dari hari pertama toko buka.\n\nWaktu unduh sekitar 15-30 detik tergantung jumlah tahunan data.\nLanjutkan?")) return;
+        // 🚀 PANGGIL POP-UP MODERN KITA DENGAN PROMISE (AWAIT)
+        const confirmed = await this.customConfirm({
+            title: "Unduh Arsip Tahunan?",
+            message: "Proses ini akan menarik <b class='text-amber-600 dark:text-amber-400'>seluruh riwayat transaksi & pembukuan</b> dari hari pertama toko buka.<br><br>⏳ Waktu unduh sekitar <b>15–30 detik</b> tergantung jumlah data tahunan Anda.",
+            icon: "fa-clock-rotate-left",
+            theme: "amber",
+            btnText: "Ya, Unduh Semua"
+        });
+
+        // Jika user klik "Batal" atau klik di luar kotak, hentikan fungsi
+        if (!confirmed) return;
 
         this.setLoading(true, "Mengunduh Seluruh Arsip Tahunan (Mohon Tunggu)...");
         this.isProcessing = true;
