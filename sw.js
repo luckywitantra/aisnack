@@ -60,8 +60,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const reqUrl = event.request.url;
 
-  // Abaikan API Google Sheets & Google Drive agar database selalu real-time
-  if (reqUrl.includes('script.google.com') || reqUrl.includes('googleusercontent.com')) return;
+  // =========================================================================
+  // 🚀 ATURAN MUTLAK BYPASS API (DIPERKETAT):
+  // Menangkap seluruh rantai redirect Google (script.google.com -> googleusercontent.com -> /macros -> /exec)
+  // Jangan pernah intersep atau cache request yang mengandung unsur-unsur ini!
+  // =========================================================================
+  if (reqUrl.includes('/exec') || reqUrl.includes('google') || reqUrl.includes('script.') || reqUrl.includes('macros')) {
+    return; // Biarkan browser memproses langsung ke jaringan web murni (Bypass Total)!
+  }
 
   // 🚀 JURUS NETWORK-FIRST KHUSUS FILE SISTEM (HTML, JS, CSS, Navigasi)
   if (reqUrl.includes('.html') || reqUrl.includes('.js') || reqUrl.includes('.css') || event.request.mode === 'navigate') {
@@ -77,7 +83,7 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           // 🚀 PERBAIKAN 3: Tambahkan { ignoreSearch: true } agar tetap ketemu saat offline
-          // meskipun URL-nya mengandung buntut parameter seperti ?v=581 atau ?mode=cfd
+          // meskipun URL-nya mengandung buntut parameter seperti ?v=583 atau ?mode=cfd
           return caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
             if (cachedResponse) return cachedResponse;
             // Fallback terakhir jika offline dan file tidak ada: kembalikan ke index.html
