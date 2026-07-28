@@ -428,6 +428,17 @@ const superApp = {
                     this.refreshData();
                     this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
                 }
+
+                // =====================================================================
+                // 🚀 INJECT PENARIK DATA LATAR BELAKANG (PULL BACKGROUND DATA)
+                // Beri jeda 3 detik agar HP kasir tidak lag saat baru membuka aplikasi
+                // =====================================================================
+                setTimeout(() => {
+                    if (typeof this.pullBackgroundData === 'function') {
+                        console.log("⏰ Memicu penarikan data latar belakang (90 Hari)...");
+                        this.pullBackgroundData();
+                    }
+                }, 3000);
             };
 
             // Logika eksekusi latar belakang vs pemblokiran layar
@@ -4891,50 +4902,81 @@ refreshData: function() {
         const lOutManage = document.getElementById('label-outlet-manage'); 
         if (lOutManage) lOutManage.innerHTML = this.getOutletBadge(this.outlet);
 
-        // 3. PROSES & FILTER PRODUK (Sesuai Cabang Aktif)
+        // =====================================================================
+        // 🚀 3. PROSES & FILTER PRODUK (DENGAN NORMALISASI OUTLET & NUMBER SAFETY)
+        // =====================================================================
         this.filteredProducts = [];
+        
         if (this.db && this.db.masterProduk) {
+            // Normalisasi nama cabang aktif agar kebal terhadap spasi / awalan "Ai-Snack"
+            let targetOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+
             this.db.masterProduk.forEach(master => {
-                if (String(master.Kategori || '').toLowerCase() !== 'bahan' && String(master.Kategori || '').toLowerCase() !== 'pendukung') {
-                    // Cari harga dan stok khusus untuk cabang yang sedang dipilih
-                    let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => x.SKU === master.SKU && x.ID_Outlet === this.outlet);
+                let katClean = String(master.Kategori || '').trim().toLowerCase();
+                
+                if (katClean !== 'bahan' && katClean !== 'pendukung') {
+                    // 🛡️ KOMPARASI AMAN: Normalisasi ID_Outlet dari database sebelum dibandingkan
+                    let hargaOutlet = (this.db.hargaStokOutlet || []).find(x => {
+                        let rowOutletClean = String(x.ID_Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+                        return String(x.SKU).trim() === String(master.SKU).trim() && rowOutletClean === targetOutletClean;
+                    });
+
                     let stokReference = master.SKU_Bahan ? master.SKU_Bahan : master.SKU;
-                    let stokBahan = (this.db.hargaStokOutlet || []).find(x => x.SKU === stokReference && x.ID_Outlet === this.outlet);
+                    let stokBahan = (this.db.hargaStokOutlet || []).find(x => {
+                        let rowOutletClean = String(x.ID_Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
+                        return String(x.SKU).trim() === String(stokReference).trim() && rowOutletClean === targetOutletClean;
+                    });
                     
+                    // 🛡️ NUMBER SAFETY: Pastikan harga jual benar-benar angka > 0
+                    let hargaJualNum = hargaOutlet ? Number(hargaOutlet.Harga_Jual || 0) : 0;
+
                     // Hanya tampilkan di POS jika harga sudah disetting ( > 0 )
-                    if (hargaOutlet && hargaOutlet.Harga_Jual > 0) {
-                        let qtySisa = stokBahan ? stokBahan.Stok_Toko : 0;
+                    if (hargaJualNum > 0) {
+                        let qtySisa = stokBahan ? Number(stokBahan.Stok_Toko || 0) : 0;
+                        
                         this.filteredProducts.push({ 
-                            sku: master.SKU, 
-                            nama: master.Nama_Produk, 
-                            img: master.Gambar_URL, 
-                            harga: hargaOutlet.Harga_Jual, 
+                            sku: String(master.SKU).trim(), 
+                            nama: String(master.Nama_Produk || '').trim(), 
+                            img: master.Gambar_URL || '', 
+                            harga: hargaJualNum, 
                             maxStok: qtySisa, 
-                            sku_bahan: master.SKU_Bahan,
-                            hpp: master.HPP || 0
+                            sku_bahan: master.SKU_Bahan || '',
+                            hpp: Number(master.HPP || 0)
                         });
                     }
                 }
             });
         }
+        
         // Urutkan produk berdasarkan abjad agar kasir mudah mencari
         this.filteredProducts.sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
 
-        // 4. RENDER SEMUA TAMPILAN (Sinkronisasi UI)
-        if (document.getElementById('product-list')) this.renderProducts();
-        if (typeof this.renderReport === 'function') this.renderReport();
-        if (typeof this.renderGudang === 'function') this.renderGudang();
-        if (typeof this.renderStaf === 'function') this.renderStaf();
-        if (typeof this.renderOpname === 'function') this.renderOpname();
-        if (typeof this.renderAudit === 'function') this.renderAudit();
-        if (typeof this.renderTerimaBarang === 'function') this.renderTerimaBarang();
-        if (typeof this.generateAIReport === 'function') this.generateAIReport();
+        // =====================================================================
+        // 🚀 4. RENDER SEMUA TAMPILAN (DENGAN ISOLASI ERROR / SAFE WRAPPER)
+        // =====================================================================
+        // Helper senyap: Jika 1 render error, render yang lain tetap jalan (Anti Domino Crash)
+        const safeRender = (fnName, condition = true) => {
+            if (condition && typeof this[fnName] === 'function') {
+                try {
+                    this[fnName]();
+                } catch (err) {
+                    console.warn(`[Safe Render] Gagal merender "${fnName}":`, err.message);
+                }
+            }
+        };
+
+        safeRender('renderProducts', !!document.getElementById('product-list'));
+        safeRender('renderReport');
+        safeRender('renderGudang');
+        safeRender('renderStaf');
+        safeRender('renderOpname');
+        safeRender('renderAudit');
+        safeRender('renderTerimaBarang');
+        safeRender('generateAIReport');
 
         // 🚀 5. TRIGGER NOTIFIKASI SPANDUK & BADGE 
-        // (Agar spanduk kuning di layar kasir otomatis hilang saat Owner selesai Approve)
-        if (typeof this.updatePendingNotifications === 'function') {
-            this.updatePendingNotifications();
-        }
+        // (Dijamin pasti tereksekusi karena aman dari efek domino error di atas)
+        safeRender('updatePendingNotifications');
     },
 
 
