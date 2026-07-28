@@ -1132,7 +1132,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v582"; 
+        const CURRENT_VER = "v585"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
