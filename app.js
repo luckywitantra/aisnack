@@ -1132,7 +1132,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v585"; 
+        const CURRENT_VER = "v586"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
@@ -1305,20 +1305,25 @@ const superApp = {
             }
 
             // =====================================================================
-            // 🚀 ENGINE PENARIK DATA (ANTI-CACHE HTTP & AUTO RE-RENDER LAYAR)
+            // 🚀 ENGINE PENARIK DATA (ADAPTIVE TIMEOUT & AUTO-RETRY AWAL)
             // =====================================================================
             let performFetch = async () => {
                 let data = null;
-                for (let i = 0; i < 2; i++) {
+                
+                // 🚀 JURUS ADAPTIVE: Jika baru pertama kali buka (!cacheDb), beri 3x percobaan & waktu 35 detik!
+                // Jika sudah ada cache harian, cukup 2x percobaan & 25 detik.
+                let maxAttempts = cacheDb ? 2 : 3;
+                let timeoutLimit = cacheDb ? 25000 : 35000;
+
+                for (let i = 0; i < maxAttempts; i++) {
                     try { 
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 15000);
+                        const timeoutId = setTimeout(() => controller.abort(), timeoutLimit);
 
-                        // 🚀 PERBAIKAN 1: Wajib tambahkan cache: 'no-store' agar browser tidak memberi data bekas!
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=14", { 
                             method: 'GET',
                             redirect: 'follow',
-                            cache: 'no-store', // <-- KUNCI ANTI-CACHE HTTP WEBVIEW
+                            cache: 'no-store',
                             signal: controller.signal 
                         }); 
                         clearTimeout(timeoutId);
@@ -1326,9 +1331,11 @@ const superApp = {
                         data = await res.json(); 
                         if (data && data.status === 'sukses') break; 
                     } catch (e) { 
-                        console.warn(`Percobaan ke-${i+1} ke server gagal:`, e.message);
-                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/2)...`; 
-                        await new Promise(r => setTimeout(r, 1500)); 
+                        console.warn(`[Init Fetch] Percobaan ke-${i+1}/${maxAttempts} gagal:`, e.message);
+                        if (logStat && !this.db) {
+                            logStat.innerText = `Mencoba hubungkan ulang (${i+1}/${maxAttempts})...`;
+                        }
+                        await new Promise(r => setTimeout(r, 2000)); // Beri jeda 2 detik sebelum coba lagi
                     }
                 }
                 
@@ -1356,9 +1363,7 @@ const superApp = {
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
-                // 🚀 PERBAIKAN 2: JIKA KASIR SUDAH LOGIN SAAT BACKGROUND FETCH SELESAI, RE-RENDER LAYAR SECARA OTOMATIS!
                 if (this.currentUser) {
-                    console.log("⚡ Background fetch selesai! Memperbarui tampilan layar kasir secara otomatis...");
                     this.refreshData();
                     this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
                 }
@@ -1374,11 +1379,9 @@ const superApp = {
             // 🚀 LOGIKA EKSEKUSI (DENGAN PENANGKAP ERROR LATAR BELAKANG)
             // =====================================================================
             if (cacheDb) {
-                // Biarkan di latar belakang, TAPI pasang .catch agar teks loading tidak macet abadi!
                 performFetch().catch(err => {
                     console.warn("Sinkronisasi latar belakang terhenti:", err.message);
                     if (logStat) { 
-                        // 🟠 GAGAL/TIMEOUT: Ubah teks menjadi orange statis (berhenti berkedip)
                         logStat.innerText = 'Mode Lokal Aktif (Server Lambat/Offline)'; 
                         logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
                     }
@@ -1388,14 +1391,26 @@ const superApp = {
             }
 
         } catch (err) {
-            // Penanganan error untuk instalasi pertama kali (belum ada cache)
+            // 🚀 PERBAIKAN: Penanganan error interaktif untuk instalasi pertama kali
             const logStat = document.getElementById('login-status');
             if (logStat && this.db) { 
                 logStat.innerText = 'Mode Lokal Aktif (Gunakan PIN Anda)'; 
                 logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
             } else if (logStat) { 
-                logStat.innerText = 'Gagal! Buka aplikasi pertama kali butuh Internet.'; 
-                logStat.className = 'text-[10px] text-red-500 font-bold uppercase tracking-widest text-center'; 
+                // Ubah teks error menjadi tombol klik interaktif & coba ulang otomatis setelah 4 detik
+                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server Google.</span>
+                                     <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-[10px] font-black shadow-md active:scale-95 transition-all">
+                                         <i class="fas fa-rotate-right mr-1"></i> Klik untuk Coba Lagi
+                                     </button>`; 
+                logStat.className = 'text-[10px] font-bold tracking-wider text-center';
+                
+                // Coba muat ulang otomatis dalam 4 detik tanpa merepotkan kasir
+                setTimeout(() => {
+                    if (!this.db) {
+                        console.log("Mencoba muat ulang otomatis untuk pertama kali instal...");
+                        window.location.reload(true);
+                    }
+                }, 4000);
             }
         }
     },
