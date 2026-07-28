@@ -308,23 +308,18 @@ const superApp = {
     
     
    // =========================================================================
-    // 🚀 1. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI & ADA TIMEOUT AMAN)
+    // 🚀 1. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI Tanpa Pemutus Paksa)
     // =========================================================================
     pullBackgroundData: async function() {
         console.log("Memulai sinkronisasi data latar belakang...");
         try {
-            // ⏰ Pasang bom waktu 30 detik agar tidak menggantung selamanya
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' agar webview PWA selalu minta data baru
+            // 🚀 SINKRONISASI: Dihilangkan AbortController agar proses belakang layar
+            // bisa berhalan santai menyelesaikan unduhan 90 hari tanpa takut diputus paksa.
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=90", { 
                 method: 'GET',
                 redirect: 'follow',
-                cache: 'no-store',
-                signal: controller.signal
+                cache: 'no-store'
             });
-            clearTimeout(timeoutId);
 
             const data = await res.json();
             
@@ -346,12 +341,12 @@ const superApp = {
                 console.log("✅ Sinkronisasi latar belakang selesai! (Memuat riwayat 90 hari)");
             }
         } catch (e) {
-            console.warn("Sinkronisasi latar belakang dilewati (Server sibuk/Timeout).", e.message);
+            console.warn("Sinkronisasi latar belakang dilewati (Server Offline/Gangguan).", e.message);
         }
     },
 
     // =========================================================================
-    // 🚀 2. TARIK DATA MANUAL (TOMBOL TARIK DATA - CEPAT & RESPONSIF)
+    // 🚀 2. TARIK DATA MANUAL (TOMBOL TARIK DATA - STABIL & AUTO-RETRY)
     // =========================================================================
     pullFreshData: async function(silent = false) {
         if (this.isProcessing && !silent) return; 
@@ -359,82 +354,86 @@ const superApp = {
         if (!silent) this.setLoading(true, "Menyinkronkan Database Terkini...");
         this.isProcessing = true; 
 
+        let data = null;
+
         try {
-            // ⏰ Pasang bom waktu 15 detik untuk proteksi anti-gantung
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' dan method: 'GET'
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=60", { 
-                method: 'GET',
-                redirect: 'follow',
-                cache: 'no-store',
-                signal: controller.signal
-            }); 
-            clearTimeout(timeoutId);
-
-            const data = await res.json();
-            
-            if (data && data.status === 'sukses') { 
-                
-                // --- RADAR PENDETEKSI UPDATE VERSI ---
-                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
-                if (serverVersion) {
-                    let localVersion = localStorage.getItem('app_version');
+            // 🚀 SINKRONISASI: Menggunakan 3x pengulangan alami seperti pada init
+            for (let i = 0; i < 3; i++) {
+                try {
+                    // 🚀 DIET PAYLOAD: Diganti menjadi history=31
+                    // Agar tombol tarik data manual melesat super kilat (< 2 detik)!
+                    const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
+                        method: 'GET',
+                        redirect: 'follow',
+                        cache: 'no-store'
+                    }); 
                     
-                    if (!localVersion) {
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                    } 
-                    else if (localVersion !== serverVersion.Nilai) {
-                        console.log("Versi baru ditemukan, memuat ulang...");
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                        
-                        if ('serviceWorker' in navigator) {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            for(let reg of regs) { reg.update(); }
-                        }
-                        
-                        window.location.reload(true);
-                        return; 
+                    data = await res.json();
+                    if (data && data.status === 'sukses') break; 
+                } catch (e) {
+                    console.warn(`[Tarik Data] Percobaan ke-${i+1}/3 gagal:`, e.message);
+                    if (!silent && i < 2) {
+                        this.setLoading(true, `Mencoba ulang koneksi (${i+2}/3)...`);
+                        await new Promise(r => setTimeout(r, 1500));
                     }
                 }
-                
-                // Simpan database ke memori
-                this.db = data; 
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
-
-                // JEMBATAN PENGATURAN PERSONALISASI
-                let configs = [
-                    { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
-                    { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
-                    { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
-                    { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
-                ];
-
-                configs.forEach(c => {
-                    let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
-                    if (item && item.Nilai) {
-                        localStorage.setItem(c.storage, item.Nilai);
-                        if (c.callback) c.callback(item.Nilai);
-                    }
-                });
-                
-                // Refresh layar jika tidak sedang melayani pelanggan
-                if (this.cart.length === 0) this.refreshData(); 
-                
-                if (!silent) this.showToast("Database berhasil disinkronkan! (60 Hari Terakhir)"); 
-            } else {
-                throw new Error("Data dari server tidak valid");
             }
+            
+            if (!data || data.status === 'error') {
+                throw new Error(data ? data.pesan : "Gagal mengunduh dari server");
+            }
+                
+            // --- RADAR PENDETEKSI UPDATE VERSI ---
+            let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+            if (serverVersion) {
+                let localVersion = localStorage.getItem('app_version');
+                
+                if (!localVersion) {
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                } 
+                else if (localVersion !== serverVersion.Nilai) {
+                    console.log("Versi baru ditemukan, memuat ulang...");
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                    
+                    if ('serviceWorker' in navigator) {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for(let reg of regs) { reg.update(); }
+                    }
+                    
+                    window.location.reload(true);
+                    return; 
+                }
+            }
+            
+            // Simpan database ke memori
+            this.db = data; 
+            localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+
+            // JEMBATAN PENGATURAN PERSONALISASI
+            let configs = [
+                { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
+                { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
+                { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
+                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
+            ];
+
+            configs.forEach(c => {
+                let item = (this.db.pengaturan || []).find(x => x.Pengaturan === c.key);
+                if (item && item.Nilai) {
+                    localStorage.setItem(c.storage, item.Nilai);
+                    if (c.callback) c.callback(item.Nilai);
+                }
+            });
+            
+            // Refresh layar jika tidak sedang melayani pelanggan
+            if (this.cart.length === 0) this.refreshData(); 
+            
+            if (!silent) this.showToast("Database berhasil disinkronkan! (14 Hari Terakhir)"); 
+            
         } catch (e) { 
             console.warn("Fetch Error pullFreshData:", e.message);
             if (!silent) {
-                // 🚀 PERBAIKAN: Pengecekan error timeout yang lebih komprehensif
-                if (e.name === 'AbortError' || e.name === 'TimeoutError' || e.message.includes('aborted')) {
-                    this.showToast("Server Google sedang sibuk, coba tekan tombol Tarik Data lagi.", "warning");
-                } else {
-                    this.showToast("Gagal menarik data. Cek koneksi internet Anda.", "error"); 
-                }
+                this.showToast("Gagal menarik data. Cek koneksi internet Anda.", "error"); 
             }
         } finally {
             this.isProcessing = false;
@@ -455,18 +454,13 @@ const superApp = {
         this.isProcessing = true;
 
         try {
-            // ⏰ Pasang bom waktu 60 detik (60000 ms) khusus untuk data raksasa
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-            // 🚀 PERBAIKAN: Ditambahkan cache: 'no-store' agar tidak mengambil dari cache webview
+            // 🚀 SINKRONISASI: Pada unduhan raksasa tahunan (history=all), kita hilangkan 
+            // AbortController agar tidak putus di tengah jalan saat mengunduh file 5MB+.
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { 
                 method: 'GET',
                 redirect: 'follow',
-                cache: 'no-store',
-                signal: controller.signal
+                cache: 'no-store'
             });
-            clearTimeout(timeoutId);
 
             const data = await res.json();
             
@@ -474,7 +468,7 @@ const superApp = {
                 // Timpa database aktif saat ini dengan data yang 100% lengkap
                 this.db = data;
                 
-                // Simpan ke LocalStorage (Kompresor pintar kita di baris atas app.js otomatis melindunginya jika > 5MB)
+                // Simpan ke LocalStorage
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
                 
                 this.showToast("✅ Seluruh arsip data lawas berhasil dimuat!", "success");
@@ -487,11 +481,7 @@ const superApp = {
             }
         } catch (e) {
             console.error("Deep Archive Error:", e);
-            if (e.name === 'AbortError' || e.name === 'TimeoutError' || e.message.includes('aborted')) {
-                this.showToast("Server Google terlalu sibuk memproses data tahunan. Coba lagi beberapa saat.", "warning");
-            } else {
-                this.showToast("Gagal mengunduh arsip lawas: " + e.message, "error");
-            }
+            this.showToast("Gagal mengunduh arsip lawas: " + e.message, "error");
         } finally {
             this.isProcessing = false;
             this.setLoading(false);
