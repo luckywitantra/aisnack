@@ -2676,8 +2676,9 @@ const superApp = {
         this.calcDailyReportLive();
     },
 
-   // =========================================================
-    // 🚀 2. RIWAYAT LAPORAN HARIAN (ANTI-CRASH & RESPONSIF)
+ 
+    // =========================================================
+    // 🚀 2. RIWAYAT LAPORAN HARIAN (KEBAL ERROR & PENANGKAP REVISI)
     // =========================================================
     renderLaporanHarianHistory: function() {
         const tbody = document.getElementById('laporan-harian-tbody');
@@ -2687,18 +2688,16 @@ const superApp = {
         let deskHtml = ''; let mobHtml = ''; let count = 0;
         let now = new Date();
 
-        // Ambil input elemen filter tanggal awal & akhir
         const startInput = document.getElementById('filter-lap-start');
         const endInput = document.getElementById('filter-lap-end');
 
-        // ✨ ATUR DEFAULT RANGE BULAN BERJALAN JIKA KOSONG
         if (startInput && !startInput.value) {
             let pad = n => String(n).padStart(2, '0');
-            startInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`; // Tanggal 1 bulan ini
+            startInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`; 
         }
         if (endInput && !endInput.value) {
             let pad = n => String(n).padStart(2, '0');
-            endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`; // Hari ini
+            endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`; 
         }
 
         let startObj = startInput?.value ? new Date(startInput.value) : null;
@@ -2734,7 +2733,9 @@ const superApp = {
             let net = Number(item.Net_Sales || 0);
             let cash = Number(item.Cash || 0);
             let qris = Number(item.QRIS || 0);
-            let status = item.Status_Approval || 'Disetujui';
+            
+            // 🛡️ PROTEKSI PENANGKAP: Tangkap Status_Approval dari berbagai variasi penulisan header
+            let status = item.Status_Approval || item.status_approval || item['Status Approval'] || 'Disetujui';
             let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
 
             let badgeStatus = '';
@@ -2744,15 +2745,15 @@ const superApp = {
                 badgeStatus = `<span class="mt-1 inline-block bg-rose-100 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] font-black"><i class="fas fa-xmark mr-1"></i>Revisi Ditolak</span>`;
             }
 
-            // 🛡️ PARSING AMAN: Mencegah crash jika string JSON rusak atau kosong
+            // 🛡️ PROTEKSI PENANGKAP REVISI_JSON (Anti-Gagal Tangkap)
             let infoRevisi = '';
             if (status === 'Pending Edit') {
                 try {
-                    let revObj = item.Revisi_JSON;
-                    let rev = typeof revObj === 'string' ? JSON.parse(revObj || '{}') : (revObj || {});
+                    // Cari isi revisi baik dari nama kolom Revisi_JSON maupun revisi_json
+                    let revObj = item.Revisi_JSON || item.revisi_json || item['Revisi JSON'] || '{}';
+                    let rev = typeof revObj === 'string' ? JSON.parse(revObj) : revObj;
                     
                     if (rev && rev.net_sales !== undefined) {
-                        // Cek apakah item pengeluaran diubah
                         let expChanged = (item.Pengeluaran_JSON !== rev.pengeluaran_json);
                         let expBadge = expChanged ? `<div class="mt-1.5 bg-amber-200/60 text-amber-800 px-2 py-1 rounded-md border border-amber-300 inline-block text-[9px] shadow-sm"><i class="fas fa-receipt mr-1"></i> Rincian Pengeluaran Diubah</div>` : '';
                         
@@ -2765,7 +2766,7 @@ const superApp = {
                         </div>`;
                     }
                 } catch(e) {
-                    console.warn("Gagal memparsing Revisi_JSON pada ID:", item.ID_Laporan);
+                    console.warn("Gagal membaca revisi pada ID:", item.ID_Laporan);
                 }
             }
 
