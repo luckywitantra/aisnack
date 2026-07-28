@@ -1024,7 +1024,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v565"; 
+        const CURRENT_VER = "v568"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
@@ -1919,13 +1919,14 @@ const superApp = {
         }
     },
 
-   // =========================================================
-    // 🚀 ENGINE FILTER OUTLET LAPORAN HARIAN (SINKRON UTAMA)
-    // =========================================================
+   // =========================================================================
+    // 2. FILTER LAPORAN BY OUTLET (NORMALISASI OUTLET & RE-INIT)
+    // =========================================================================
     filterLaporanByOutlet: function(targetOutlet) {
-        // 1. Ubah outlet aktif di memori global aplikasi
-        this.outlet = targetOutlet;
-        localStorage.setItem('aicha_active_outlet', targetOutlet);
+        // 1. Bersihkan awalan nama outlet sebelum disimpan
+        let cleanTarget = String(targetOutlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
+        this.outlet = cleanTarget;
+        localStorage.setItem('aicha_active_outlet', cleanTarget);
 
         // 2. Perbarui tampilan aktif pada tombol bar pemilih
         document.querySelectorAll('.btn-lap-outlet').forEach(btn => {
@@ -1933,7 +1934,8 @@ const superApp = {
             btn.classList.add('bg-slate-800', 'text-slate-400', 'hover:bg-slate-700', 'hover:text-white');
         });
 
-        let activeBtn = document.getElementById(`btn-lap-outlet-${targetOutlet}`);
+        // Cari tombol berdasarkan ID baik yang menggunakan nama bersih maupun nama mentah
+        let activeBtn = document.getElementById(`btn-lap-outlet-${targetOutlet}`) || document.getElementById(`btn-lap-outlet-${cleanTarget}`);
         if (activeBtn) {
             activeBtn.classList.remove('bg-slate-800', 'text-slate-400', 'hover:bg-slate-700');
             activeBtn.classList.add('bg-rose-500', 'text-white', 'shadow-2xs');
@@ -1944,10 +1946,9 @@ const superApp = {
             this.updateHeaderOutletName();
         }
 
-        this.showToast(`Memuat Laporan Cabang: ${targetOutlet === 'Semua' ? 'Konsolidasi Seluruh Cabang' : targetOutlet}`);
+        this.showToast(`Memuat Laporan Cabang: ${cleanTarget === 'Semua' ? 'Konsolidasi Seluruh Cabang' : cleanTarget}`);
 
-        // 🚀 4. KUNCI PERBAIKAN: Panggil initLaporanHarian() secara utuh!
-        // Ini akan merefresh otomatis Target Bulanan, Dashboard Eksekutif, Kalender, dan Tabel Riwayat.
+        // 4. Panggil initLaporanHarian() secara utuh
         this.initLaporanHarian();
     },
 
@@ -2194,9 +2195,9 @@ const superApp = {
     },
 
     // 4. Simpan & Buat Teks Laporan WhatsApp Presisi
-   // =========================================================
-    // 🚀 SUBMIT LAPORAN HARIAN (SMART MERGE & GEMBOK TOMBOL AMAN)
-    // =========================================================
+   // =========================================================================
+    // 1. SUBMIT LAPORAN HARIAN (NORMALISASI OUTLET & KALKULASI DINAMIS)
+    // =========================================================================
     submitLaporanHarian: async function() {
         if (this.isProcessing) return;
         let cash = this.getNumericValue(document.getElementById('daily-cash')?.value || 0);
@@ -2215,16 +2216,17 @@ const superApp = {
         let cuaca = this.currentDailyWeather || "31°C";
 
         // ======================================================================
-        // 🛑 1. PROTEKSI AUTO-MERGE (CEGAH DATA GANDA TANGGAL & OUTLET SAMA)
+        // 🛑 1. PROTEKSI AUTO-MERGE & NORMALISASI NAMA OUTLET
         // ======================================================================
-        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
+        // Memastikan nama outlet bersih dari awalan "Ai-Snack " atau "Ai-CHA "
+        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
         let cleanCurrTanggal = String(tglTeks).trim().toLowerCase();
 
         let existingRep = (this.db.laporanHarian || []).find(x => {
             if (x.Status_Approval === 'Ditolak') return false;
             let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
             let xTgl = String(x.Tanggal || '').trim().toLowerCase();
-            return xOut === cleanCurrOutlet && xTgl === cleanCurrTanggal;
+            return xOut === cleanCurrOutlet.toLowerCase() && xTgl === cleanCurrTanggal;
         });
 
         let isEdit = (this.editReportId !== null) || (existingRep !== undefined);
@@ -2249,7 +2251,7 @@ const superApp = {
         this.setLoading(true, "Membaca Akumulasi...");
 
         // ======================================================================
-        // 🚀 3. SINKRONISASI KILAT DENGAN "SMART MERGE" (ANTI-DROP AKUMULASI)
+        // 🚀 3. SINKRONISASI KILAT DENGAN "SMART MERGE"
         // ======================================================================
         if (this.isOnline) {
             try {
@@ -2287,17 +2289,35 @@ const superApp = {
             } catch(e) {}
         }
 
-        // Hitung akumulasi setelah Smart Merge selesai dan data lokal dijamin utuh
-        let exactAccumulation = typeof this.calcMonthlyAccumulation === 'function' 
-            ? this.calcMonthlyAccumulation(netSales) 
-            : (this.currentAccumMonth || netSales);
+        // ======================================================================
+        // 🚀 4. KALKULASI AKUMULASI DINAMIS (ANTI-HARDCODE / ANTI-DROP)
+        // ======================================================================
+        // Selalu prioritaskan kalkulasi langsung dari database. Jika fungsi tidak tersedia,
+        // hitung ulang secara dinamis dari this.db, bukan dari nilai statis yang bisa meleset.
+        let exactAccumulation = 0;
+        if (typeof this.calcMonthlyAccumulation === 'function') {
+            exactAccumulation = this.calcMonthlyAccumulation(netSales);
+        } else {
+            // Kalkulasi cadangan dinamis jika offline / gagal sinkron
+            let accumPrevious = 0;
+            (this.db.laporanHarian || []).forEach(rep => {
+                let repOut = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
+                if (repOut === cleanCurrOutlet.toLowerCase() && rep.Status_Approval !== 'Ditolak') {
+                    if (rep.ID_Laporan !== idRep) {
+                        accumPrevious += Number(rep.Net_Sales || 0);
+                    }
+                }
+            });
+            exactAccumulation = accumPrevious + netSales;
+            this.currentAccumMonth = exactAccumulation;
+        }
 
         this.setLoading(true, isEdit && !isOwner ? "Mengirim Pengajuan Revisi..." : "Menyimpan Laporan...");
 
         const payload = {
             action: isEdit ? 'update_laporan_harian' : 'save_laporan_harian',
             id_laporan: idRep,
-            outlet: this.outlet,
+            outlet: cleanCurrOutlet, // <-- KUNCI: Menggunakan nama outlet yang sudah dibersihkan
             tanggal: tglTeks,
             cuaca: cuaca,
             cash: cash,
@@ -2326,6 +2346,7 @@ const superApp = {
             } else {
                 this.db.laporanHarian[idx] = {
                     ...this.db.laporanHarian[idx],
+                    Outlet: cleanCurrOutlet, // <-- KUNCI: Memperbarui dengan nama bersih
                     Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
                     Pengeluaran_JSON: JSON.stringify(expValid), Total_Pengeluaran: totExp,
                     Akumulasi_Bulan: exactAccumulation,
@@ -2334,7 +2355,7 @@ const superApp = {
             }
         } else {
             this.db.laporanHarian.push({
-                ID_Laporan: idRep, Outlet: this.outlet, Tanggal: tglTeks, Cuaca: cuaca,
+                ID_Laporan: idRep, Outlet: cleanCurrOutlet, Tanggal: tglTeks, Cuaca: cuaca,
                 Cash: cash, QRIS: qris, Net_Sales: netSales, Bill: bill, Pcs: pcs,
                 Pengeluaran_JSON: JSON.stringify(expValid), Akumulasi_Bulan: exactAccumulation, Status_Approval: 'Disetujui'
             });
@@ -2342,7 +2363,7 @@ const superApp = {
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
         // ======================================================================
-        // 🔒 4. TRY...FINALLY: PASTIKAN TOMBOL TERBUKA KEMBALI APAPUN YANG TERJADI
+        // 🔒 5. TRY...FINALLY: PASTIKAN TOMBOL TERBUKA KEMBALI APAPUN YANG TERJADI
         // ======================================================================
         try {
             await this.apiPost(payload);
@@ -2370,10 +2391,9 @@ const superApp = {
         }
 
         let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-CHA*`;
-        let cleanOutletName = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
         
         let waText = `${labelJudul}\n`;
-        waText += `Update Sales Report Outlet: *Ai-CHA ${cleanOutletName}*\n`;
+        waText += `Update Sales Report Outlet: *Ai-CHA ${cleanCurrOutlet}*\n`;
         waText += `Tanggal: ${tglTeks}\n`;
         waText += `Cuaca: ${cuaca}\n\n`;
         waText += `Net Sales: *Rp ${netSales.toLocaleString('id-ID')}*\n`;
@@ -3150,26 +3170,28 @@ selectOutlet: function(id) {
     this.changeOutlet(id);
 },
 
-// Pastikan fungsi changeOutlet Anda bersih seperti ini
-changeOutlet: function(val) { 
-    this.outlet = val; 
-    this.cart = []; 
-    
-    // Panggil fungsi internal lainnya
-    if(typeof this.renderCart === 'function') this.renderCart();
-    if(typeof this.checkShiftStatus === 'function') this.checkShiftStatus();
-    if(typeof this.updateHeaderOutletName === 'function') this.updateHeaderOutletName();
-    if(typeof this.closeModal === 'function') this.closeModal('modal-outlet-selector');
+// =========================================================================
+    // 3. CHANGE OUTLET GENERAL (NORMALISASI OUTLET & RE-INIT)
+    // =========================================================================
+    changeOutlet: function(val) { 
+        // Bersihkan awalan nama outlet dari pilihan dropdown
+        let cleanVal = String(val || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
+        this.outlet = cleanVal; 
+        this.cart = []; 
+        
+        if(typeof this.renderCart === 'function') this.renderCart();
+        if(typeof this.checkShiftStatus === 'function') this.checkShiftStatus();
+        if(typeof this.updateHeaderOutletName === 'function') this.updateHeaderOutletName();
+        if(typeof this.closeModal === 'function') this.closeModal('modal-outlet-selector');
 
-    // Refresh Data
-    this.refreshData(); 
+        this.refreshData(); 
 
-    // Cek apakah sedang di halaman laporan untuk melakukan re-render
-    const activeView = document.querySelector('.app-view:not(.hidden)');
-    if (activeView && activeView.id === 'view-laporan-harian') {
-        this.initLaporanHarian(); 
-    }
-},
+        // Cek apakah sedang di halaman laporan untuk melakukan re-render
+        const activeView = document.querySelector('.app-view:not(.hidden)');
+        if (activeView && activeView.id === 'view-laporan-harian') {
+            this.initLaporanHarian(); 
+        }
+    },
 
     // =========================================================
     // 🚀 RESET FILTER DASHBOARD KE BULAN BERJALAN
@@ -5301,7 +5323,7 @@ refreshData: function() {
         }
     },
     
-    // PENAMBAHAN SISTEM NOMOR ANTRIAN
+    // PENAMBAHAN SISTEM NOMOR ANTRIAN (OPTIMISTIC UI - INSTANT CHECKOUT)
     executeCheckout: async function() {
         // 1. GEMBOK ANTI DOUBLE-CLICK & KERANJANG KOSONG
         if (this.isProcessing) return; 
@@ -5313,24 +5335,22 @@ refreshData: function() {
 
         this.isProcessing = true;
 
-        // Kunci tombol secara visual agar tidak bisa ditekan dua kali
+        // Kunci tombol secara visual (Teks diganti jadi "Memproses..." karena tidak ada lagi ritual "Cek Server")
         let btnPay = document.getElementById('btn-execute-pay');
         let originalBtnHtml = '';
         if (btnPay) {
             originalBtnHtml = btnPay.innerHTML;
             btnPay.disabled = true;
-            btnPay.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Cek Server...';
+            btnPay.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> Memproses...';
             btnPay.classList.add('opacity-70', 'cursor-not-allowed');
         }
         
         // ======================================================================
-        // 🚀 SINKRONISASI KILAT SEBELUM BAYAR (Cegah Antrian & Stok Bentrok)
+        // 🚀 SINKRONISASI KILAT DIHAPUS DARI SINI AGAR TRANSAKSI INSTAN (0 DETIK)!
+        // Kita percaya sepenuhnya pada data stok yang ada di RAM lokal saat ini.
         // ======================================================================
-        if (this.isOnline && typeof this.refreshStokOnly === 'function') {
-            await this.refreshStokOnly(); // Tarik data terbaru diam-diam
-        }
 
-        // 🚀 VALIDASI STOK TERAKHIR (Cegah stok minus karena keduluan device lain)
+        // 🚀 VALIDASI STOK TERAKHIR (Dilakukan secara instan di memori lokal)
         let stokAman = true;
         let barangHabis = '';
         
@@ -5349,7 +5369,7 @@ refreshData: function() {
             }
         }
 
-        // Jika keduluan dibeli kasir PC, tolak transaksi di HP!
+        // Jika stok lokal tidak cukup, tolak transaksi!
         if (!stokAman) {
             this.isProcessing = false;
             if (btnPay) {
@@ -5357,7 +5377,7 @@ refreshData: function() {
                 btnPay.innerHTML = originalBtnHtml;
                 btnPay.classList.remove('opacity-70', 'cursor-not-allowed');
             }
-            this.showToast(`Gagal! Stok ${barangHabis} baru saja dihabiskan device lain.`, "error");
+            this.showToast(`Gagal! Stok ${barangHabis} tidak mencukupi (Sisa lokal kurang).`, "error");
             return;
         }
         // ======================================================================
@@ -5365,13 +5385,28 @@ refreshData: function() {
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         
-        // Nomor Antrean dijamin urut karena database memori baru saja di-refresh
+        // ======================================================================
+        // 🚀 1. LOCAL QUEUE TRACKER (CEGAH DOUBLE ANTREAN DI DEVICE YANG SAMA)
+        // ======================================================================
         let countToday = 0;
         (this.db.transactions || []).forEach(t => {
             let tglTrx = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
-            if (t.Outlet === this.outlet && tglTrx === todayStrLocal) { countToday++; }
+            if (t.Outlet === this.outlet && tglTrx === todayStrLocal) { 
+                let num = Number(t.Antrian || 0);
+                if (num > countToday) countToday = num; // Cari nomor antrean tertinggi hari ini
+            }
         });
-        let noAntrian = countToday + 1;
+
+        // Ambil juga memori nomor antrean terakhir yang pernah dicetak HP ini hari ini
+        let queueKey = `aisnack_last_queue_${this.outlet}_${todayStrLocal}`;
+        let lastSavedQueue = Number(localStorage.getItem(queueKey) || 0);
+
+        // KUNCI AMAN: Antrean baru ADALAH angka tertinggi di antara (Array DB vs Memori HP) + 1
+        let noAntrian = Math.max(countToday, lastSavedQueue) + 1;
+        
+        // Simpan langsung nomor baru ini ke memori HP agar tidak bisa mundur lagi hari ini
+        localStorage.setItem(queueKey, noAntrian);
+        // ======================================================================
         
         // ID Resi Dijamin Unik
         let kasirPrefix = this.currentUser ? this.currentUser.Username.substring(0,3).toUpperCase() : 'KSR';
@@ -5381,7 +5416,7 @@ refreshData: function() {
         
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintSuccess ? 'Sudah' : 'Belum' };
 
-        // 1. UPDATE MEMORI LOKAL DULUAN
+        // 1. UPDATE MEMORI LOKAL SECARA INSTAN
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
             ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
@@ -5427,13 +5462,20 @@ refreshData: function() {
             }
         }, 500);
 
-        // 4. SINKRONISASI SERVER DI LATAR BELAKANG
+        // ======================================================================
+        // 4. 🚀 SINKRONISASI SERVER DI LATAR BELAKANG (NON-BLOCKING)
+        // ======================================================================
+        // Kasir sudah bisa melayani pelanggan berikutnya saat kode di bawah ini bekerja!
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
                 if (isPrintSuccess) {
                     this.laporStrukDicetak(trxID);
                 }
-                // Hapus fetch manual di sini karena refreshStokOnly sudah menanganinya di awal!
+                // 🚀 TARIK STOK TERBARU DI LATAR BELAKANG SETELAH TRANSAKSI BERHASIL
+                // Agar stok di device ini tetap akurat tanpa mengorbankan kecepatan checkout
+                if (typeof this.refreshStokOnly === 'function') {
+                    this.refreshStokOnly(); 
+                }
             } else if (res && res.status !== 'sukses' && !res.is_offline) {
                let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
                if (!isAlreadyQueued) {
