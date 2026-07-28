@@ -1205,7 +1205,7 @@ const superApp = {
                 // Menggunakan 3x percobaan tanpa AbortController agar tidak diputus paksa
                 for (let i = 0; i < 3; i++) {
                     try { 
-                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=30", { 
+                        const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
                             method: 'GET',
                             redirect: 'follow',
                             cache: 'no-store'
