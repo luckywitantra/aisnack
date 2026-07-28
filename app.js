@@ -54,7 +54,7 @@
     };
 })();
 
-const API_URL = "https://script.google.com/macros/s/AKfycbwRss8HzQwPardxTi4Scd-QOUZ2pitnsubY6pqASyLZA7oaagmym61VuFJvWjb91NRhfg/exec"; // <-- GANTI DENGAN URL API ANDA
+const API_URL = "https://script.google.com/macros/s/AKfycbxvXkaCbwgkXVD1J9_O9WJftjL_I5iAmdBdNFFrawK3ODPAxPLef4a5GOSX9qGHuxuXXw/exec"; // <-- GANTI DENGAN URL API ANDA
 
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
@@ -1120,7 +1120,7 @@ const superApp = {
         // 🚀 0. AUTO-PURGE CACHE ENGINE (ANTI-CACHE & GEMBOK INSTAN HP)
         // =========================================================================
         // 🛑 ATURAN EMAS: Setiap kali Anda update kodingan penting, UBAH TEKS VERSI INI!
-        const CURRENT_VER = "v581"; 
+        const CURRENT_VER = "v582"; 
         const savedVer = localStorage.getItem('aisnack_sys_version');
         
         // JIKA VERSI BEDA: Langsung kunci tombol PIN di detik ke-0!
