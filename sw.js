@@ -1,7 +1,6 @@
 // 🛑 ATURAN EMAS 1: Setiap upload versi baru ke GitHub/Server, NAIKKAN ANGKA VERSI INI!
-const CACHE_NAME = 'aisnack-erp-v597';
+const CACHE_NAME = 'aisnack-erp-v609'; // <-- Contoh dinaikkan ke 605
 
-// 🚀 PERBAIKAN 2: Masukkan app.js dan Ikon PWA ke dalam daftar instalasi wajib
 const urlsToCache = [
   './index.html',
   './app.js',
@@ -17,11 +16,12 @@ const externalUrls = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
-// 1. INSTALASI: Simpan file-file utama ke Cache Storage secara berurutan & aman
+// =========================================================================
+// 1. INSTALASI: Paksa Langsung Aktif (Skip Waiting)
+// =========================================================================
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // 🚀 PERBAIKAN 1: Gunakan Promise.all untuk menggabungkan cache lokal & eksternal agar selesai bersamaan!
       const cacheLocal = cache.addAll(urlsToCache).catch(err => {
         console.warn('SW: Ada file lokal yang gagal di-cache awal:', err);
       });
@@ -35,46 +35,54 @@ self.addEventListener('install', event => {
       );
 
       return Promise.all([cacheLocal, cacheExternal]);
+    }).then(() => {
+      // 🚀 PERBAIKAN KRITIS 1: Wajib dipanggil! Jangan tunggu app.js
+      // Ini akan memaksa SW baru untuk langsung menendang SW lama detik ini juga!
+      console.log('SW: Instalasi selesai. Langsung mengambil alih sistem (Skip Waiting)!');
+      return self.skipWaiting();
     })
   );
-  // self.skipWaiting() sengaja tidak dipanggil di sini agar dikendalikan oleh radar app.js
 });
 
-// 2. AKTIVASI: Bersihkan cache versi lawas secara otomatis
+// =========================================================================
+// 2. AKTIVASI: Hapus Seluruh Cache Lawas Tanpa Ampun
+// =========================================================================
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('SW: Menghapus cache lawas ->', cacheName);
+            // 🚀 EFEK DARI SKIP WAITING: Kode penghancur cache ini sekarang PASTI BERJALAN!
+            console.log('SW: Menghancurkan cache versi lawas ->', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim()) // Langsung klaim kendali atas semua tab aktif
+    }).then(() => {
+      console.log('SW: Versi baru berhasil aktif dan mengontrol semua klien!');
+      return self.clients.claim();
+    })
   );
 });
 
-// 3. FETCH STRATEGY: Network-First untuk HTML/JS/CSS, Cache-First untuk Gambar/CDN
+// =========================================================================
+// 3. FETCH STRATEGY: Network-First & Bypass API
+// =========================================================================
 self.addEventListener('fetch', event => {
   const reqUrl = event.request.url;
 
-  // =========================================================================
-  // 🚀 ATURAN MUTLAK BYPASS API (DIPERKETAT):
-  // Menangkap seluruh rantai redirect Google (script.google.com -> googleusercontent.com -> /macros -> /exec)
-  // Jangan pernah intersep atau cache request yang mengandung unsur-unsur ini!
-  // =========================================================================
+  // 🚀 ATURAN MUTLAK BYPASS API (Google Apps Script)
   if (reqUrl.includes('/exec') || reqUrl.includes('google') || reqUrl.includes('script.') || reqUrl.includes('macros')) {
-    return; // Biarkan browser memproses langsung ke jaringan web murni (Bypass Total)!
+    return; // Bypass total
   }
 
-  // 🚀 JURUS NETWORK-FIRST KHUSUS FILE SISTEM (HTML, JS, CSS, Navigasi)
+  // 🚀 NETWORK-FIRST (HTML, JS, CSS)
   if (reqUrl.includes('.html') || reqUrl.includes('.js') || reqUrl.includes('.css') || event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
-          // Jika berhasil download versi baru dari server, perbarui isi cache diam-diam
+          // Jika berhasil dapat dari internet, update cache diam-diam
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
@@ -82,11 +90,10 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         })
         .catch(() => {
-          // 🚀 PERBAIKAN 3: Tambahkan { ignoreSearch: true } agar tetap ketemu saat offline
-          // meskipun URL-nya mengandung buntut parameter seperti ?v=583 atau ?mode=cfd
+          // Jika offline, tarik dari cache
           return caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
             if (cachedResponse) return cachedResponse;
-            // Fallback terakhir jika offline dan file tidak ada: kembalikan ke index.html
+            // Fallback offline murni
             if (event.request.mode === 'navigate') {
               return caches.match('./index.html', { ignoreSearch: true });
             }
@@ -96,11 +103,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 🚀 JURUS CACHE-FIRST UNTUK CDN & ASSETS (FontAwesome, Tailwind, Flaticon, Gambar)
+  // 🚀 CACHE-FIRST (Aset Statis & CDN Eksternal)
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
       return cachedResponse || fetch(event.request).then(networkResponse => {
-        // 🚀 PERBAIKAN 4: Izinkan status 0 (opaque response) untuk CDN pihak ketiga
         if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
@@ -111,12 +117,4 @@ self.addEventListener('fetch', event => {
       });
     })
   );
-});
-
-// 4. PESAN DARI APP.JS: Paksa SW baru aktif saat diperintahkan oleh radar anti-bypass
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.action === 'skipWaiting') {
-    console.log('SW: Menerima perintah skipWaiting dari app.js, mengambil alih sistem!');
-    self.skipWaiting();
-  }
 });
