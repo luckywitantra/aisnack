@@ -1,206 +1,246 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 /* ========================================================================== */
-/* 1. ROOT & BASE RESET (LIGHT MODE DEFAULT)                                  */
+/* 1. ROOT, BASE RESET & SMOOTH SCROLLING                                     */
 /* ========================================================================== */
 body { 
     font-family: 'Plus Jakarta Sans', sans-serif; 
     -webkit-tap-highlight-color: transparent; 
     background-color: #f4f7fa;
     color: #1e293b;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    scroll-behavior: smooth;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* 🎨 Scrollbar Elegan (Mac-OS Style) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; margin: 4px; }
+::-webkit-scrollbar-thumb { 
+    background: rgba(148, 163, 184, 0.4); 
+    border-radius: 20px; 
+    border: 2px solid transparent; 
+    background-clip: padding-box; 
+    transition: all 0.3s ease;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(148, 163, 184, 0.8); }
 .no-scrollbar::-webkit-scrollbar, .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ========================================================================== */
-/* 2. NAVIGATION & GLASSMORPHISM (LIGHT MODE)                                 */
+/* 2. PREMIUM GLASSMORPHISM & NAVIGATION                                      */
 /* ========================================================================== */
 .nav-active { 
     background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
     color: white !important; 
-    box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.4); 
+    /* Efek 3D dan Glow saat aktif */
+    box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.5), inset 0 -2px 0 rgba(0,0,0,0.1); 
+    transform: translateY(-1px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .nav-active i, .nav-active span { color: white !important; }
 
 .glass-header, .glass-panel { 
-    background: rgba(255, 255, 255, 0.85); 
-    backdrop-filter: blur(16px); 
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(255, 255, 255, 0.75); 
+    backdrop-filter: blur(20px); 
+    -webkit-backdrop-filter: blur(20px);
+    /* Garis tipis untuk kesan kaca asli */
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
 }
 
 /* ========================================================================== */
-/* 3. ANIMATIONS & MODAL ENTER                                                */
+/* 3. MICRO-INTERACTIONS & EYE-CATCHING ANIMATIONS                            */
 /* ========================================================================== */
-.modal-enter { opacity: 0; transform: scale(0.95) translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.modal-enter { opacity: 0; transform: scale(0.92) translateY(15px); transition: all 0.4s cubic-bezier(0.2, 1.2, 0.3, 1); }
 .modal-enter-active { opacity: 1; transform: scale(1) translateY(0); }
 
-.vnumpad-enter { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.vnumpad-enter { transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .vnumpad-enter-active { transform: translateY(0); }
 
-@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-.toast-animate { animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes slideInRight { 
+    0% { transform: translateX(100%) scale(0.9); opacity: 0; } 
+    80% { transform: translateX(-10px) scale(1.02); opacity: 1; }
+    100% { transform: translateX(0) scale(1); opacity: 1; } 
+}
+.toast-animate { animation: slideInRight 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 
 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .slide-up { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 
-@keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
+/* Nadi Berkedip Elegan */
+@keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(249,115,22, 0.4); } 50% { opacity: .8; transform: scale(1.05); box-shadow: 0 0 0 10px rgba(249,115,22, 0); } }
 .animate-pulse-slow { animation: pulse-slow 3s infinite; }
 
-.blur-lock { filter: blur(8px); pointer-events: none; user-select: none; transition: filter 0.3s ease; }
+/* Animasi Mengambang (Gunakan untuk Ikon/Kartu Utama) */
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
+.animate-float { animation: float 4s ease-in-out infinite; }
+
+/* Teks Shimmering (Gunakan pada Total Omzet agar mewah) */
+.text-shimmer {
+    background: linear-gradient(90deg, #1e293b, #f97316, #1e293b);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: shimmer 3s linear infinite;
+}
+@keyframes shimmer { to { background-position: 200% center; } }
+
+.blur-lock { filter: blur(10px); pointer-events: none; user-select: none; transition: filter 0.4s ease; }
 .pdf-container { background: white !important; color: black !important; padding: 20px !important; }
 
 /* ========================================================================== */
-/* 4. COMPONENTS (NUMPAD, CHECKBOX, SKELETON)                                 */
+/* 4. COMPONENTS (3D NUMPAD, CHECKBOX, SKELETON)                              */
 /* ========================================================================== */
+/* 🎮 Numpad 3D Interactive Button */
 .numpad-btn { 
-    background: white; border-radius: 1.2rem; font-size: 1.5rem; font-weight: 800; 
-    padding: 1rem; display: flex; align-items: center; justify-content: center; 
-    border: 1px solid #e2e8f0; transition: all 0.15s ease; cursor: pointer; 
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02); color: #1e293b;
+    background: #ffffff; 
+    border-radius: 1.25rem; 
+    font-size: 1.5rem; 
+    font-weight: 800; 
+    padding: 1rem; 
+    display: flex; align-items: center; justify-content: center; 
+    border: 1px solid #e2e8f0; 
+    border-bottom-width: 4px; /* Efek Tebal 3D */
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); 
+    cursor: pointer; 
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+    color: #1e293b;
+    user-select: none;
 }
-.numpad-btn:hover { border-color: #f97316; color: #f97316; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(249,115,22,0.15); }
-.numpad-btn:active { transform: scale(0.95) translateY(0); }
+.numpad-btn:hover { 
+    border-color: #f97316; color: #f97316; 
+    transform: translateY(-2px); 
+    box-shadow: 0 10px 15px -3px rgba(249,115,22,0.2); 
+}
+.numpad-btn:active { 
+    transform: translateY(3px); /* Turun ke bawah saat ditekan */
+    border-bottom-width: 1px; /* Efek pipih */
+    box-shadow: 0 1px 2px rgba(249,115,22,0.1); 
+    background: #fff7ed;
+}
 
-.skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
+.skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: skeletonLoading 1.5s infinite; }
 @keyframes skeletonLoading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-.fly-dot { position: fixed; width: 20px; height: 20px; background-color: #f97316; border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; box-shadow: 0 4px 10px rgba(249,115,22,0.5); }
+.fly-dot { position: fixed; width: 22px; height: 22px; background: linear-gradient(135deg, #f97316, #ea580c); border-radius: 50%; z-index: 9999; pointer-events: none; transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.5s ease-in; box-shadow: 0 6px 15px rgba(249,115,22,0.6); }
 
-.cb-audit-opname, .cb-audit-terima { width: 1.25rem; height: 1.25rem; cursor: pointer; accent-color: #f97316; }
+.cb-audit-opname, .cb-audit-terima { width: 1.25rem; height: 1.25rem; cursor: pointer; accent-color: #f97316; transition: transform 0.2s; }
+.cb-audit-opname:hover, .cb-audit-terima:hover { transform: scale(1.1); }
 .item-empty { opacity: 0.5; filter: grayscale(1); pointer-events: none; }
-.row-void { background-color: rgba(254, 226, 226, 0.6) !important; border-left: 4px solid #ef4444; }
-.row-void:hover { background-color: rgba(254, 202, 202, 0.8) !important; }
+
+.row-void { background-color: rgba(254, 226, 226, 0.6) !important; border-left: 4px solid #ef4444; position: relative; overflow: hidden; }
+.row-void::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.1), transparent); transform: translateX(-100%); animation: voidShine 2s infinite; pointer-events: none; }
+@keyframes voidShine { 100% { transform: translateX(100%); } }
+
 .translate-y-full { transform: translateY(100%); }
 
 /* ========================================================================== */
-/* 🚀 5. ULTIMATE DARK MODE (SMART TARGETING ENGINE)                          */
+/* 🌌 5. ULTIMATE DARK MODE (SMART TARGETING & NEON GLOW ENGINE)              */
 /* ========================================================================== */
-.dark body { background-color: #0b0f19; color: #f1f5f9; }
+.dark body { background-color: #0f172a; color: #f8fafc; } /* Deep Navy Slate, not flat black */
 
-/* Panel & Kartu Utama */
-.dark .bg-white { background-color: #151c2f !important; border-color: #222f4e !important; color: #f1f5f9; }
-.dark .bg-slate-50, .dark .bg-[#f4f7f9], .dark .bg-slate-100 { background-color: #0b0f19 !important; border-color: #1e293b !important; }
-.dark .bg-slate-100\/90, .dark .bg-slate-50\/80, .dark .bg-slate-50\/50 { background-color: rgba(15, 23, 42, 0.8) !important; }
+/* Panel & Kartu Utama (Frosted Dark Glass) */
+.dark .bg-white { 
+    background-color: rgba(30, 41, 59, 0.8) !important; 
+    backdrop-filter: blur(16px);
+    border-color: rgba(255, 255, 255, 0.05) !important; 
+    color: #f8fafc; 
+    box-shadow: 0 4px 25px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+.dark .bg-slate-50, .dark .bg-[#f4f7f9], .dark .bg-slate-100 { background-color: #0f172a !important; border-color: #1e293b !important; }
+.dark .bg-slate-100\/90, .dark .bg-slate-50\/80, .dark .bg-slate-50\/50 { background-color: rgba(15, 23, 42, 0.8) !important; border: 1px solid rgba(255, 255, 255, 0.02) !important; }
 
 /* Teks & Typography */
-.dark .text-slate-800, .dark .text-slate-700, .dark .text-slate-600 { color: #f1f5f9 !important; }
+.dark .text-slate-800, .dark .text-slate-700, .dark .text-slate-600 { color: #f8fafc !important; }
 .dark .text-slate-500, .dark .text-slate-400 { color: #94a3b8 !important; }
 
 /* Border & Garis Pemisah */
-.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-200\/60, .dark .border-slate-200\/80 { border-color: #222f4e !important; }
+.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-200\/60, .dark .border-slate-200\/80 { border-color: rgba(255, 255, 255, 0.05) !important; }
 .dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]), .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b !important; }
 
 /* Header, Sidebar, & Glassmorphism di Dark Mode */
-.dark .glass-header, .dark .glass-panel { background: rgba(21, 28, 47, 0.85) !important; border-color: #222f4e !important; }
-.dark aside#sidebar { background: rgba(21, 28, 47, 0.95) !important; border-color: #222f4e !important; }
+.dark .glass-header, .dark .glass-panel { background: rgba(15, 23, 42, 0.85) !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
+.dark aside#sidebar { background: rgba(15, 23, 42, 0.95) !important; border-right: 1px solid rgba(255,255,255,0.05) !important; box-shadow: 5px 0 25px rgba(0,0,0,0.3) !important;}
 
 /* Form Input, Search Box, & Select Dropdown */
 .dark input[type="text"], .dark input[type="number"], .dark input[type="date"], .dark input[type="month"], .dark select, .dark textarea {
-    background-color: #0f172a !important;
-    border-color: #2e3c5d !important;
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid #334155 !important;
     color: #f8fafc !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+    transition: all 0.3s ease;
 }
 .dark input::placeholder, .dark textarea::placeholder { color: #64748b !important; }
-.dark input:focus, .dark select:focus, .dark textarea:focus { border-color: #f97316 !important; }
+.dark input:focus, .dark select:focus, .dark textarea:focus { border-color: #f97316 !important; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2), inset 0 2px 4px rgba(0,0,0,0.2) !important; }
 
 /* Table Headings & Sticky Bars */
-.dark thead, .dark th { background-color: #111827 !important; color: #94a3b8 !important; border-color: #222f4e !important; }
-.dark tr:hover td { background-color: rgba(30, 41, 59, 0.5) !important; }
+.dark thead, .dark th { background-color: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(8px); color: #94a3b8 !important; border-color: #1e293b !important; }
+.dark tr:hover td { background-color: rgba(30, 41, 59, 0.8) !important; }
 
-/* Virtual Keyboard & Numpad di Dark Mode */
-.dark #virtual-keyboard { background: rgba(15, 23, 42, 0.95) !important; border-color: #222f4e !important; }
-.dark .numpad-btn { background: #1e293b; border-color: #334155; color: #f8fafc; }
-.dark .numpad-btn:hover { border-color: #f97316; background: #25334d; color: #f97316; }
+/* Virtual Keyboard & Numpad di Dark Mode (Neon 3D Effect) */
+.dark #virtual-keyboard { background: rgba(15, 23, 42, 0.98) !important; border-top: 1px solid rgba(255,255,255,0.05) !important; }
+.dark .numpad-btn { 
+    background: #1e293b; 
+    border-color: #334155; 
+    border-bottom-color: #0f172a;
+    color: #f8fafc; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+.dark .numpad-btn:hover { 
+    border-color: #f97316; 
+    background: #2a2522; 
+    color: #f97316; 
+    box-shadow: 0 10px 20px -5px rgba(249,115,22,0.3); 
+}
+.dark .numpad-btn:active { background: #3d2214; border-bottom-width: 1px; transform: translateY(3px); }
 
 /* Skeleton Loading Dark Mode */
 .dark .skeleton { background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 200% 100%; }
 
 /* Pengecualian (Proteksi Warna Agar Tetap Cantik di Dark Mode) */
-.dark .bg-rose-50, .dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.15) !important; border-color: rgba(244, 63, 94, 0.3) !important; }
-.dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.15) !important; border-color: rgba(16, 185, 129, 0.3) !important; }
-.dark .bg-amber-50, .dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.15) !important; border-color: rgba(245, 158, 11, 0.3) !important; }
-.dark .bg-blue-50, .dark .bg-blue-100, .dark .bg-indigo-50 { background-color: rgba(59, 130, 246, 0.15) !important; border-color: rgba(59, 130, 246, 0.3) !important; }
-.dark .bg-purple-50, .dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.15) !important; border-color: rgba(168, 85, 247, 0.3) !important; }
-
-/* Cetak Struk & PDF Tetap Wajib Putih */
-.dark #receipt-canvas, .dark .pdf-container { background-color: white !important; color: black !important; }
-.dark #receipt-canvas * { color: black !important; }
+.dark .bg-rose-50, .dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.15) !important; border: 1px solid rgba(244, 63, 94, 0.2) !important; }
+.dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.15) !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+.dark .bg-amber-50, .dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.15) !important; border: 1px solid rgba(245, 158, 11, 0.2) !important; }
+.dark .bg-blue-50, .dark .bg-blue-100, .dark .bg-indigo-50 { background-color: rgba(59, 130, 246, 0.15) !important; border: 1px solid rgba(59, 130, 246, 0.2) !important; }
+.dark .bg-purple-50, .dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.15) !important; border: 1px solid rgba(168, 85, 247, 0.2) !important; }
 
 /* ========================================================================== */
-/* 🛡️ ULTIMATE DARK MODE PATCH (MENGATASI SEMUA BENTROK DI INDEX.HTML)      */
+/* 🛡️ ULTIMATE DARK MODE PATCH (MENGATASI BENTROK TAILWIND)                   */
 /* ========================================================================== */
 
-/* 1. Menjinakkan Hardcode bg-[#f4f7f9] & Elemen Transparan (white/60, dll) */
-.dark .bg-\[\#f4f7f9\],
-.dark .bg-slate-50,
-.dark .bg-slate-100 {
-    background-color: #0b0f19 !important;
-    border-color: #1e293b !important;
-}
+/* Menjinakkan Hardcode bg-[#f4f7f9] & Elemen Transparan */
+.dark .bg-\[\#f4f7f9\], .dark .bg-slate-50, .dark .bg-slate-100 { background-color: #0f172a !important; border-color: #1e293b !important; }
 
-.dark .bg-white\/60,
-.dark .bg-white\/90,
-.dark .bg-white\/95,
-.dark .bg-slate-50\/90,
-.dark .bg-slate-50\/95,
-.dark .bg-slate-50\/80,
-.dark .bg-slate-100\/90,
-.dark .bg-slate-100\/50 {
-    background-color: rgba(21, 28, 47, 0.85) !important;
-    border-color: #222f4e !important;
-    color: #f1f5f9 !important;
-}
-
-/* 2. Menjinakkan Kartu KPI Gradasi Pastel agar Tidak Menyilaukan di Dark Mode */
-.dark [class*="from-blue-50"],
-.dark [class*="from-emerald-50"],
-.dark [class*="from-cyan-50"],
-.dark [class*="from-purple-50"],
-.dark [class*="from-amber-50"],
-.dark [class*="from-rose-50"],
-.dark [class*="from-indigo-50"] {
-    background-image: none !important;
-    background-color: #151c2f !important;
-    border-color: #222f4e !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* 3. Memastikan Semua Teks di Dalam Tabel & Tombol Terbaca Jelas */
-.dark thead, .dark th {
-    background-color: #111827 !important;
-    color: #94a3b8 !important;
-    border-color: #222f4e !important;
-}
-.dark tbody tr {
-    border-color: #1e293b !important;
-}
-.dark tbody tr:hover td {
-    background-color: rgba(30, 41, 59, 0.6) !important;
-}
-
-/* 4. Menyelamatkan Container Tab (Pill Tabs Navigation) */
-.dark .bg-slate-100\/50, .dark .bg-slate-100\/90 {
-    background-color: #0f172a !important;
-    border-color: #1e293b !important;
-}
-.dark button.bg-white {
-    background-color: #1e293b !important;
+.dark .bg-white\/60, .dark .bg-white\/90, .dark .bg-white\/95, .dark .bg-slate-50\/90, .dark .bg-slate-50\/95, .dark .bg-slate-50\/80, .dark .bg-slate-100\/90, .dark .bg-slate-100\/50 {
+    background-color: rgba(30, 41, 59, 0.7) !important;
+    backdrop-filter: blur(16px);
+    border-color: rgba(255,255,255,0.05) !important;
     color: #f8fafc !important;
-    border-color: #334155 !important;
 }
 
-/* 5. PENGECUALIAN MUTLAK: Area Kertas Struk & PDF WAJIB PUTIH! */
-.dark #receipt-canvas,
-.dark #receipt-canvas *,
-.dark #detail-struk-body,
-.dark .pdf-container,
-.dark .pdf-container * {
+/* Menjinakkan Kartu KPI Gradasi Pastel agar Menjadi Premium Glass */
+.dark [class*="from-blue-50"], .dark [class*="from-emerald-50"], .dark [class*="from-cyan-50"], .dark [class*="from-purple-50"], .dark [class*="from-amber-50"], .dark [class*="from-rose-50"], .dark [class*="from-indigo-50"] {
+    background-image: none !important;
+    background-color: rgba(30, 41, 59, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Menyelamatkan Container Tab (Pill Tabs Navigation) */
+.dark .bg-slate-100\/50, .dark .bg-slate-100\/90 { background-color: rgba(15, 23, 42, 0.8) !important; border-color: #1e293b !important; }
+.dark button.bg-white { background-color: #1e293b !important; color: #f8fafc !important; border-color: #334155 !important; }
+
+/* 🚫 PENGECUALIAN MUTLAK: Area Kertas Struk & PDF WAJIB PUTIH! */
+.dark #receipt-canvas, .dark #receipt-canvas *, .dark #detail-struk-body, .dark .pdf-container, .dark .pdf-container * {
     background-color: #ffffff !important;
     color: #000000 !important;
+}
+
+/* Efek saat PIN terisi */
+.pin-filled {
+    background-color: #E5202B !important; /* Warna merah Ai-Snack */
+    border-color: #E5202B !important;
+    transform: scale(1.15); /* Efek membesar (pop) */
+    box-shadow: 0 0 10px rgba(229, 32, 43, 0.4);
 }
