@@ -533,37 +533,56 @@ const superApp = {
 
     
     
-   addPin: function(num) {
+  addPin: function(num) {
         // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
         if (this.isSystemUpdating) {
             this.showToast('⚡ Sistem sedang menginstal pembaruan, mohon tunggu...', 'warning');
             return;
         }
 
+        // 🛑 SATPAM 2: Pastikan database sudah termuat
         if (!this.db || !this.db.users) { 
             this.showToast('Sistem sedang memuat data, mohon tunggu sebentar...', 'warning'); 
             return; 
         }
         
+        // Asumsi menggunakan 4 digit PIN
         if (this.pinBuffer.length < 4) { 
             this.pinBuffer += num; 
             const dot = document.getElementById(`dot-${this.pinBuffer.length}`); 
+            
             if (dot) { 
-                dot.classList.replace('border-slate-300', 'bg-brand-500'); 
-                dot.classList.replace('border-2', 'border-0'); 
+                // Suntikkan class CSS animasi saat terisi
+                dot.classList.add('pin-filled'); 
             } 
         }
         
+        // Pemicu login otomatis jika sudah 4 digit
         if (this.pinBuffer.length === 4) {
             setTimeout(() => this.processLogin(), 200);
         }
     },
+
     delPin: function() {
-        if (this.pinBuffer.length > 0) { const dot = document.getElementById(`dot-${this.pinBuffer.length}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } this.pinBuffer = this.pinBuffer.slice(0, -1); }
+        if (this.pinBuffer.length > 0) { 
+            const dot = document.getElementById(`dot-${this.pinBuffer.length}`); 
+            
+            if (dot) { 
+                // Cabut class animasi saat dihapus
+                dot.classList.remove('pin-filled'); 
+            } 
+            
+            this.pinBuffer = this.pinBuffer.slice(0, -1); 
+        }
     },
+
+    // 🧹 Opsional: Fungsi untuk membersihkan semua PIN sekaligus (Tombol Hapus Silang)
     clearPin: function() {
-        this.pinBuffer = ''; for (let i = 1; i <= 4; i++) { const dot = document.getElementById(`dot-${i}`); if (dot) { dot.classList.replace('bg-brand-500', 'border-slate-300'); dot.classList.replace('border-0', 'border-2'); } }
+        while (this.pinBuffer.length > 0) {
+            this.delPin();
+        }
     },
+    
     processLogin: function() {
         if (this.isProcessing) return; this.isProcessing = true;
         if (!this.db || !this.db.users) { 
@@ -11387,4 +11406,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
