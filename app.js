@@ -306,9 +306,73 @@ const superApp = {
         return new Date(0);
     },
 
-    // STARTUP & LOGIN
+    // =========================================================================
+    // 🚀 RADAR SILUMAN: CEK UPDATE OTOMATIS SAAT APLIKASI DIBUKA
+    // =========================================================================
+    autoCheckUpdateOnStart: async function() {
+        console.log("📡 Memeriksa versi aplikasi terbaru di latar belakang...");
+        try {
+            // Tarik data sangat ringan (history=1 hari saja) agar server merespons kilat (< 1 detik)
+            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=1", { 
+                method: 'GET',
+                cache: 'no-store'
+            });
+            
+            const data = await res.json();
+            
+            if (data && data.status === 'sukses') {
+                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
+                if (serverVersion) {
+                    let localVersion = localStorage.getItem('app_version');
+                    
+                    if (!localVersion) {
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                    } 
+                    else if (localVersion !== serverVersion.Nilai) {
+                        console.log(`🚀 Versi baru terdeteksi! (Lokal: ${localVersion} -> Server: ${serverVersion.Nilai})`);
+                        
+                        // 1. Kunci versi baru di memori
+                        localStorage.setItem('app_version', serverVersion.Nilai);
+                        
+                        // 2. Notifikasi (opsional, jika toast sudah ada)
+                        if (typeof this.showToast === 'function') {
+                            this.showToast("Pembaruan Sistem Ditemukan. Memuat ulang...", "success");
+                        }
+                        
+                        // 3. BAKAR CACHE LAWAS AGAR TIDAK BENTROK
+                        if ('caches' in window) {
+                            const cacheNames = await caches.keys();
+                            await Promise.all(cacheNames.map(name => caches.delete(name)));
+                        }
+
+                        // 4. CABUT PAKSA SERVICE WORKER LAWAS
+                        if ('serviceWorker' in navigator) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for(let reg of regs) { await reg.unregister(); }
+                        }
+                        
+                        // 5. Muat ulang halaman secara paksa setelah setengah detik
+                        setTimeout(() => {
+                            window.location.reload(true);
+                        }, 500);
+                    } else {
+                        console.log("✅ Aplikasi sudah menggunakan versi paling mutakhir.");
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("📡 Cek update latar belakang dilewati (Offline/Gangguan):", e.message);
+        }
+    },
+
+    // =========================================================================
+    // STARTUP & LOGIN (INIT)
+    // =========================================================================
     init: async function() {
-        // --- 🚀 RADAR UPDATE APLIKASI (SERVICE WORKER) ---
+        // 🚀 JALANKAN RADAR UPDATE SILUMAN SEBELUM KASIR LOGIN
+        this.autoCheckUpdateOnStart();
+
+        // --- 🚀 SERVICE WORKER REGISTRATION ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
                 registration.addEventListener('updatefound', () => {
@@ -378,11 +442,10 @@ const superApp = {
             }
 
             // =====================================================================
-            // 🚀 ENGINE PENARIK DATA STABIL (ADAPTASE DARI KODE LAWAS YANG KUAT)
+            // 🚀 ENGINE PENARIK DATA STABIL 
             // =====================================================================
             let performFetch = async () => {
                 let data = null;
-                // Menggunakan 3x percobaan tanpa AbortController agar tidak diputus paksa
                 for (let i = 0; i < 3; i++) {
                     try { 
                         const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
@@ -423,15 +486,14 @@ const superApp = {
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
-                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis jika kasir sudah login terlebih dahulu
+                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis
                 if (this.currentUser) {
                     this.refreshData();
                     this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
                 }
 
                 // =====================================================================
-                // 🚀 INJECT PENARIK DATA LATAR BELAKANG (PULL BACKGROUND DATA)
-                // Beri jeda 3 detik agar HP kasir tidak lag saat baru membuka aplikasi
+                // 🚀 INJECT PENARIK DATA LATAR BELAKANG
                 // =====================================================================
                 setTimeout(() => {
                     if (typeof this.pullBackgroundData === 'function') {
@@ -468,6 +530,8 @@ const superApp = {
             }
         }
     },
+
+    
     
    addPin: function(num) {
         // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
@@ -519,6 +583,16 @@ const superApp = {
             let roleStr = String(user.Role).toLowerCase();
             let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
             this.userRole = roleStr.includes('owner') ? 'owner' : (roleStr.includes('admin') ? 'admin' : 'kasir');
+            
+            // =====================================================================
+            // 🔒 GEMBOK UI: KONTROL TAMPILAN STATISTIK EKSKLUSIF OWNER
+            // =====================================================================
+            const ownerExclusiveStats = document.getElementById('owner-exclusive-stats');
+            if (ownerExclusiveStats) {
+                ownerExclusiveStats.className = (this.userRole === 'owner' || this.userRole === 'admin') 
+                    ? "flex flex-col gap-5 mb-6 transition-all duration-500" 
+                    : "hidden";
+            }
             
             // =====================================================================
             // 🚀 NORMALISASI MUTLAK: BERSIHKAN TEKS CABANG DARI AWALAN "AI-SNACK"
@@ -704,7 +778,7 @@ const superApp = {
         }
     },
 
-  // =========================================================================
+    // =========================================================================
     // 🚀 2. TARIK DATA MANUAL (STABILITAS ANTI-GAGAL + AUTO-RETRY 3X)
     // =========================================================================
     pullFreshData: async function(silent = false) {
@@ -716,12 +790,10 @@ const superApp = {
         let data = null;
 
         try {
-            // 🚀 PERBAIKAN KRITIS: Menggunakan sistem 3x percobaan TANPA AbortController!
-            // Menjamin koneksi tidak diputus sepihak oleh HP sebelum server Google selesai menjawab.
+            // 🚀 PERBAIKAN KRITIS: Menggunakan sistem 3x percobaan TANPA AbortController
             for (let i = 0; i < 3; i++) {
                 try {
-                    // 🚀 DIET PAYLOAD: Tarik 14 hari saja agar melesat kilat (< 1,5 detik)!
-                    // Jangan khawatir, data hari ke-15 s/d 90 TIDAK AKAN HILANG karena dilindungi Smart Merge.
+                    // DIET PAYLOAD: 14 hari
                     const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=14", { 
                         method: 'GET',
                         redirect: 'follow',
@@ -743,7 +815,9 @@ const superApp = {
                 throw new Error(data ? data.pesan : "Gagal mengunduh dari server");
             }
                 
-            // --- RADAR PENDETEKSI UPDATE VERSI ---
+            // =================================================================
+            // --- RADAR PENDETEKSI UPDATE VERSI (TERMINATOR CACHE) ---
+            // =================================================================
             let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
             if (serverVersion) {
                 let localVersion = localStorage.getItem('app_version');
@@ -752,21 +826,25 @@ const superApp = {
                     localStorage.setItem('app_version', serverVersion.Nilai);
                 } 
                 else if (localVersion !== serverVersion.Nilai) {
-                    console.log("Versi baru ditemukan, memuat ulang...");
+                    console.log("🚀 Update manual terdeteksi! Membongkar paksa cache...");
                     localStorage.setItem('app_version', serverVersion.Nilai);
                     
+                    if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    }
                     if ('serviceWorker' in navigator) {
                         const regs = await navigator.serviceWorker.getRegistrations();
-                        for(let reg of regs) { reg.update(); }
+                        for(let reg of regs) { await reg.unregister(); }
                     }
                     
-                    window.location.reload(true);
+                    setTimeout(() => { window.location.reload(true); }, 500);
                     return; 
                 }
             }
             
             // =================================================================
-            // 🚀 PERUBAHAN KRITIS: Strict Smart Merge agar riwayat lawas utuh!
+            // 🚀 STRICT SMART MERGE 
             // =================================================================
             if (typeof this.mergeDatabase === 'function') {
                 this.db = this.mergeDatabase(this.db, data);
@@ -792,7 +870,6 @@ const superApp = {
                 }
             });
             
-            // Refresh seluruh antarmuka agar angka editan dan tombol otorisasi langsung muncul!
             if (this.cart.length === 0) this.refreshData(); 
             if (typeof this.renderReport === 'function') this.renderReport();
             if (typeof this.renderLaporanHarianHistory === 'function') this.renderLaporanHarianHistory();
@@ -809,6 +886,8 @@ const superApp = {
             if (!silent) this.setLoading(false);
         }
     },
+
+   
 
     // =========================================================================
     // 🚀 ENGINE KHUSUS ARSIP LAWAS (DENGAN POP-UP KONFIRMASI CANTIK)
@@ -4085,6 +4164,373 @@ selectOutlet: function(id) {
         // Tutup modal secara otomatis setelah mengalihkan user ke WA
         this.closeWaLaporanModal();
     },
+
+    // =========================================================================
+    // 🏛️ 1. ENGINE AUDIT KONSOLIDASI LAPORAN HARIAN AI-CHA (CPA GRADE)
+    // =========================================================================
+    getLaporanAichaConsolidatedData: function() {
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+        
+        let now = new Date();
+        let pad = n => String(n).padStart(2, '0');
+        let defaultStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+        let defaultEnd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        let startDateStr = startInput?.value || defaultStart;
+        let endDateStr = endInput?.value || defaultEnd;
+
+        let startObj = new Date(startDateStr); startObj.setHours(0,0,0,0);
+        let endObj = new Date(endDateStr); endObj.setHours(23,59,59,999);
+
+        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+        // 1. Filter Data Sesuai Tanggal & Cabang
+        let filteredList = [...(this.db.laporanHarian || [])].filter(x => {
+            let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let cocokOutlet = isConsolidated || (repOutlet === currOutletClean);
+            if (!cocokOutlet) return false;
+
+            let cleanStr = (x.Tanggal || '').split(',').pop().trim();
+            let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (match) {
+                let dObj = new Date(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10));
+                return dObj >= startObj && dObj <= endObj;
+            }
+            return false;
+        });
+
+        // 2. Kalkulasi Agregasi Keuangan
+        let summary = {
+            totalNetSales: 0,
+            totalCash: 0,
+            totalQris: 0,
+            totalBill: 0,
+            totalPcs: 0,
+            totalOpex: 0,
+            outletBreakdown: {},
+            expenseItems: []
+        };
+
+        filteredList.forEach(item => {
+            let sales = Number(item.Net_Sales || 0);
+            let cash = Number(item.Cash || 0);
+            let qris = Number(item.QRIS || 0);
+            let bill = Number(item.Bill || 0);
+            let pcs = Number(item.Pcs || 0);
+            let opex = Number(item.Total_Pengeluaran || 0);
+            let outName = String(item.Outlet || 'Umum').replace(/^Ai\-Snack\s+/i, '').trim();
+
+            summary.totalNetSales += sales;
+            summary.totalCash += cash;
+            summary.totalQris += qris;
+            summary.totalBill += bill;
+            summary.totalPcs += pcs;
+            summary.totalOpex += opex;
+
+            // Breakdown Per Outlet
+            if (!summary.outletBreakdown[outName]) {
+                summary.outletBreakdown[outName] = { sales: 0, cash: 0, qris: 0, bill: 0, pcs: 0, opex: 0, count: 0 };
+            }
+            summary.outletBreakdown[outName].sales += sales;
+            summary.outletBreakdown[outName].cash += cash;
+            summary.outletBreakdown[outName].qris += qris;
+            summary.outletBreakdown[outName].bill += bill;
+            summary.outletBreakdown[outName].pcs += pcs;
+            summary.outletBreakdown[outName].opex += opex;
+            summary.outletBreakdown[outName].count += 1;
+
+            // Ekstrak Rincian Pengeluaran dari JSON
+            try {
+                let expArr = typeof item.Pengeluaran_JSON === 'string' ? JSON.parse(item.Pengeluaran_JSON || '[]') : (item.Pengeluaran_JSON || []);
+                if (Array.isArray(expArr)) {
+                    expArr.forEach(ex => {
+                        let nom = Number(ex.nominal || ex.Nominal || 0);
+                        if (nom > 0) {
+                            summary.expenseItems.push({
+                                tanggal: item.Tanggal,
+                                outlet: outName,
+                                nama: ex.nama || ex.Nama || 'Biaya Operasional',
+                                nominal: nom
+                            });
+                        }
+                    });
+                }
+            } catch(e) {}
+        });
+
+        // 3. Kalkulasi Rasio & KPI
+        summary.netSurplus = summary.totalNetSales - summary.totalOpex;
+        summary.cirPercentage = summary.totalNetSales > 0 ? ((summary.totalOpex / summary.totalNetSales) * 100).toFixed(1) : '0.0';
+        summary.cashPercentage = summary.totalNetSales > 0 ? ((summary.totalCash / summary.totalNetSales) * 100).toFixed(1) : '0.0';
+        summary.qrisPercentage = summary.totalNetSales > 0 ? ((summary.totalQris / summary.totalNetSales) * 100).toFixed(1) : '0.0';
+        summary.avgTicketValue = summary.totalBill > 0 ? Math.round(summary.totalNetSales / summary.totalBill) : 0;
+        summary.startDateStr = startDateStr;
+        summary.endDateStr = endDateStr;
+        summary.totalReports = filteredList.length;
+
+        return summary;
+    },
+
+    // =========================================================================
+    // 🏛️ 2. GENERATOR LAPORAN WHATSAPP (EXECUTIVE TEXT FORMAT)
+    // =========================================================================
+    generateLaporanAichaWA: function() {
+        let data = this.getLaporanAichaConsolidatedData();
+        if (data.totalReports === 0) {
+            return this.showToast("Tidak ada data laporan pada rentang tanggal terpilih!", "warning");
+        }
+
+        let fmt = n => Number(n || 0).toLocaleString('id-ID');
+        let outLabel = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet) ? "KONSOLIDASI SEMUA CABANG" : `CABANG ${this.outlet.toUpperCase()}`;
+
+        let waText = `*🏛️ LAPORAN AUDIT KEUANGAN AI-CHA*\n`;
+        waText += `*${outLabel}*\n`;
+        waText += `📅 Periode: ${data.startDateStr} s/d ${data.endDateStr}\n`;
+        waText += `📑 Total Laporan: ${data.totalReports} Hari Operasional\n`;
+        waText += `---------------------------------------\n\n`;
+
+        waText += `*📊 RINGKASAN EKSEKUTIF (AUDITED)*\n`;
+        waText += `• Gross Revenue (Net Sales): *Rp ${fmt(data.totalNetSales)}*\n`;
+        waText += `• Tunai (Cash - ${data.cashPercentage}%): Rp ${fmt(data.totalCash)}\n`;
+        waText += `• Non-Tunai (QRIS - ${data.qrisPercentage}%): Rp ${fmt(data.totalQris)}\n`;
+        waText += `• Operating Expenses (OPEX): Rp ${fmt(data.totalOpex)}\n`;
+        waText += `• *NET CASH SURPLUS*: *Rp ${fmt(data.netSurplus)}*\n\n`;
+
+        waText += `*📈 KPI & EFISIENSI OPERASIONAL*\n`;
+        waText += `• Total Transaksi: ${fmt(data.totalBill)} Bill (${fmt(data.totalPcs)} Pcs Cup)\n`;
+        waText += `• Avg. Ticket Value (ATV): Rp ${fmt(data.avgTicketValue)} / bill\n`;
+        waText += `• Cost-to-Income Ratio (CIR): *${data.cirPercentage}%* ${data.cirPercentage > 30 ? '⚠️ (Tinggi)' : '✅ (Sehat)'}\n\n`;
+
+        waText += `*🏢 BREAKDOWN PER OUTLET*\n`;
+        Object.keys(data.outletBreakdown).forEach(out => {
+            let ob = data.outletBreakdown[out];
+            let netOut = ob.sales - ob.opex;
+            waText += `*▪️ Ai-Cha ${out}* (${ob.count} hari)\n`;
+            waText += `   Sales: Rp ${fmt(ob.sales)} | OPEX: Rp ${fmt(ob.opex)}\n`;
+            waText += `   Surplus: *Rp ${fmt(netOut)}* (${fmt(ob.bill)} Bill / ${fmt(ob.pcs)} Pcs)\n`;
+        });
+
+        if (data.expenseItems.length > 0) {
+            waText += `\n*🧾 TOP 5 RINCIAN BIAYA OPERASIONAL*\n`;
+            // Sort biaya terbesar
+            let topExp = [...data.expenseItems].sort((a,b) => b.nominal - a.nominal).slice(0, 5);
+            topExp.forEach((ex, idx) => {
+                waText += `${idx+1}. [${ex.outlet}] ${ex.nama}: Rp ${fmt(ex.nominal)}\n`;
+            });
+            if (data.expenseItems.length > 5) {
+                waText += `...dan ${data.expenseItems.length - 5} item pengeluaran lainnya.\n`;
+            }
+        }
+
+        waText += `\n---------------------------------------\n`;
+        waText += `_Laporan di-generate secara otomatis oleh Sistem ERP Ai-Snack & Ai-Cha pada ${new Date().toLocaleString('id-ID')}_`;
+
+        // Copy ke Clipboard & Buka WhatsApp
+        navigator.clipboard.writeText(waText);
+        this.showToast("✅ Laporan WA disalin ke clipboard! Membuka WhatsApp...", "success");
+
+        let waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(waText)}`;
+        window.open(waUrl, '_blank');
+    },
+
+    // =========================================================================
+    // 🏛️ 3. GENERATOR LAPORAN PDF (PUBLIC ACCOUNTANT GRADE PRINT SHEET)
+    // =========================================================================
+    generateLaporanAichaPDF: function() {
+        let data = this.getLaporanAichaConsolidatedData();
+        if (data.totalReports === 0) {
+            return this.showToast("Tidak ada data laporan pada rentang tanggal terpilih!", "warning");
+        }
+
+        let fmt = n => Number(n || 0).toLocaleString('id-ID');
+        let outLabel = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet) ? "KONSOLIDASI SELURUH CABANG" : `CABANG AI-CHA ${this.outlet.toUpperCase()}`;
+        let appLogo = localStorage.getItem('app_logo_url') || '';
+
+        // Generate baris tabel outlet
+        let outletRowsHtml = '';
+        Object.keys(data.outletBreakdown).forEach(out => {
+            let ob = data.outletBreakdown[out];
+            let netOut = ob.sales - ob.opex;
+            let cirOut = ob.sales > 0 ? ((ob.opex / ob.sales) * 100).toFixed(1) : '0.0';
+            outletRowsHtml += `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 10px; font-weight: bold; color: #1e293b;">AI-CHA ${out.toUpperCase()}</td>
+                    <td style="padding: 10px; text-align: center;">${ob.count} Hari</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold;">Rp ${fmt(ob.sales)}</td>
+                    <td style="padding: 10px; text-align: right; color: #475569;">Rp ${fmt(ob.cash)}</td>
+                    <td style="padding: 10px; text-align: right; color: #2563eb;">Rp ${fmt(ob.qris)}</td>
+                    <td style="padding: 10px; text-align: right; color: #dc2626;">Rp ${fmt(ob.opex)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: 800; color: #059669;">Rp ${fmt(netOut)}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: bold;">${cirOut}%</td>
+                </tr>
+            `;
+        });
+
+        // Generate baris tabel rincian pengeluaran (Maks 30 teratas agar tidak berlebih)
+        let opexRowsHtml = '';
+        let sortedOpex = [...data.expenseItems].sort((a,b) => b.nominal - a.nominal);
+        sortedOpex.forEach(ex => {
+            opexRowsHtml += `
+                <tr style="border-bottom: 1px solid #f1f5f9; font-size: 11px;">
+                    <td style="padding: 8px;">${ex.tanggal}</td>
+                    <td style="padding: 8px; font-weight: bold;">AI-CHA ${ex.outlet.toUpperCase()}</td>
+                    <td style="padding: 8px;">${ex.nama}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: bold; color: #dc2626;">Rp ${fmt(ex.nominal)}</td>
+                </tr>
+            `;
+        });
+        if (opexRowsHtml === '') {
+            opexRowsHtml = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: #94a3b8;">Tidak ada pengeluaran operasional tercatat pada periode ini.</td></tr>`;
+        }
+
+        // Window Print Template Professional
+        let printWin = window.open('', '_blank', 'width=1100,height=850');
+        printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Laporan Keuangan Ai-Cha - ${data.startDateStr} sd ${data.endDateStr}</title>
+                <style>
+                    @page { size: A4; margin: 15mm; }
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; line-height: 1.4; font-size: 12px; }
+                    .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+                    .logo-img { max-height: 55px; }
+                    .title-area h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; text-transform: uppercase; }
+                    .title-area p { margin: 3px 0 0; color: #64748b; font-size: 11px; }
+                    
+                    .executive-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px; }
+                    .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+                    .kpi-label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+                    .kpi-value { font-size: 16px; font-weight: 900; color: #0f172a; }
+                    .kpi-sub { font-size: 10px; color: #475569; margin-top: 4px; }
+                    
+                    .section-title { font-size: 13px; font-weight: 900; text-transform: uppercase; margin: 25px 0 10px; padding-bottom: 5px; border-bottom: 2px solid #cbd5e1; color: #1e293b; }
+                    
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    th { background: #0f172a; color: #ffffff; padding: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #0f172a; }
+                    td { border: 1px solid #e2e8f0; }
+                    
+                    .footer-sign { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
+                    .sign-box { width: 200px; text-align: center; }
+                    .sign-line { margin-top: 60px; border-bottom: 1px solid #0f172a; font-weight: bold; }
+                    
+                    .badge-healthy { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+                    .badge-warning { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <!-- HEADER AUDIT -->
+                <div class="header-box">
+                    <div class="title-area">
+                        <h1>FINANCIAL AUDIT & CONSOLIDATION REPORT</h1>
+                        <p><strong>ENTITAS:</strong> AI-CHA TEA & BEVERAGE INDONESIA (${outLabel})</p>
+                        <p><strong>PERIODE AUDIT:</strong> ${data.startDateStr} s/d ${data.endDateStr} | <strong>HARI OPERASIONAL:</strong> ${data.totalReports} Hari</p>
+                    </div>
+                    <div>
+                        ${appLogo ? `<img src="${appLogo}" class="logo-img" />` : `<h2 style="margin:0; color:#dc2626;">AI-CHA</h2>`}
+                    </div>
+                </div>
+
+                <!-- 4 KARTU NERACA RINGKAS -->
+                <div class="executive-grid">
+                    <div class="kpi-card" style="border-left: 4px solid #0f172a;">
+                        <div class="kpi-label">Gross Revenue (Net Sales)</div>
+                        <div class="kpi-value">Rp ${fmt(data.totalNetSales)}</div>
+                        <div class="kpi-sub">${fmt(data.totalBill)} Bill | ${fmt(data.totalPcs)} Cups</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid #2563eb;">
+                        <div class="kpi-label">Komposisi Kas (Cash vs QRIS)</div>
+                        <div class="kpi-value">${data.cashPercentage}% / ${data.qrisPercentage}%</div>
+                        <div class="kpi-sub">C: Rp ${fmt(data.totalCash)} | Q: Rp ${fmt(data.totalQris)}</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid #dc2626;">
+                        <div class="kpi-label">Operating Expense (OPEX)</div>
+                        <div class="kpi-value" style="color:#dc2626;">Rp ${fmt(data.totalOpex)}</div>
+                        <div class="kpi-sub">CIR Ratio: <strong>${data.cirPercentage}%</strong> ${data.cirPercentage > 30 ? '<span class="badge-warning">HIGH</span>' : '<span class="badge-healthy">EFFICIENT</span>'}</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid #059669; background: #ecfdf5;">
+                        <div class="kpi-label" style="color:#065f46;">Net Cash Surplus (Laba Kas)</div>
+                        <div class="kpi-value" style="color:#059669;">Rp ${fmt(data.netSurplus)}</div>
+                        <div class="kpi-sub">Avg. Ticket: Rp ${fmt(data.avgTicketValue)} / bill</div>
+                    </div>
+                </div>
+
+                <!-- TABEL KONSOLIDASI PER OUTLET -->
+                <div class="section-title">1. Konsolidasi Performa Outlet (Revenue vs Expenditure)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Nama Outlet</th>
+                            <th>Hari Operasional</th>
+                            <th style="text-align: right;">Gross Sales</th>
+                            <th style="text-align: right;">Kas Tunai</th>
+                            <th style="text-align: right;">QRIS / Digital</th>
+                            <th style="text-align: right;">Biaya (OPEX)</th>
+                            <th style="text-align: right;">Net Surplus</th>
+                            <th>CIR %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${outletRowsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #f8fafc; font-weight: 900; border-top: 2px solid #0f172a;">
+                            <td style="padding: 10px;">TOTAL AGREGAT</td>
+                            <td style="padding: 10px; text-align: center;">${data.totalReports} Hari</td>
+                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalNetSales)}</td>
+                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalCash)}</td>
+                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalQris)}</td>
+                            <td style="padding: 10px; text-align: right; color:#dc2626;">Rp ${fmt(data.totalOpex)}</td>
+                            <td style="padding: 10px; text-align: right; color:#059669;">Rp ${fmt(data.netSurplus)}</td>
+                            <td style="padding: 10px; text-align: center;">${data.cirPercentage}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- TABEL RINCIAN PENGELUARAN OPERASIONAL -->
+                <div class="section-title" style="margin-top:30px;">2. Rincian Pengeluaran Operasional yang Diaudit (Itemized OPEX)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; width: 15%;">Tanggal</th>
+                            <th style="text-align: left; width: 25%;">Outlet</th>
+                            <th style="text-align: left; width: 40%;">Deskripsi Pengeluaran / Beban</th>
+                            <th style="text-align: right; width: 20%;">Nominal (IDR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${opexRowsHtml}
+                    </tbody>
+                </table>
+
+                <!-- LEMBAR PENGESAHAN (SIGNATURE BLOCK) -->
+                <div class="footer-sign">
+                    <div class="sign-box">
+                        <div style="font-size: 11px; color:#64748b;">Disiapkan oleh:</div>
+                        <div class="sign-line">${this.currentUser ? this.currentUser.Username : 'Financial Controller'}</div>
+                        <div style="font-size: 10px; color:#64748b; margin-top:2px;">ERP System Administrator</div>
+                    </div>
+                    <div class="sign-box">
+                        <div style="font-size: 11px; color:#64748b;">Diperiksa & Disetujui oleh:</div>
+                        <div class="sign-line">Owner / Direksi</div>
+                        <div style="font-size: 10px; color:#64748b; margin-top:2px;">Ai-Cha Tea & Beverage</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px; font-size: 9px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                    Laporan ini dibuat dan diverifikasi secara otomatis oleh Sistem Pembukuan Ai-Snack ERP pada ${new Date().toLocaleString('id-ID')}. Dokumen ini sah sebagai lampiran audit akuntansi internal.
+                </div>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+        printWin.focus();
+        setTimeout(() => { printWin.print(); }, 500);
+    },
+
+    
 
     
     // =========================================================
