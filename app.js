@@ -1195,6 +1195,34 @@ const superApp = {
         }
     },
 
+    // ==============================================================================
+    // 🌓 FUNGSI TEMA TERANG & GELAP (DARK MODE)
+    // ==============================================================================
+    toggleTheme: function() {
+        const htmlDoc = document.documentElement;
+        
+        // Cek apakah saat ini sedang mode dark
+        if (htmlDoc.classList.contains('dark')) {
+            htmlDoc.classList.remove('dark');
+            localStorage.setItem('aisnack_theme', 'light');
+            this.showToast("Beralih ke Tema Terang 🌞", "info");
+        } else {
+            htmlDoc.classList.add('dark');
+            localStorage.setItem('aisnack_theme', 'dark');
+            this.showToast("Beralih ke Tema Gelap 🌙", "info");
+        }
+    },
+    
+    // Panggil fungsi ini di dalam superApp.init() agar saat refresh tema tidak hilang
+    loadSavedTheme: function() {
+        if (localStorage.getItem('aisnack_theme') === 'dark' || 
+            (!localStorage.getItem('aisnack_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    },
+
     
     // =========================================================
     // 🚀 ENGINE: API POST (XHR ANTI-GANTUNG & ANTI-CRASH DI HP)
@@ -7854,10 +7882,13 @@ openDetailStokOpname: function(sku) {
     },
     
 
-    toggleGudangTab: function(tab) {
+   toggleGudangTab: function(tab) {
         const tabs = ['stok', 'menu', 'outlet', 'hpp'];
-        const activeClass = 'snap-start px-4 md:px-5 py-2 md:py-2.5 bg-slate-900 text-white rounded-xl md:rounded-2xl text-xs md:text-sm font-black shadow-sm whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border border-slate-800';
-        const inactiveClass = 'snap-start px-4 md:px-5 py-2 md:py-2.5 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border border-slate-200/80';
+        
+        // 🔴 Gaya Tab Aktif (Merah Ai-Snack)
+        const activeClass = 'snap-start px-5 py-2.5 md:py-3 bg-gradient-to-r from-[#E5202B] to-[#CC1A24] text-white rounded-xl md:rounded-[1.25rem] text-xs md:text-sm font-black shadow-[0_6px_15px_rgba(229,32,43,0.3)] whitespace-nowrap transition-all flex items-center gap-2 shrink-0 border border-[#CC1A24] active:scale-95';
+        // ⚪ Gaya Tab Tidak Aktif (Putih/Slate Lembut)
+        const inactiveClass = 'snap-start px-5 py-2.5 md:py-3 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-[#FFF5D1] hover:text-[#E5202B] hover:border-[#FFD874] rounded-xl md:rounded-[1.25rem] text-xs md:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 border border-slate-200 dark:border-slate-700 active:scale-95 shadow-sm';
 
         tabs.forEach(t => {
             const content = document.getElementById(`gudang-content-${t}`);
@@ -7874,33 +7905,33 @@ openDetailStokOpname: function(sku) {
         }
         if (activeBtn) activeBtn.className = activeClass;
 
-        // 🚀 KELOLA STICKY BOTTOM BAR KHUSUS HP
+        // 🚀 KELOLA STICKY BOTTOM BAR KHUSUS HP (Ai-Snack Mobile Bottom Bar)
         const mobBar = document.getElementById('gudang-mobile-bottom-bar');
         if (mobBar) {
             if (tab === 'stok') {
                 mobBar.innerHTML = `
-                <button onclick="superApp.openCrudBahan()" class="flex-1 bg-slate-900 text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 active:scale-95">
-                    <i class="fas fa-plus text-emerald-400"></i> BAHAN BARU
+                <button onclick="superApp.openCrudBahan()" class="flex-1 bg-white border border-[#FFD874] text-[#E5202B] font-black py-3.5 rounded-[1.25rem] text-[11px] flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+                    <i class="fas fa-plus text-[#FFB800]"></i> BAHAN BARU
                 </button>
-                <button onclick="superApp.openRestokModal()" class="flex-[1.5] bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95">
+                <button onclick="superApp.openRestokModal()" class="flex-[1.5] bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white font-black py-3.5 rounded-[1.25rem] text-[11px] shadow-[0_6px_15px_rgba(37,211,102,0.3)] flex items-center justify-center gap-2 active:scale-95 border border-[#128C7E]">
                     <i class="fas fa-truck-loading"></i> RESTOK SUPLIER
                 </button>`;
             } else if (tab === 'menu') {
                 mobBar.innerHTML = `
-                <button onclick="superApp.openCrudMasterMenu('add')" class="w-full bg-gradient-to-r from-brand-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95">
+                <button onclick="superApp.openCrudMasterMenu('add')" class="w-full bg-gradient-to-r from-[#E5202B] to-[#CC1A24] text-white font-black py-3.5 rounded-[1.25rem] text-xs shadow-[0_6px_15px_rgba(229,32,43,0.3)] border border-[#CC1A24] flex items-center justify-center gap-2 active:scale-95">
                     <i class="fas fa-plus"></i> TAMBAH MENU POS BARU
                 </button>`;
             } else if (tab === 'outlet') {
                 mobBar.innerHTML = `
-                <button onclick="superApp.openCrudOutlet('add')" class="flex-1 bg-slate-900 text-white font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 active:scale-95">
-                    <i class="fas fa-plus text-emerald-400"></i> TOKO BARU
+                <button onclick="superApp.openCrudOutlet('add')" class="flex-1 bg-white border border-[#FFD874] text-[#E5202B] font-black py-3.5 rounded-[1.25rem] text-[11px] flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+                    <i class="fas fa-plus text-[#FFB800]"></i> TOKO BARU
                 </button>
-                <button onclick="superApp.openDistribusiModal()" class="flex-[1.5] bg-blue-600 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95">
+                <button onclick="superApp.openDistribusiModal()" class="flex-[1.5] bg-[#25D366] text-white font-black py-3.5 rounded-[1.25rem] text-[11px] shadow-[0_6px_15px_rgba(37,211,102,0.3)] flex items-center justify-center gap-2 active:scale-95">
                     <i class="fas fa-truck-fast"></i> DISTRIBUSI SUPLAI
                 </button>`;
             } else if (tab === 'hpp') {
                 mobBar.innerHTML = `
-                <button onclick="superApp.saveHPP()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black py-3 rounded-xl text-xs shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95">
+                <button onclick="superApp.saveHPP()" class="w-full bg-gradient-to-r from-[#FFB800] to-orange-500 border border-[#D49800] text-white font-black py-3.5 rounded-[1.25rem] text-xs shadow-[0_6px_15px_rgba(255,184,0,0.3)] flex items-center justify-center gap-2 active:scale-95">
                     <i class="fas fa-save"></i> SIMPAN PERUBAHAN HPP
                 </button>`;
             }
@@ -7918,35 +7949,48 @@ openDetailStokOpname: function(sku) {
         const btnUtama = document.getElementById('subtab-gstok-utama');
         const btnPend = document.getElementById('subtab-gstok-pendukung');
 
-        const activeClass = 'flex-1 md:flex-none py-2 md:py-2.5 px-4 md:px-5 bg-white text-emerald-600 rounded-lg md:rounded-xl text-xs md:text-sm font-black shadow-2xs transition flex items-center justify-center gap-1.5 border border-slate-200/60';
-        const inactiveClass = 'flex-1 md:flex-none py-2 md:py-2.5 px-4 md:px-5 text-slate-500 hover:text-slate-800 rounded-lg md:rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-1.5 border border-transparent';
+        // 🔴 Gaya Sub-Tab Aktif (Ai-Snack Style)
+        const activeClass = 'flex-1 md:flex-none py-2.5 px-5 bg-white text-[#E5202B] rounded-lg md:rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-100';
+        // ⚪ Gaya Sub-Tab Tidak Aktif
+        const inactiveClass = 'flex-1 md:flex-none py-2.5 px-5 text-slate-500 hover:text-[#4A3B32] rounded-lg md:rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border border-transparent';
 
         if (tab === 'utama') {
             if(tbUtama) tbUtama.classList.remove('hidden'); if(tbPend) tbPend.classList.add('hidden');
             if(mobUtama) mobUtama.classList.remove('hidden'); if(mobPend) mobPend.classList.add('hidden');
             if(btnUtama) btnUtama.className = activeClass; if(btnPend) btnPend.className = inactiveClass;
+            
+            // Toggle warna badge mini di dalam tombol
+            const cUtama = document.getElementById('count-gstok-utama'); if(cUtama) cUtama.className = 'bg-[#FFF5D1] text-[#E5202B] px-2 py-0.5 rounded-md text-[10px] shadow-inner';
+            const cPend = document.getElementById('count-gstok-pendukung'); if(cPend) cPend.className = 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md text-[10px] shadow-inner';
         } else {
             if(tbUtama) tbUtama.classList.add('hidden'); if(tbPend) tbPend.classList.remove('hidden');
             if(mobUtama) mobUtama.classList.add('hidden'); if(mobPend) mobPend.classList.remove('hidden');
             if(btnUtama) btnUtama.className = inactiveClass; if(btnPend) btnPend.className = activeClass;
+            
+            const cUtama = document.getElementById('count-gstok-utama'); if(cUtama) cUtama.className = 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md text-[10px] shadow-inner';
+            const cPend = document.getElementById('count-gstok-pendukung'); if(cPend) cPend.className = 'bg-[#FFF5D1] text-[#E5202B] px-2 py-0.5 rounded-md text-[10px] shadow-inner';
         }
     },
-
-   
 
     // =========================================================
     // 🚀 SUB-TAB SWITCHER MANAJEMEN CABANG
     // =========================================================
     switchOutletSubTab: function(tab) {
         const sections = ['daftar', 'harga', 'matrix'];
-        const activeClass = 'flex-1 md:flex-none px-5 py-2.5 bg-white text-blue-600 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-200/60';
-        const inactiveClass = 'flex-1 md:flex-none px-5 py-2.5 text-slate-500 hover:text-slate-800 rounded-xl text-xs md:text-sm font-bold transition flex items-center justify-center gap-2 border border-transparent';
+        
+        // 🔴 Gaya Sub-Tab Cabang Aktif
+        const activeClass = 'flex-1 md:flex-none py-2.5 px-5 bg-white text-[#E5202B] rounded-lg md:rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-2 border border-slate-100 whitespace-nowrap';
+        // ⚪ Gaya Sub-Tab Cabang Tidak Aktif
+        const inactiveClass = 'flex-1 md:flex-none py-2.5 px-5 text-slate-500 hover:text-[#4A3B32] rounded-lg md:rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border border-transparent whitespace-nowrap';
 
         sections.forEach(s => {
             const sec = document.getElementById(`out-section-${s}`);
             const btn = document.getElementById(`subtab-out-${s}`);
             if(sec) sec.classList.add('hidden');
             if(btn) btn.className = inactiveClass;
+            
+            // Kembalikan semua ikon ke warna standar jika tidak aktif
+            if(btn && btn.querySelector('i')) btn.querySelector('i').className = btn.querySelector('i').className.replace('text-[#E5202B]', '');
         });
 
         const activeSec = document.getElementById(`out-section-${tab}`);
@@ -7955,7 +7999,11 @@ openDetailStokOpname: function(sku) {
             activeSec.classList.remove('hidden');
             activeSec.classList.add('flex');
         }
-        if(activeBtn) activeBtn.className = activeClass;
+        if(activeBtn) {
+            activeBtn.className = activeClass;
+            // Warnai ikon tab aktif menjadi merah
+            if(activeBtn.querySelector('i')) activeBtn.querySelector('i').classList.add('text-[#E5202B]');
+        }
     },
     
     
@@ -11704,3 +11752,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
