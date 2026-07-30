@@ -244,3 +244,34 @@ body {
     transform: scale(1.15); /* Efek membesar (pop) */
     box-shadow: 0 0 10px rgba(229, 32, 43, 0.4);
 }
+
+/* CSS Khusus Tuts Virtual Keyboard Ai-Snack */
+#vk-keys button {
+    background-color: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 0.75rem; /* Sudut membulat */
+    color: #4A3B32;
+    font-weight: 900;
+    box-shadow: 0 4px 0 rgba(203, 213, 225, 0.6); /* Efek 3D tebal */
+    transition: all 0.1s ease-in-out;
+}
+
+#vk-keys button:active {
+    transform: translateY(4px);
+    box-shadow: none;
+    background-color: #FFF5D1; /* Berubah kekuningan saat ditekan */
+    color: #E5202B; /* Teks merah saat ditekan */
+    border-color: rgba(255, 216, 116, 0.8);
+}
+
+/* Khusus tombol khusus seperti Space, Enter, Backspace */
+#vk-keys button.vk-special-key {
+    background-color: #FFB800;
+    color: #ffffff;
+    box-shadow: 0 4px 0 rgba(212, 152, 0, 0.8);
+    border-color: #FFB800;
+}
+
+#vk-keys button.vk-special-key:active {
+    background-color: #F0A800;
+}
