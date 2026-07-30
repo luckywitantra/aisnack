@@ -817,7 +817,7 @@ const superApp = {
             for (let i = 0; i < 3; i++) {
                 try {
                     // DIET PAYLOAD: 14 hari
-                    const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=14", { 
+                    const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
                         method: 'GET',
                         redirect: 'follow',
                         cache: 'no-store'
