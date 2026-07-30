@@ -4343,7 +4343,7 @@ selectOutlet: function(id) {
     // =========================================================================
     // 🏛️ 3. GENERATOR LAPORAN PDF (PUBLIC ACCOUNTANT GRADE PRINT SHEET)
     // =========================================================================
-    generateLaporanAichaPDF: function() {
+   generateLaporanAichaPDF: function() {
         let data = this.getLaporanAichaConsolidatedData();
         if (data.totalReports === 0) {
             return this.showToast("Tidak ada data laporan pada rentang tanggal terpilih!", "warning");
@@ -4353,76 +4353,117 @@ selectOutlet: function(id) {
         let outLabel = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet) ? "KONSOLIDASI SELURUH CABANG" : `CABANG AI-CHA ${this.outlet.toUpperCase()}`;
         let appLogo = localStorage.getItem('app_logo_url') || '';
 
-        // Generate baris tabel outlet
+        // ==========================================================
+        // 1. GENERATE BARIS TABEL OUTLET (PERFORMA KESELURUHAN)
+        // ==========================================================
         let outletRowsHtml = '';
         Object.keys(data.outletBreakdown).forEach(out => {
             let ob = data.outletBreakdown[out];
             let netOut = ob.sales - ob.opex;
             let cirOut = ob.sales > 0 ? ((ob.opex / ob.sales) * 100).toFixed(1) : '0.0';
+            
             outletRowsHtml += `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 10px; font-weight: bold; color: #1e293b;">AI-CHA ${out.toUpperCase()}</td>
-                    <td style="padding: 10px; text-align: center;">${ob.count} Hari</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold;">Rp ${fmt(ob.sales)}</td>
-                    <td style="padding: 10px; text-align: right; color: #475569;">Rp ${fmt(ob.cash)}</td>
-                    <td style="padding: 10px; text-align: right; color: #2563eb;">Rp ${fmt(ob.qris)}</td>
-                    <td style="padding: 10px; text-align: right; color: #dc2626;">Rp ${fmt(ob.opex)}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: 800; color: #059669;">Rp ${fmt(netOut)}</td>
-                    <td style="padding: 10px; text-align: center; font-weight: bold;">${cirOut}%</td>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 12px; font-weight: 900; color: #4A3B32;">AI-SNACK ${out.toUpperCase()}</td>
+                    <td style="padding: 12px; text-align: center; color: #4A3B32; font-weight: bold;">${ob.count} Hari</td>
+                    <td style="padding: 12px; text-align: right; font-weight: 900; color: #4A3B32;">Rp ${fmt(ob.sales)}</td>
+                    <td style="padding: 12px; text-align: right; color: #E5202B; font-weight: bold;">Rp ${fmt(ob.cash)}</td>
+                    <td style="padding: 12px; text-align: right; color: #D49800; font-weight: bold;">Rp ${fmt(ob.qris)}</td>
+                    <td style="padding: 12px; text-align: right; color: #E5202B; font-weight: bold;">Rp ${fmt(ob.opex)}</td>
+                    <td style="padding: 12px; text-align: right; font-weight: 900; color: #10b981;">Rp ${fmt(netOut)}</td>
+                    <td style="padding: 12px; text-align: center; font-weight: 900; color: #4A3B32; background-color: #FFF5D1;">${cirOut}%</td>
                 </tr>
             `;
         });
 
-        // Generate baris tabel rincian pengeluaran (Maks 30 teratas agar tidak berlebih)
-        let opexRowsHtml = '';
-        let sortedOpex = [...data.expenseItems].sort((a,b) => b.nominal - a.nominal);
-        sortedOpex.forEach(ex => {
-            opexRowsHtml += `
-                <tr style="border-bottom: 1px solid #f1f5f9; font-size: 11px;">
-                    <td style="padding: 8px;">${ex.tanggal}</td>
-                    <td style="padding: 8px; font-weight: bold;">AI-CHA ${ex.outlet.toUpperCase()}</td>
-                    <td style="padding: 8px;">${ex.nama}</td>
-                    <td style="padding: 8px; text-align: right; font-weight: bold; color: #dc2626;">Rp ${fmt(ex.nominal)}</td>
-                </tr>
-            `;
+        // ==========================================================
+        // 2. LOGIKA GROUPING PENGELUARAN (PER CABANG -> PER ITEM)
+        // ==========================================================
+        let groupedOpex = {};
+        
+        // Mengelompokkan data
+        data.expenseItems.forEach(ex => {
+            let out = ex.outlet.toUpperCase();
+            let itemName = (ex.nama || 'Tanpa Nama').trim().toUpperCase();
+            
+            if (!groupedOpex[out]) groupedOpex[out] = {};
+            if (!groupedOpex[out][itemName]) groupedOpex[out][itemName] = 0;
+            
+            groupedOpex[out][itemName] += parseFloat(ex.nominal || 0);
         });
-        if (opexRowsHtml === '') {
-            opexRowsHtml = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: #94a3b8;">Tidak ada pengeluaran operasional tercatat pada periode ini.</td></tr>`;
+
+        // Generate HTML Pengeluaran
+        let opexRowsHtml = '';
+        let sortedOutlets = Object.keys(groupedOpex).sort();
+        
+        if (sortedOutlets.length === 0) {
+            opexRowsHtml = `<tr><td colspan="2" style="padding: 20px; text-align: center; color: #E5202B; font-weight: 900; background-color: #FFF5D1;">TIDAK ADA PENGELUARAN TERCATAT PADA PERIODE INI.</td></tr>`;
+        } else {
+            sortedOutlets.forEach(out => {
+                // Header Cabang (Warna Kuning Ai-Snack)
+                opexRowsHtml += `
+                    <tr style="background-color: #FFF5D1; border-bottom: 2px solid #FFD874;">
+                        <td colspan="2" style="padding: 10px 15px; font-weight: 900; color: #E5202B; text-align: left; font-size: 13px;">
+                            🏠 OUTLET: AI-SNACK ${out}
+                        </td>
+                    </tr>
+                `;
+                
+                // Urutkan item pengeluaran berdasarkan nominal tertinggi
+                let items = Object.keys(groupedOpex[out]).map(k => ({ nama: k, nominal: groupedOpex[out][k] }));
+                items.sort((a,b) => b.nominal - a.nominal);
+                
+                items.forEach(item => {
+                    opexRowsHtml += `
+                        <tr style="border-bottom: 1px solid #f1f5f9; font-size: 11px;">
+                            <td style="padding: 10px 15px 10px 30px; font-weight: bold; color: #4A3B32;">▪ ${item.nama}</td>
+                            <td style="padding: 10px 15px; text-align: right; font-weight: 900; color: #E5202B;">Rp ${fmt(item.nominal)}</td>
+                        </tr>
+                    `;
+                });
+            });
         }
 
-        // Window Print Template Professional
+        // ==========================================================
+        // 3. RENDER WINDOW PRINT (PDF HTML)
+        // ==========================================================
         let printWin = window.open('', '_blank', 'width=1100,height=850');
         printWin.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Laporan Keuangan Ai-Cha - ${data.startDateStr} sd ${data.endDateStr}</title>
+                <title>Laporan Keuangan Ai-Snack - ${data.startDateStr} sd ${data.endDateStr}</title>
                 <style>
                     @page { size: A4; margin: 15mm; }
-                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; line-height: 1.4; font-size: 12px; }
-                    .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
-                    .logo-img { max-height: 55px; }
-                    .title-area h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; text-transform: uppercase; }
-                    .title-area p { margin: 3px 0 0; color: #64748b; font-size: 11px; }
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4A3B32; margin: 0; padding: 0; line-height: 1.4; font-size: 12px; }
                     
-                    .executive-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px; }
-                    .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
-                    .kpi-label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
-                    .kpi-value { font-size: 16px; font-weight: 900; color: #0f172a; }
-                    .kpi-sub { font-size: 10px; color: #475569; margin-top: 4px; }
+                    /* Header Styles */
+                    .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #FFB800; padding-bottom: 15px; margin-bottom: 20px; }
+                    .logo-img { max-height: 60px; border-radius: 12px; }
+                    .title-area h1 { font-size: 22px; font-weight: 900; margin: 0; letter-spacing: -0.5px; text-transform: uppercase; color: #E5202B; }
+                    .title-area p { margin: 4px 0 0; font-size: 11px; font-weight: bold; color: #A87B00; }
                     
-                    .section-title { font-size: 13px; font-weight: 900; text-transform: uppercase; margin: 25px 0 10px; padding-bottom: 5px; border-bottom: 2px solid #cbd5e1; color: #1e293b; }
+                    /* Bubbly KPI Cards */
+                    .executive-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+                    .kpi-card { background: #ffffff; border: 2px solid #FFF5D1; border-radius: 20px; padding: 15px; box-shadow: 0 4px 10px rgba(229,32,43,0.05); }
+                    .kpi-label { font-size: 10px; font-weight: 900; color: #A87B00; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px; }
+                    .kpi-value { font-size: 18px; font-weight: 900; color: #4A3B32; }
+                    .kpi-sub { font-size: 10px; font-weight: bold; color: #64748b; margin-top: 5px; }
                     
-                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                    th { background: #0f172a; color: #ffffff; padding: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #0f172a; }
-                    td { border: 1px solid #e2e8f0; }
+                    /* Table Styles */
+                    .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 30px 0 12px; padding-bottom: 6px; border-bottom: 3px solid #E5202B; color: #4A3B32; display: inline-block; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 25px; border-radius: 12px; overflow: hidden; }
+                    th { background: #E5202B; color: #ffffff; padding: 12px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; border: 1px solid #CC1A24; }
+                    td { border: 1px solid #f1f5f9; }
                     
-                    .footer-sign { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
-                    .sign-box { width: 200px; text-align: center; }
-                    .sign-line { margin-top: 60px; border-bottom: 1px solid #0f172a; font-weight: bold; }
+                    /* Footer Signatures */
+                    .footer-sign { display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
+                    .sign-box { width: 220px; text-align: center; }
+                    .sign-line { margin-top: 70px; border-bottom: 2px solid #4A3B32; font-weight: 900; padding-bottom: 5px; color: #E5202B; }
                     
-                    .badge-healthy { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-                    .badge-warning { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+                    /* Badges */
+                    .badge-healthy { background: #dcfce7; color: #166534; padding: 3px 8px; border-radius: 6px; font-size: 9px; font-weight: 900; }
+                    .badge-warning { background: #fee2e2; color: #E5202B; padding: 3px 8px; border-radius: 6px; font-size: 9px; font-weight: 900; border: 1px solid #fca5a5;}
                 </style>
             </head>
             <body>
@@ -4430,35 +4471,35 @@ selectOutlet: function(id) {
                 <div class="header-box">
                     <div class="title-area">
                         <h1>FINANCIAL AUDIT & CONSOLIDATION REPORT</h1>
-                        <p><strong>ENTITAS:</strong> AI-CHA TEA & BEVERAGE INDONESIA (${outLabel})</p>
-                        <p><strong>PERIODE AUDIT:</strong> ${data.startDateStr} s/d ${data.endDateStr} | <strong>HARI OPERASIONAL:</strong> ${data.totalReports} Hari</p>
+                        <p><strong>ENTITAS:</strong> AI-CHA (${outLabel})</p>
+                        <p style="color: #4A3B32;"><strong>PERIODE AUDIT:</strong> ${data.startDateStr} s/d ${data.endDateStr} &nbsp;|&nbsp; <strong style="color:#E5202B;">HARI OPERASIONAL:</strong> ${data.totalReports} Hari</p>
                     </div>
                     <div>
-                        ${appLogo ? `<img src="${appLogo}" class="logo-img" />` : `<h2 style="margin:0; color:#dc2626;">AI-CHA</h2>`}
+                        ${appLogo ? `<img src="${appLogo}" class="logo-img" />` : `<h2 style="margin:0; color:#E5202B; font-size: 32px; font-weight: 900;">Ai-Snack</h2>`}
                     </div>
                 </div>
 
                 <!-- 4 KARTU NERACA RINGKAS -->
                 <div class="executive-grid">
-                    <div class="kpi-card" style="border-left: 4px solid #0f172a;">
+                    <div class="kpi-card" style="border-left: 6px solid #FFB800;">
                         <div class="kpi-label">Gross Revenue (Net Sales)</div>
                         <div class="kpi-value">Rp ${fmt(data.totalNetSales)}</div>
-                        <div class="kpi-sub">${fmt(data.totalBill)} Bill | ${fmt(data.totalPcs)} Cups</div>
+                        <div class="kpi-sub">${fmt(data.totalBill)} Bill &nbsp;|&nbsp; ${fmt(data.totalPcs)} Pcs Item</div>
                     </div>
-                    <div class="kpi-card" style="border-left: 4px solid #2563eb;">
-                        <div class="kpi-label">Komposisi Kas (Cash vs QRIS)</div>
-                        <div class="kpi-value">${data.cashPercentage}% / ${data.qrisPercentage}%</div>
-                        <div class="kpi-sub">C: Rp ${fmt(data.totalCash)} | Q: Rp ${fmt(data.totalQris)}</div>
+                    <div class="kpi-card" style="border-left: 6px solid #D49800; background: #FFF5D1;">
+                        <div class="kpi-label" style="color: #E5202B;">Cash vs QRIS</div>
+                        <div class="kpi-value" style="color: #E5202B;">${data.cashPercentage}% / ${data.qrisPercentage}%</div>
+                        <div class="kpi-sub" style="color: #A87B00;">C: Rp ${fmt(data.totalCash)} | Q: Rp ${fmt(data.totalQris)}</div>
                     </div>
-                    <div class="kpi-card" style="border-left: 4px solid #dc2626;">
-                        <div class="kpi-label">Operating Expense (OPEX)</div>
-                        <div class="kpi-value" style="color:#dc2626;">Rp ${fmt(data.totalOpex)}</div>
-                        <div class="kpi-sub">CIR Ratio: <strong>${data.cirPercentage}%</strong> ${data.cirPercentage > 30 ? '<span class="badge-warning">HIGH</span>' : '<span class="badge-healthy">EFFICIENT</span>'}</div>
+                    <div class="kpi-card" style="border-left: 6px solid #E5202B;">
+                        <div class="kpi-label" style="color: #E5202B;">Operating Expense (OPEX)</div>
+                        <div class="kpi-value" style="color:#E5202B;">Rp ${fmt(data.totalOpex)}</div>
+                        <div class="kpi-sub">CIR Ratio: <strong>${data.cirPercentage}%</strong> ${data.cirPercentage > 30 ? '<span class="badge-warning">HIGH OPEX</span>' : '<span class="badge-healthy">EFFICIENT</span>'}</div>
                     </div>
-                    <div class="kpi-card" style="border-left: 4px solid #059669; background: #ecfdf5;">
-                        <div class="kpi-label" style="color:#065f46;">Net Cash Surplus (Laba Kas)</div>
-                        <div class="kpi-value" style="color:#059669;">Rp ${fmt(data.netSurplus)}</div>
-                        <div class="kpi-sub">Avg. Ticket: Rp ${fmt(data.avgTicketValue)} / bill</div>
+                    <div class="kpi-card" style="border-left: 6px solid #10b981; background: #ecfdf5; border-color: #d1fae5;">
+                        <div class="kpi-label" style="color:#059669;">Net Cash Surplus (Laba Kas)</div>
+                        <div class="kpi-value" style="color:#10b981; font-size: 20px;">Rp ${fmt(data.netSurplus)}</div>
+                        <div class="kpi-sub" style="color:#047857;">Avg. Ticket: Rp ${fmt(data.avgTicketValue)} / bill</div>
                     </div>
                 </div>
 
@@ -4468,7 +4509,7 @@ selectOutlet: function(id) {
                     <thead>
                         <tr>
                             <th style="text-align: left;">Nama Outlet</th>
-                            <th>Hari Operasional</th>
+                            <th>Operasional</th>
                             <th style="text-align: right;">Gross Sales</th>
                             <th style="text-align: right;">Kas Tunai</th>
                             <th style="text-align: right;">QRIS / Digital</th>
@@ -4481,28 +4522,26 @@ selectOutlet: function(id) {
                         ${outletRowsHtml}
                     </tbody>
                     <tfoot>
-                        <tr style="background: #f8fafc; font-weight: 900; border-top: 2px solid #0f172a;">
-                            <td style="padding: 10px;">TOTAL AGREGAT</td>
-                            <td style="padding: 10px; text-align: center;">${data.totalReports} Hari</td>
-                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalNetSales)}</td>
-                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalCash)}</td>
-                            <td style="padding: 10px; text-align: right;">Rp ${fmt(data.totalQris)}</td>
-                            <td style="padding: 10px; text-align: right; color:#dc2626;">Rp ${fmt(data.totalOpex)}</td>
-                            <td style="padding: 10px; text-align: right; color:#059669;">Rp ${fmt(data.netSurplus)}</td>
-                            <td style="padding: 10px; text-align: center;">${data.cirPercentage}%</td>
+                        <tr style="background: #FFF5D1; font-weight: 900; border-top: 3px solid #FFB800;">
+                            <td style="padding: 12px; color: #E5202B;">TOTAL AGREGAT</td>
+                            <td style="padding: 12px; text-align: center; color: #4A3B32;">${data.totalReports} Hari</td>
+                            <td style="padding: 12px; text-align: right; color: #4A3B32;">Rp ${fmt(data.totalNetSales)}</td>
+                            <td style="padding: 12px; text-align: right; color: #E5202B;">Rp ${fmt(data.totalCash)}</td>
+                            <td style="padding: 12px; text-align: right; color: #D49800;">Rp ${fmt(data.totalQris)}</td>
+                            <td style="padding: 12px; text-align: right; color:#E5202B;">Rp ${fmt(data.totalOpex)}</td>
+                            <td style="padding: 12px; text-align: right; color:#10b981; font-size: 14px;">Rp ${fmt(data.netSurplus)}</td>
+                            <td style="padding: 12px; text-align: center; color: #4A3B32;">${data.cirPercentage}%</td>
                         </tr>
                     </tfoot>
                 </table>
 
-                <!-- TABEL RINCIAN PENGELUARAN OPERASIONAL -->
-                <div class="section-title" style="margin-top:30px;">2. Rincian Pengeluaran Operasional yang Diaudit (Itemized OPEX)</div>
+                <!-- TABEL RINCIAN PENGELUARAN OPERASIONAL (GROUPED) -->
+                <div class="section-title" style="margin-top:20px;">2. Rincian Pengeluaran Operasional yang Diaudit (Grouped OPEX)</div>
                 <table>
                     <thead>
                         <tr>
-                            <th style="text-align: left; width: 15%;">Tanggal</th>
-                            <th style="text-align: left; width: 25%;">Outlet</th>
-                            <th style="text-align: left; width: 40%;">Deskripsi Pengeluaran / Beban</th>
-                            <th style="text-align: right; width: 20%;">Nominal (IDR)</th>
+                            <th style="text-align: left; width: 70%;">Item Pengeluaran / Beban (Diakumulasi)</th>
+                            <th style="text-align: right; width: 30%;">Total Nominal (IDR)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -4513,19 +4552,19 @@ selectOutlet: function(id) {
                 <!-- LEMBAR PENGESAHAN (SIGNATURE BLOCK) -->
                 <div class="footer-sign">
                     <div class="sign-box">
-                        <div style="font-size: 11px; color:#64748b;">Disiapkan oleh:</div>
+                        <div style="font-size: 11px; font-weight: bold; color:#A87B00;">Disiapkan oleh:</div>
                         <div class="sign-line">${this.currentUser ? this.currentUser.Username : 'Financial Controller'}</div>
-                        <div style="font-size: 10px; color:#64748b; margin-top:2px;">ERP System Administrator</div>
+                        <div style="font-size: 10px; font-weight: bold; color:#4A3B32; margin-top:4px;">ERP System Administrator</div>
                     </div>
                     <div class="sign-box">
-                        <div style="font-size: 11px; color:#64748b;">Diperiksa & Disetujui oleh:</div>
+                        <div style="font-size: 11px; font-weight: bold; color:#A87B00;">Diperiksa & Disetujui oleh:</div>
                         <div class="sign-line">Owner / Direksi</div>
-                        <div style="font-size: 10px; color:#64748b; margin-top:2px;">Ai-Cha Tea & Beverage</div>
+                        <div style="font-size: 10px; font-weight: bold; color:#4A3B32; margin-top:4px;">Ai-CHA Indonesia</div>
                     </div>
                 </div>
 
-                <div style="margin-top: 30px; font-size: 9px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-                    Laporan ini dibuat dan diverifikasi secara otomatis oleh Sistem Pembukuan Ai-Snack ERP pada ${new Date().toLocaleString('id-ID')}. Dokumen ini sah sebagai lampiran audit akuntansi internal.
+                <div style="margin-top: 40px; font-size: 10px; font-weight: bold; color: #94a3b8; text-align: center; border-top: 2px dashed #e2e8f0; padding-top: 15px;">
+                    Laporan ini dibuat dan diverifikasi secara otomatis oleh <span style="color:#E5202B;">Sistem ERP Ai-Snack</span> pada ${new Date().toLocaleString('id-ID')}.<br>Dokumen ini sah sebagai lampiran audit akuntansi internal.
                 </div>
             </body>
             </html>
@@ -8227,7 +8266,7 @@ openDetailStokOpname: function(sku) {
 
         // 🚀 LOGIKA PERIODE SEBELUMNYA (Untuk menghitung % Kenaikan/Penurunan)
         let rangeDiff = dateEnd.getTime() - dateStart.getTime();
-        let prevDateStart = new Date(dateStart.getTime() - rangeDiff - 86400000); // Mundur 1 siklus + 1 hari
+        let prevDateStart = new Date(dateStart.getTime() - rangeDiff - 86400000); 
         let prevDateEnd = new Date(dateEnd.getTime() - rangeDiff - 86400000);
 
         let searchTrxEl = document.getElementById('filter-search-trx');
@@ -8236,14 +8275,11 @@ openDetailStokOpname: function(sku) {
         const rdl = document.getElementById('report-date-label'); if(rdl) rdl.innerText = new Date().toLocaleString('id-ID');
         const rtl = document.getElementById('report-title-label'); if(rtl) rtl.innerText = `Filter Outlet: ${filterVal} ${dStart ? `| Tgl: ${dStart} s/d ${dEnd}` : ''}`;
 
-        // Variabel Current
         let totalOmset = 0, totalTunai = 0, totalQris = 0, countTrx = 0, totalKas = 0;
         let productSales = {}; let trxHtml = ''; let renderedRowsTrx = 0; 
         
-        // Variabel Previous
         let prevOmset = 0, prevTunai = 0, prevQris = 0, prevTrx = 0;
 
-        // Variabel Tren
         let trendRange = document.getElementById('filter-trend-range')?.value || '7';
         let trendDataObj = {};
         
@@ -8261,7 +8297,6 @@ openDetailStokOpname: function(sku) {
                     totalOmset += bayar; countTrx++;
                     if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += bayar; else totalTunai += bayar;
                     
-                    // Kumpulkan Penjualan Produk
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                     items.forEach(item => {
                         let safeNama = item.nama || 'Unknown';
@@ -8271,35 +8306,33 @@ openDetailStokOpname: function(sku) {
                     });
                 }
 
-                // Render Tabel (Hanya yang lolos kotak pencarian)
                 if(!searchTrx || safeID.toLowerCase().includes(searchTrx)) {
                     if(renderedRowsTrx < 1000) {
-                        let statBadge = t.Status === 'Sukses' ? `<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px] font-bold">Sukses</span>` : `<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold">Batal</span>`;
-                        let isCoret = t.Status === 'Sukses' ? 'text-brand-500' : 'text-slate-400 line-through';
-                        let rowBg = t.Status === 'Sukses' ? 'hover:bg-slate-50' : 'bg-slate-50 opacity-80';
+                        let statBadge = t.Status === 'Sukses' ? `<span class="bg-[#25D366]/20 text-[#128C7E] px-2 py-1 rounded-md text-[9px] font-black border border-[#25D366]/30 uppercase tracking-widest shadow-sm">Sukses</span>` : `<span class="bg-rose-100 text-[#E5202B] px-2 py-1 rounded-md text-[9px] font-black border border-rose-200 uppercase tracking-widest shadow-sm">Batal</span>`;
+                        let isCoret = t.Status === 'Sukses' ? 'text-[#E5202B]' : 'text-slate-400 line-through';
+                        let rowBg = t.Status === 'Sukses' ? 'hover:bg-[#FFF5D1]/60' : 'bg-slate-50 opacity-70';
                         let cleanDate = this.cleanDateOnly(t.Tanggal);
                         let cleanTime = this.cleanTimeOnly(t.Waktu);
-                        let antrianTeks = t.Antrian ? `<span class="text-[10px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Q:${t.Antrian}</span>` : '';
+                        let antrianTeks = t.Antrian ? `<span class="text-[9px] font-black bg-[#FFB800] text-white px-2 py-0.5 rounded shadow-sm">Q:${t.Antrian}</span>` : '';
                         let statusCetak = t.Status_Cetak || 'Belum';
-                        let warningStruk = (isAdmin && t.Status === 'Sukses' && statusCetak !== 'Sudah') ? `<span class="text-[9px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded shadow-sm animate-pulse border border-red-200">🚨 NO PRINT</span>` : '';
+                        let warningStruk = (isAdmin && t.Status === 'Sukses' && statusCetak !== 'Sudah') ? `<span class="text-[8px] font-black bg-rose-100 text-[#E5202B] px-1.5 py-0.5 rounded border border-rose-200 animate-pulse">NO PRINT</span>` : '';
 
-                        trxHtml += `<tr class="${rowBg} transition border-b border-slate-100">
-                            <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs">
-                                <div class="font-black text-slate-700 flex items-center gap-1">${safeID || 'N/A'} ${antrianTeks} ${warningStruk}</div>
-                                <div class="text-[10px] text-slate-400 mt-0.5">${cleanDate} ${cleanTime}</div>
+                        trxHtml += `<tr class="${rowBg} transition-colors border-b border-slate-100">
+                            <td class="py-3.5 px-4 whitespace-nowrap text-xs">
+                                <div class="font-black text-[#4A3B32] flex items-center gap-1.5">${safeID || 'N/A'} ${antrianTeks} ${warningStruk}</div>
+                                <div class="text-[10px] text-slate-500 font-bold mt-1">${cleanDate} <span class="text-[#FFB800]">${cleanTime}</span></div>
                             </td>
-                            <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-700 font-bold">${t.Kasir || t.Outlet}</td>
-                            <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-black uppercase text-blue-500"><span class="mr-2">${t.Metode_Bayar||'Tunai'}</span>${statBadge}</td>
-                            <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black ${isCoret}">Rp ${bayar.toLocaleString('id-ID')}</td>
-                            <td class="py-3 px-3 md:px-5 whitespace-nowrap text-center" data-html2canvas-ignore="true">
-                                <button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm transition active:scale-95"><i class="fas fa-eye mr-1"></i> Detail</button>
+                            <td class="py-3.5 px-4 whitespace-nowrap text-xs text-[#4A3B32] font-black">${t.Kasir || t.Outlet}</td>
+                            <td class="py-3.5 px-4 whitespace-nowrap text-xs font-black uppercase text-[#4A3B32]"><span class="mr-2.5">${t.Metode_Bayar||'Tunai'}</span>${statBadge}</td>
+                            <td class="py-3.5 px-4 whitespace-nowrap text-right font-black ${isCoret} text-sm">Rp ${bayar.toLocaleString('id-ID')}</td>
+                            <td class="py-3.5 px-4 whitespace-nowrap text-center" data-html2canvas-ignore="true">
+                                <button onclick="superApp.openDetailTrx('${safeID}')" class="bg-white border-2 border-slate-100 hover:border-[#FFB800] hover:text-[#E5202B] text-slate-500 text-[10px] font-black px-4 py-2 rounded-xl shadow-sm transition-all active:scale-95"><i class="fas fa-eye mr-1.5 text-sm"></i> Lihat</button>
                             </td>
                         </tr>`;
                         renderedRowsTrx++;
                     }
                 }
             } 
-            // B. TANGKAP DATA PERIODE SEBELUMNYA (Untuk Pembanding)
             else if (isTargetOutlet && trxDate >= prevDateStart && trxDate <= prevDateEnd) {
                 if (t.Status === 'Sukses') {
                     let bayar = Number(t.Total_Bayar) || 0;
@@ -8317,9 +8350,9 @@ openDetailStokOpname: function(sku) {
                     let key = '';
                     if(trendRange === '365') {
                         let pad = n => n < 10 ? '0' + n : n;
-                        key = `${pad(trxDate.getMonth()+1)}/${trxDate.getFullYear()}`; // Grup per bulan
+                        key = `${pad(trxDate.getMonth()+1)}/${trxDate.getFullYear()}`; 
                     } else {
-                        key = this.cleanDateOnly(t.Tanggal); // Grup per hari
+                        key = this.cleanDateOnly(t.Tanggal); 
                     }
                     if(!trendDataObj[key]) trendDataObj[key] = 0;
                     trendDataObj[key] += Number(t.Total_Bayar) || 0;
@@ -8335,11 +8368,11 @@ openDetailStokOpname: function(sku) {
             return { val: Math.abs(diff).toFixed(1), isUp: diff >= 0 };
         };
         const createBadge = (diffObj, isInverted=false) => {
-            if(diffObj.val == 0) return `<span class="text-slate-400"><i class="fas fa-minus mr-1"></i>0%</span> <span class="${isInverted?'text-white/70':'text-slate-400'}">vs Sblmnya</span>`;
+            if(diffObj.val == 0) return `<span class="text-[#FFB800]"><i class="fas fa-minus mr-1"></i>0%</span> <span class="${isInverted?'text-[#FFF5D1]':'text-slate-400'}">vs Sblmnya</span>`;
             let isGood = isInverted ? !diffObj.isUp : diffObj.isUp;
             let icon = diffObj.isUp ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
-            let color = isGood ? (diffObj.isUp ? 'text-emerald-300' : 'text-emerald-500') : (diffObj.isUp ? 'text-rose-500' : 'text-rose-300');
-            return `<span class="${color} font-black"><i class="fas ${icon} mr-0.5"></i>${diffObj.val}%</span> <span class="opacity-80 ${isInverted?'text-white':'text-slate-400'} ml-0.5">vs Sblmnya</span>`;
+            let color = isGood ? 'text-emerald-400' : 'text-[#E5202B]';
+            return `<span class="${color} font-black"><i class="fas ${icon} mr-1"></i>${diffObj.val}%</span> <span class="font-bold opacity-90 ${isInverted?'text-[#FFF5D1]':'text-slate-400'} ml-0.5">vs Sblmnya</span>`;
         };
 
         // 🚀 UPDATE UI KARTU METRIK UTAMA
@@ -8353,25 +8386,25 @@ openDetailStokOpname: function(sku) {
         const dQrisEl = document.getElementById('rep-diff-qris'); if (dQrisEl) dQrisEl.innerHTML = createBadge(calcDiff(totalQris, prevQris));
         const dTrxEl = document.getElementById('rep-diff-trx'); if (dTrxEl) dTrxEl.innerHTML = createBadge(calcDiff(countTrx, prevTrx));
         
-        const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || `<tr><td colspan="5" class="text-center py-12 h-32">${this.getEmptyState('fa-file-invoice', 'Tidak Ada Transaksi', 'Belum ada transaksi di rentang tanggal/resi ini')}</td></tr>`;
+        const rtb = document.getElementById('report-trx-tbody'); if(rtb) rtb.innerHTML = trxHtml || `<tr><td colspan="5" class="text-center py-16 h-40"><div class="flex flex-col items-center justify-center gap-3"><i class="fas fa-file-invoice text-5xl text-[#FFB800] opacity-50"></i><p class="font-black text-[#4A3B32]">Tidak Ada Transaksi</p></div></td></tr>`;
 
-        // --- 2. TOP 5 PRODUK TERLARIS ---
+        // --- 2. TOP 5 PRODUK TERLARIS (AI-SNACK BUBBLY & CLICKABLE) ---
         let sortedProducts = Object.keys(productSales).map(k => ({ nama: k, qty: productSales[k].qty, rev: productSales[k].rev })).sort((a,b) => b.qty - a.qty);
         let top5Html = '';
         sortedProducts.slice(0, 5).forEach((p, idx) => {
-            let medal = idx === 0 ? 'text-yellow-400 drop-shadow-md' : (idx === 1 ? 'text-slate-300' : (idx === 2 ? 'text-amber-600' : 'text-slate-200'));
-            top5Html += `<div class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition cursor-default">
-                <div class="w-8 text-center text-xl font-black ${medal}"><i class="fas ${idx < 3 ? 'fa-medal' : 'fa-certificate'}"></i></div>
+            let medal = idx === 0 ? 'text-[#FFB800] drop-shadow-[0_2px_4px_rgba(255,184,0,0.5)] text-2xl' : (idx === 1 ? 'text-slate-400 text-xl' : (idx === 2 ? 'text-amber-700 text-lg' : 'text-slate-200 text-base'));
+            top5Html += `<div onclick="superApp.showProductInsight('${p.nama}', '${dStart}', '${dEnd}', '${filterVal}')" class="flex items-center gap-3 p-3 hover:bg-[#FFF5D1]/80 rounded-[1.25rem] transition-all cursor-pointer border-2 border-transparent hover:border-[#FFD874]/50 group active:scale-[0.98]">
+                <div class="w-8 text-center font-black ${medal}"><i class="fas ${idx < 3 ? 'fa-medal' : 'fa-certificate'}"></i></div>
                 <div class="flex-1 min-w-0">
-                    <h5 class="font-bold text-sm text-slate-800 truncate">${p.nama}</h5>
-                    <p class="text-[10px] font-black text-brand-500">Rp ${p.rev.toLocaleString('id-ID')}</p>
+                    <h5 class="font-black text-sm text-[#4A3B32] truncate group-hover:text-[#E5202B] transition-colors">${p.nama}</h5>
+                    <p class="text-[10px] font-black text-[#E5202B] mt-0.5">Rp ${p.rev.toLocaleString('id-ID')}</p>
                 </div>
-                <div class="w-12 text-right"><span class="bg-slate-100 text-slate-600 text-xs font-black px-2 py-1 rounded-lg">${p.qty}</span></div>
+                <div class="w-auto text-right"><span class="bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-[#FFB800] text-[#4A3B32] text-xs font-black px-3 py-1.5 rounded-xl transition-colors shadow-sm">${p.qty} Pcs</span></div>
             </div>`;
         });
-        const t5List = document.getElementById('report-top-5-list'); if (t5List) t5List.innerHTML = top5Html || `<div class="text-center py-6 text-slate-400 text-xs">Belum ada data penjualan.</div>`;
+        const t5List = document.getElementById('report-top-5-list'); if (t5List) t5List.innerHTML = top5Html || `<div class="text-center py-8 text-[#A87B00] font-bold text-xs bg-[#FFF5D1]/50 rounded-[1.25rem] border border-[#FFD874]/50">Belum ada data penjualan.</div>`;
 
-        // --- 3. GRAFIK TREN PENJUALAN ---
+        // --- 3. GRAFIK TREN PENJUALAN (AI-SNACK GRADIENT & CLICKABLE) ---
         let maxTrend = 0; let trendKeys = Object.keys(trendDataObj);
         trendKeys.forEach(k => { if(trendDataObj[k] > maxTrend) maxTrend = trendDataObj[k]; });
         
@@ -8383,7 +8416,7 @@ openDetailStokOpname: function(sku) {
         });
 
         if(trendKeys.length === 0) {
-            chartHtml = `<div class="w-full flex items-center justify-center text-slate-400 text-xs h-full">Tidak ada data untuk rentang ini</div>`;
+            chartHtml = `<div class="w-full flex items-center justify-center text-[#A87B00] font-bold text-xs h-full bg-[#FFF5D1]/50 rounded-[1.5rem] border border-[#FFD874]/50">Tidak ada data tren untuk rentang ini</div>`;
         } else {
             let barsHtml = '';
             let lblsHtml = '';
@@ -8392,26 +8425,22 @@ openDetailStokOpname: function(sku) {
                 let val = trendDataObj[k];
                 let pctHeight = maxTrend > 0 ? (val / maxTrend) * 100 : 0;
                 if(pctHeight < 5 && val > 0) pctHeight = 5; 
-                
                 let labelTxt = k.substring(0, 5); 
                 
-                // 🚀 PERBAIKAN 1: Beri min-w-[32px] agar batang grafik tidak gepeng/hilang di HP
-                barsHtml += `<div class="flex-1 min-w-[32px] md:min-w-[40px] flex flex-col justify-end h-full relative group">
-                    <div class="w-full bg-gradient-to-t from-brand-500 to-orange-400 rounded-t-sm md:rounded-t-md transition-all duration-1000 ease-out hover:brightness-110" style="height: ${pctHeight}%;"></div>
-                    <div class="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-bold py-1 px-2 rounded shadow-md z-20 whitespace-nowrap pointer-events-none transition-opacity">Rp ${val.toLocaleString('id-ID')}</div>
+                barsHtml += `<div class="flex-1 min-w-[36px] md:min-w-[44px] flex flex-col justify-end h-full relative group cursor-pointer" onclick="superApp.showTrendInsight('${k}', '${filterVal}')">
+                    <div class="w-full bg-gradient-to-t from-[#E5202B] to-[#FFB800] rounded-t-xl transition-all duration-700 ease-out hover:brightness-110 hover:-translate-y-1 shadow-[0_-2px_10px_rgba(229,32,43,0.3)] border border-[#CC1A24]" style="height: ${pctHeight}%;"></div>
+                    <div class="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 bg-[#4A3B32] text-[#FFD874] text-[10px] font-black py-1.5 px-3 rounded-xl shadow-lg z-20 whitespace-nowrap pointer-events-none transition-all transform group-hover:-translate-y-1 border border-[#FFD874]/30">Rp ${val.toLocaleString('id-ID')}</div>
                 </div>`;
-                
-                lblsHtml += `<div class="flex-1 min-w-[32px] md:min-w-[40px] text-center truncate px-0.5">${labelTxt}</div>`;
+                lblsHtml += `<div class="flex-1 min-w-[36px] md:min-w-[44px] text-center truncate px-0.5 text-[#4A3B32]">${labelTxt}</div>`;
             });
 
-            // 🚀 PERBAIKAN 2: Bungkus dengan wadah scroll (overflow-x-auto)
             chartHtml = `
-            <div class="absolute inset-0 w-full h-full overflow-x-auto custom-scroll pb-1">
-                <div class="min-w-max h-full flex flex-col justify-end px-1 pt-8">
-                    <div class="flex items-end gap-1 md:gap-1.5 flex-1 border-b border-slate-100 pb-1">
+            <div class="absolute inset-0 w-full h-full overflow-x-auto custom-scroll pb-2">
+                <div class="min-w-max h-full flex flex-col justify-end px-2 pt-10">
+                    <div class="flex items-end gap-1.5 md:gap-2 flex-1 border-b-2 border-slate-100 pb-1">
                         ${barsHtml}
                     </div>
-                    <div class="flex mt-2 text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest gap-1 md:gap-1.5">
+                    <div class="flex mt-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-1.5 md:gap-2">
                         ${lblsHtml}
                     </div>
                 </div>
@@ -8420,25 +8449,21 @@ openDetailStokOpname: function(sku) {
 
         const rtc = document.getElementById('report-trend-chart'); 
         if (rtc) {
-            // 🚀 PERBAIKAN 3: Ubah class bawaan agar mendukung Absolute Positioning & Fixed Height untuk mobile
-            rtc.className = 'flex-1 relative min-h-[160px] md:min-h-[200px] w-full mt-4';
+            rtc.className = 'flex-1 relative min-h-[180px] md:min-h-[220px] w-full mt-4';
             rtc.innerHTML = chartHtml;
         }
-        
-        // Matikan wadah label lama HTML karena labelnya sudah kita pindah ke dalam wadah scroll
-        const rtlbl = document.getElementById('report-trend-labels'); 
-        if (rtlbl) rtlbl.style.display = 'none';
+        const rtlbl = document.getElementById('report-trend-labels'); if (rtlbl) rtlbl.style.display = 'none';
 
-        // --- 4. RENDER REKAP JUALAN ---
+        // --- 4. RENDER REKAP JUALAN (AI-SNACK STYLE & CLICKABLE) ---
         let rekapHtml = '';
         for (const [nama, data] of Object.entries(productSales)) { 
-            rekapHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
-                <td class="py-3 px-3 md:px-5 whitespace-nowrap text-slate-700 font-bold min-w-[150px]">${nama}</td>
-                <td class="py-3 px-3 md:px-5 whitespace-nowrap text-center font-black text-slate-700 bg-slate-50/50">${data.qty} Pcs</td>
-                <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black text-green-600">Rp ${data.rev.toLocaleString('id-ID')}</td>
+            rekapHtml += `<tr onclick="superApp.showProductInsight('${nama}', '${dStart}', '${dEnd}', '${filterVal}')" class="transition-colors border-b border-slate-100 hover:bg-[#FFF5D1]/60 cursor-pointer group active:scale-[0.99] transform">
+                <td class="py-3.5 px-4 whitespace-nowrap text-[#4A3B32] font-black min-w-[150px] group-hover:text-[#E5202B]"><i class="fas fa-box-open mr-2 text-[#FFB800] opacity-50 group-hover:opacity-100"></i> ${nama}</td>
+                <td class="py-3.5 px-4 whitespace-nowrap text-center font-black text-[#4A3B32] bg-slate-50/50 group-hover:bg-white transition-colors">${data.qty} Pcs</td>
+                <td class="py-3.5 px-4 whitespace-nowrap text-right font-black text-emerald-500 text-sm">Rp ${data.rev.toLocaleString('id-ID')}</td>
             </tr>`; 
         }
-        const rreb = document.getElementById('report-rekap-tbody'); if(rreb) rreb.innerHTML = rekapHtml || `<tr><td colspan="3" class="text-center py-12 h-32">${this.getEmptyState('fa-box-open', 'Belum Ada Penjualan', 'Data rekapitulasi kosong')}</td></tr>`;
+        const rreb = document.getElementById('report-rekap-tbody'); if(rreb) rreb.innerHTML = rekapHtml || `<tr><td colspan="3" class="text-center py-16 h-40"><div class="flex flex-col items-center justify-center gap-3"><i class="fas fa-box-open text-5xl text-[#FFB800] opacity-50"></i><p class="font-black text-[#4A3B32]">Data Rekap Kosong</p></div></td></tr>`;
         
         // --- 5. RENDER MUTASI STOK ---
         let mutasiHtml = ''; let renderedRowsMut = 0;
@@ -8448,18 +8473,18 @@ openDetailStokOpname: function(sku) {
             if((filterVal === 'Semua' || m.Outlet_Tujuan === filterVal) && mDate >= dateStart && mDate <= dateEnd) {
                 let mWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
                 if(renderedRowsMut < 500) {
-                    mutasiHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-500">${mWaktuStr}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-slate-700 font-bold">${m.SKU || '-'}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-brand-600"><i class="fas fa-location-dot mr-1 hidden md:inline"></i>${m.Outlet_Tujuan || '-'}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black bg-blue-50/30 text-blue-700 rounded">${m.Qty || 0} Pcs</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs italic text-slate-500 max-w-[150px] md:max-w-[250px] truncate" title="${m.Keterangan || '-'}">${m.Keterangan || '-'}</td>
+                    mutasiHtml += `<tr class="transition-colors border-b border-slate-100 hover:bg-[#FFF5D1]/40">
+                        <td class="py-3.5 px-4 whitespace-nowrap text-[10px] font-bold text-slate-500">${mWaktuStr}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-[#4A3B32] font-black">${m.SKU || '-'}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap font-black text-[#E5202B]"><i class="fas fa-location-dot mr-1.5 hidden md:inline text-[#FFB800]"></i>${m.Outlet_Tujuan || '-'}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-right font-black bg-blue-50/50 text-blue-600 rounded-lg shadow-sm border border-blue-100">${m.Qty || 0} Pcs</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs font-bold text-slate-500 max-w-[150px] md:max-w-[250px] truncate" title="${m.Keterangan || '-'}">${m.Keterangan || '-'}</td>
                     </tr>`;
                     renderedRowsMut++;
                 }
             }
         });
-        const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || `<tr><td colspan="5" class="text-center py-12 h-32">${this.getEmptyState('fa-truck', 'Belum Ada Mutasi', 'Tidak ada data distribusi di rentang ini')}</td></tr>`;
+        const rmb = document.getElementById('report-mutasi-tbody'); if(rmb) rmb.innerHTML = mutasiHtml || `<tr><td colspan="5" class="text-center py-16 h-40"><div class="flex flex-col items-center justify-center gap-3"><i class="fas fa-truck text-5xl text-[#FFB800] opacity-50"></i><p class="font-black text-[#4A3B32]">Belum Ada Mutasi</p></div></td></tr>`;
 
         // --- 6. RENDER KAS KELUAR ---
         let kasHtml = ''; let renderedRowsKas = 0;
@@ -8470,18 +8495,18 @@ openDetailStokOpname: function(sku) {
                 let kDateStr = this.cleanDateOnly(k.Tanggal);
                 let kTimeStr = this.cleanTimeOnly(k.Waktu);
                 if(renderedRowsKas < 500) {
-                    kasHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-500">${kDateStr} ${kTimeStr}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-slate-700">${this.getOutletBadge(k.Outlet)} <span class="text-[10px] text-slate-400 font-normal">(${k.Kasir})</span></td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-medium text-slate-600 max-w-[150px] md:max-w-[250px] truncate" title="${k.Keterangan}">${k.Keterangan}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black text-red-500 bg-red-50/30 rounded">- Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td>
+                    kasHtml += `<tr class="transition-colors border-b border-slate-100 hover:bg-[#FFF5D1]/40">
+                        <td class="py-3.5 px-4 whitespace-nowrap text-[10px] font-bold text-slate-500">${kDateStr} <span class="text-[#FFB800]">${kTimeStr}</span></td>
+                        <td class="py-3.5 px-4 whitespace-nowrap font-black text-[#4A3B32]">${k.Outlet === 'Pusat' ? '<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[9px] border border-indigo-200 uppercase">Pusat</span>' : k.Outlet} <span class="text-[9px] text-slate-400 font-bold ml-1 bg-slate-100 px-1.5 py-0.5 rounded">${k.Kasir}</span></td>
+                        <td class="py-3.5 px-4 whitespace-nowrap font-bold text-[#4A3B32] max-w-[150px] md:max-w-[250px] truncate" title="${k.Keterangan}">${k.Keterangan}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-right font-black text-[#E5202B] bg-rose-50/50 rounded-lg border border-rose-100">- Rp ${(Number(k.Nominal)||0).toLocaleString('id-ID')}</td>
                     </tr>`;
                     renderedRowsKas++;
                 }
             }
         });
         const repKas = document.getElementById('rep-total-kas'); if(repKas) repKas.innerText = `Rp ${totalKas.toLocaleString('id-ID')}`;
-        const kBody = document.getElementById('report-kas-tbody'); if(kBody) kBody.innerHTML = kasHtml || `<tr><td colspan="4" class="text-center py-12 h-32">${this.getEmptyState('fa-wallet', 'Tidak Ada Kas Keluar', 'Belum ada pengeluaran dicatat')}</td></tr>`;
+        const kBody = document.getElementById('report-kas-tbody'); if(kBody) kBody.innerHTML = kasHtml || `<tr><td colspan="4" class="text-center py-16 h-40"><div class="flex flex-col items-center justify-center gap-3"><i class="fas fa-wallet text-5xl text-[#FFB800] opacity-50"></i><p class="font-black text-[#4A3B32]">Tidak Ada Kas Keluar</p></div></td></tr>`;
         
         // --- 7. RENDER AUDIT SELISIH ---
         let selisihHtml = ''; let renderedRowsOp = 0;
@@ -8490,30 +8515,168 @@ openDetailStokOpname: function(sku) {
             let opDate = this.parseDateId(safeWaktu.split(' ')[0]);
             if((filterVal === 'Semua' || op.Outlet === filterVal) && opDate >= dateStart && opDate <= dateEnd) {
                 let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
-                let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
+                let selColor = op.Selisih < 0 ? 'text-[#E5202B]' : (op.Selisih > 0 ? 'text-emerald-500' : 'text-slate-400');
                 let badge = '';
-                if(op.Status_Approval === 'Pending') badge = '<span class="bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded text-[10px] font-bold">Pending</span>';
-                else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[10px] font-bold">Disetujui</span>';
-                else badge = '<span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold">Ditolak</span>';
+                if(op.Status_Approval === 'Pending') badge = '<span class="bg-[#FFB800]/20 text-[#A87B00] px-2 py-1 rounded-md text-[9px] font-black border border-[#FFD874]/50 uppercase tracking-widest shadow-sm">Pending</span>';
+                else if(op.Status_Approval === 'Disetujui') badge = '<span class="bg-[#25D366]/20 text-[#128C7E] px-2 py-1 rounded-md text-[9px] font-black border border-[#25D366]/30 uppercase tracking-widest shadow-sm">Disetujui</span>';
+                else badge = '<span class="bg-rose-100 text-[#E5202B] px-2 py-1 rounded-md text-[9px] font-black border border-rose-200 uppercase tracking-widest shadow-sm">Ditolak</span>';
                 
                 let opWaktuStr = safeWaktu.includes('T') ? this.cleanDateOnly(safeWaktu) + ' ' + this.cleanTimeOnly(safeWaktu) : safeWaktu;
 
                 if(renderedRowsOp < 500) {
-                    selisihHtml += `<tr class="transition border-b border-slate-100 hover:bg-slate-50">
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs text-slate-500">${opWaktuStr}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap font-bold text-slate-700 max-w-[150px] truncate" title="${itemName}">${itemName}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-bold">${this.getOutletBadge(op.Outlet)} <span class="text-[10px] text-slate-400 font-normal">(${op.Kasir})</span></td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-xs font-medium text-slate-500 bg-slate-50/50 rounded-lg">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fis: ${op.Stok_Fisik}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-right font-black ${selColor} text-sm">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
-                        <td class="py-3 px-3 md:px-5 whitespace-nowrap text-center">${badge}</td>
+                    selisihHtml += `<tr class="transition-colors border-b border-slate-100 hover:bg-[#FFF5D1]/40">
+                        <td class="py-3.5 px-4 whitespace-nowrap text-[10px] font-bold text-slate-500">${opWaktuStr}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap font-black text-[#4A3B32] max-w-[150px] truncate" title="${itemName}">${itemName}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs font-black text-[#4A3B32]">${op.Outlet === 'Pusat' ? '<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[9px] border border-indigo-200 uppercase">Pusat</span>' : op.Outlet} <span class="text-[9px] text-slate-400 font-bold ml-1 bg-slate-100 px-1.5 py-0.5 rounded">${op.Kasir}</span></td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs font-bold text-[#4A3B32] bg-slate-50/80 rounded-lg">Sys: <span class="text-[#FFB800]">${op.Stok_Sistem}</span> <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fis: <span class="text-emerald-500">${op.Stok_Fisik}</span></td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-right font-black ${selColor} text-base">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-center">${badge}</td>
                     </tr>`;
                     renderedRowsOp++;
                 }
             }
         });
-        const rsTbody = document.getElementById('report-selisih-tbody'); if(rsTbody) rsTbody.innerHTML = selisihHtml || `<tr><td colspan="6" class="text-center py-12 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Selisih Kosong', 'Tidak ada histori opname disini')}</td></tr>`;
+        const rsTbody = document.getElementById('report-selisih-tbody'); if(rsTbody) rsTbody.innerHTML = selisihHtml || `<tr><td colspan="6" class="text-center py-16 h-40"><div class="flex flex-col items-center justify-center gap-3"><i class="fas fa-clipboard-check text-5xl text-[#FFB800] opacity-50"></i><p class="font-black text-[#4A3B32]">Audit Selisih Kosong</p></div></td></tr>`;
+        
         if (typeof this.renderBOMReport === 'function') this.renderBOMReport();  
-  },
+    },
+
+    // ==============================================================================
+    // 🚀 FUNGSI BARU: ANALITIK POPUP TREN & PRODUK (AI-SNACK PLAYFUL THEME)
+    // ==============================================================================
+    
+    showTrendInsight: function(dateKey, outletFilter) {
+        let jamPadat = {}; let itemsSold = {}; let totalRev = 0;
+        
+        [...(this.db.transactions || [])].forEach(t => {
+            if(t.Status === 'Sukses' && (outletFilter === 'Semua' || t.Outlet === outletFilter)) {
+                let isMatch = dateKey.length > 7 ? t.Tanggal.includes(dateKey) : this.cleanDateOnly(t.Tanggal).includes(dateKey);
+                if(isMatch) {
+                    let hour = t.Waktu ? t.Waktu.substring(0, 2) + ':00' : '00:00';
+                    if(!jamPadat[hour]) jamPadat[hour] = 0;
+                    jamPadat[hour] += Number(t.Total_Bayar) || 0;
+                    totalRev += Number(t.Total_Bayar) || 0;
+                    
+                    let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                    items.forEach(item => {
+                        if(!itemsSold[item.nama]) itemsSold[item.nama] = 0;
+                        itemsSold[item.nama] += Number(item.qty) || 0;
+                    });
+                }
+            }
+        });
+
+        // Urutkan Jam & Produk
+        let sortedHours = Object.keys(jamPadat).sort((a,b) => jamPadat[b] - jamPadat[a]);
+        let peakHour = sortedHours.length > 0 ? sortedHours[0] : 'Tidak ada';
+        let sortedItems = Object.keys(itemsSold).sort((a,b) => itemsSold[b] - itemsSold[a]).slice(0, 3);
+        
+        let itemsHtml = sortedItems.map(i => `<div class="bg-white p-3 rounded-xl border border-slate-100 flex justify-between shadow-sm"><span class="font-black text-[#4A3B32] text-xs">${i}</span><span class="bg-[#FFF5D1] text-[#E5202B] px-2 py-0.5 rounded font-black text-[10px]">${itemsSold[i]} Pcs</span></div>`).join('');
+
+        this.injectAndShowInsightModal(
+            `<i class="fas fa-chart-line"></i> Analisis Harian: ${dateKey}`, 
+            `Total: Rp ${totalRev.toLocaleString('id-ID')}`, 
+            peakHour, 
+            itemsHtml || '<p class="text-xs text-slate-400 font-bold">Belum ada data produk detail.</p>'
+        );
+    },
+
+    showProductInsight: function(productName, startDateStr, endDateStr, outletFilter) {
+        let jamPadat = {}; let totalQty = 0; let totalRev = 0;
+        let dateStart = startDateStr ? new Date(startDateStr + "T00:00:00") : new Date(0);
+        let dateEnd = endDateStr ? new Date(endDateStr + "T23:59:59") : new Date();
+
+        [...(this.db.transactions || [])].forEach(t => {
+            if(t.Status === 'Sukses' && (outletFilter === 'Semua' || t.Outlet === outletFilter)) {
+                let trxDate = this.parseDateId(t.Tanggal);
+                if(trxDate >= dateStart && trxDate <= dateEnd) {
+                    let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
+                    let targetItem = items.find(i => i.nama === productName);
+                    
+                    if(targetItem) {
+                        let hour = t.Waktu ? t.Waktu.substring(0, 2) + ':00' : '00:00';
+                        if(!jamPadat[hour]) jamPadat[hour] = 0;
+                        jamPadat[hour] += Number(targetItem.qty) || 0;
+                        
+                        totalQty += Number(targetItem.qty) || 0;
+                        totalRev += (Number(targetItem.qty) || 0) * (Number(targetItem.price) || 0);
+                    }
+                }
+            }
+        });
+
+        let sortedHours = Object.keys(jamPadat).sort((a,b) => jamPadat[b] - jamPadat[a]);
+        let peakHour = sortedHours.length > 0 ? `${sortedHours[0]} (${jamPadat[sortedHours[0]]} Pcs)` : 'Tidak ada';
+
+        let statHtml = `
+        <div class="bg-white p-3.5 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm">
+            <span class="font-black text-slate-500 text-xs">Total Omset Produk</span>
+            <span class="font-black text-[#E5202B] text-sm">Rp ${totalRev.toLocaleString('id-ID')}</span>
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm">
+            <span class="font-black text-slate-500 text-xs">Kuantitas Terjual</span>
+            <span class="font-black text-emerald-500 text-sm bg-emerald-50 px-2 py-0.5 rounded">${totalQty} Pcs</span>
+        </div>`;
+
+        this.injectAndShowInsightModal(
+            `<i class="fas fa-box-open"></i> Insight: ${productName}`, 
+            `Periode Aktif Terpilih`, 
+            peakHour, 
+            statHtml
+        );
+    },
+
+    injectAndShowInsightModal: function(title, subtitle, peakHour, contentHtml) {
+        let existing = document.getElementById('dynamic-insight-modal');
+        if(existing) existing.remove(); // Bersihkan modal lama jika ada
+
+        let modalHtml = `
+        <div id="dynamic-insight-modal" class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fade-in transition-opacity duration-300">
+            <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(229,32,43,0.2)] border border-white w-full max-w-sm overflow-hidden flex flex-col transform scale-95 transition-transform duration-400" id="dim-card">
+                
+                <!-- HEADER AI-SNACK -->
+                <div class="bg-gradient-to-br from-[#E5202B] to-[#FFB800] p-6 relative overflow-hidden">
+                    <div class="absolute -right-10 -top-10 w-32 h-32 bg-white/30 rounded-full blur-3xl"></div>
+                    <button onclick="document.getElementById('dynamic-insight-modal').remove()" class="absolute top-5 right-5 w-8 h-8 bg-black/10 hover:bg-black/20 rounded-full flex items-center justify-center text-white backdrop-blur-md z-10 transition-colors"><i class="fas fa-xmark text-sm"></i></button>
+                    
+                    <div class="relative z-10 text-white pr-6">
+                        <span class="text-[9px] font-black text-[#FFF5D1] uppercase tracking-widest mb-1 bg-black/10 px-2.5 py-1 rounded-md shadow-sm inline-block"><i class="fas fa-brain mr-1"></i> AI ANALITIK</span>
+                        <h2 class="text-lg font-black leading-tight drop-shadow-md mt-1">${title}</h2>
+                        <p class="text-[10px] font-bold text-rose-100 mt-1 drop-shadow-sm">${subtitle}</p>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-[#FFF5D1]/30">
+                    <!-- JAM SIBUK -->
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-lg shrink-0"><i class="fas fa-clock"></i></div>
+                        <div>
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Paling Sibuk</p>
+                            <p class="font-black text-[#4A3B32] text-sm">${peakHour}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- KONTEN DINAMIS -->
+                    <div class="space-y-2.5">
+                        <p class="text-[9px] font-black text-[#A87B00] uppercase tracking-widest ml-1 mb-1">Rincian Data</p>
+                        ${contentHtml}
+                    </div>
+                </div>
+
+                <div class="p-4 bg-white border-t border-slate-100 text-center">
+                    <button onclick="document.getElementById('dynamic-insight-modal').remove()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-[#4A3B32] font-black rounded-[1.25rem] text-xs transition-colors shadow-sm active:scale-95">Tutup Analitik</button>
+                </div>
+            </div>
+        </div>`;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Picu animasi scale up
+        setTimeout(() => {
+            const card = document.getElementById('dim-card');
+            if(card) card.classList.replace('scale-95', 'scale-100');
+        }, 10);
+    },
 
     renderBOMReport: function() {
         const rof = document.getElementById('report-outlet-filter');
@@ -8762,59 +8925,94 @@ openDetailStokOpname: function(sku) {
         this.openModal('modal-bom-detail');
     },
     
-    exportPDF: function() {
-        this.showToast("Mempersiapkan PDF Laporan...");
+   exportPDF: function() {
+        this.showToast("Mempersiapkan PDF Laporan, mohon tunggu sebentar...", "info");
         const element = document.getElementById('pdf-export-area'); 
         if(!element) return;
-        
-        // 1. Simpan bentuk desain aslinya
-        const originalStyle = element.getAttribute('style') || '';
-        
-        // 2. Buka semua tab agar terbaca oleh mesin PDF (Termasuk tab BOM)
+
+        // Buka semua tab agar terbaca oleh mesin PDF
         const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
         const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
         const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
         const rcs = document.getElementById('report-content-selisih'); if(rcs) rcs.classList.remove('hidden');
-        const rcb = document.getElementById('report-content-bom'); if(rcb) rcb.classList.remove('hidden');
-        
-        // 3. 🚀 ANTI-BLANK: Hapus batasan scroll dan tinggi secara paksa pada tabel
-        element.style.height = 'max-content';
-        element.style.overflow = 'visible';
-        
-        const scrollables = element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .custom-scroll');
-        scrollables.forEach(el => {
-            // Ingat style asli elemen ini
-            el.setAttribute('data-orig-style', el.getAttribute('style') || '');
-            // Tarik elemen agar memanjang ke bawah sesuai isinya
-            el.style.overflow = 'visible';
-            el.style.maxHeight = 'none';
-            el.style.height = 'auto';
-        });
 
-        // 4. Beri jeda 0.5 detik agar browser selesai "menggambar ulang" layar yang panjang
+        // 🚀 SOLUSI ERROR GRADIENT & STYLING AI-SNACK: 
+        const style = document.createElement('style');
+        style.id = 'pdf-print-style';
+        style.innerHTML = `
+            .pdf-container { 
+                height: auto !important; 
+                max-height: none !important; 
+                overflow: visible !important; 
+                background-color: #ffffff !important;
+                padding: 15px !important;
+                color: #4A3B32 !important;
+            }
+            /* Paksa semua elemen di dalamnya membentang, matikan scroll, shadow, dan GRADIENT */
+            .pdf-container * { 
+                overflow: visible !important; 
+                height: auto !important; 
+                max-height: none !important; 
+                box-shadow: none !important;
+                
+                /* MEMATIKAN GRADIENT (Penyebab utama error addColorStop html2canvas) */
+                background-image: none !important; 
+                -webkit-background-clip: initial !important;
+                background-clip: initial !important;
+                -webkit-text-fill-color: initial !important;
+            }
+            /* Hapus elemen yang tidak perlu ada di PDF */
+            .pdf-container button, .pdf-container .hide-on-pdf { display: none !important; }
+            
+            /* Ai-Snack Theme Injection */
+            .pdf-container h2, .pdf-container h3 { color: #E5202B !important; font-weight: 900 !important; border-bottom: 2px solid #FFD874 !important; padding-bottom: 5px !important; margin-top: 20px !important; }
+            .pdf-container h4 { color: #A87B00 !important; font-weight: 900 !important; }
+            .pdf-container table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 15px !important; border-radius: 10px !important; overflow: hidden !important; background-color: #ffffff !important;}
+            .pdf-container th { background-color: #E5202B !important; color: white !important; padding: 12px !important; font-size: 11px !important; text-transform: uppercase !important; }
+            .pdf-container td { border-bottom: 1px solid #FFD874 !important; padding: 10px !important; font-size: 11px !important; font-weight: bold !important; color: #4A3B32 !important; }
+            .pdf-container tr:nth-child(even) { background-color: #FFF5D1 !important; }
+            
+            /* Pastikan teks yang tadinya transparent karena efek gradient kembali solid */
+            .pdf-container .text-transparent { color: #4A3B32 !important; }
+            
+            /* Hapus background bawaan elemen yang mengganggu */
+            .pdf-container .bg-slate-50, .pdf-container .bg-white, .pdf-container .bg-slate-900 { background-color: transparent !important; border: none !important; }
+        `;
+        document.head.appendChild(style);
+
+        // Tambahkan class penanda
+        element.classList.add('pdf-container'); 
+
+        // Beri jeda 800ms agar browser merender penghapusan gradient sebelum dipotret
         setTimeout(() => {
             const opt = { 
-                margin: 0.3, 
-                filename: `Laporan_Ai_Snack_${new Date().getTime()}.pdf`, 
-                image: { type: 'jpeg', quality: 0.98 }, 
-                html2canvas: { scale: 2, useCORS: true, windowWidth: element.scrollWidth }, 
+                margin: 0.4, 
+                filename: `Laporan_Terpadu_AiSnack_${new Date().getTime()}.pdf`, 
+                image: { type: 'jpeg', quality: 1 }, 
+                html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 }, 
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
             };
             
             html2pdf().set(opt).from(element).save().then(() => { 
-                // 5. KEMBALIKAN KE KONDISI NORMAL (UI KASIR)
-                element.setAttribute('style', originalStyle);
-                scrollables.forEach(el => {
-                    el.setAttribute('style', el.getAttribute('data-orig-style') || '');
-                    el.removeAttribute('data-orig-style');
-                });
+                // ==== BERSIHKAN KEMBALI SETELAH SUKSES ====
+                element.classList.remove('pdf-container'); 
+                const printStyle = document.getElementById('pdf-print-style');
+                if (printStyle) printStyle.remove();
                 
-                this.toggleReportTab('trx'); // Sembunyikan tab lain kembali
-                this.showToast("PDF Laporan Berhasil Diunduh!", "success"); 
+                this.toggleReportTab('trx'); // Kembalikan ke tab utama (transaksi)
+                this.showToast("🎉 Laporan PDF Berhasil Diunduh!", "success"); 
+                
+            }).catch(err => {
+                console.error("PDF Export Error: ", err);
+                element.classList.remove('pdf-container');
+                const printStyle = document.getElementById('pdf-print-style');
+                if (printStyle) printStyle.remove();
+                
+                this.showToast("Gagal mencetak PDF. Terjadi masalah perenderan gambar.", "error");
             });
-        }, 500); // 500ms delay sangat krusial
+            
+        }, 800); 
     },
-
     // ==========================================
     // EKSPOR CFO DASHBOARD (PDF & WHATSAPP)
     // ==========================================
@@ -8892,228 +9090,253 @@ openDetailStokOpname: function(sku) {
     },
 
  exportAIPDF: async function() {
-        this.showToast("Mengekstrak Data untuk PDF Profesional...", "warning");
-        this.setLoading(true, "Merender Laporan A4...");
+    this.showToast("Mengekstrak Data untuk PDF Profesional...", "warning");
+    this.setLoading(true, "Merender Laporan A4...");
 
-        try {
-            // 1. AMBIL GRAFIK CHART.JS (Ubah ke Gambar Kualitas Tinggi)
-            const chartCanvas = document.getElementById('aiProfitChart');
-            let chartImgSrc = '';
-            if (chartCanvas) {
-                const ctx = chartCanvas.getContext('2d');
-                ctx.save();
-                ctx.globalCompositeOperation = 'destination-over';
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, chartCanvas.width, chartCanvas.height);
-                chartImgSrc = chartCanvas.toDataURL('image/jpeg', 1.0);
-                ctx.restore();
-            }
+    try {
+        // 1. AMBIL GRAFIK CHART.JS (Ubah ke Gambar Kualitas Tinggi)
+        const chartCanvas = document.getElementById('aiProfitChart');
+        let chartImgSrc = '';
+        if (chartCanvas) {
+            const ctx = chartCanvas.getContext('2d');
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, chartCanvas.width, chartCanvas.height);
+            chartImgSrc = chartCanvas.toDataURL('image/jpeg', 1.0);
+            ctx.restore();
+        }
 
-            // 2. AMBIL METRIK UTAMA DARI DASHBOARD
-            const dStart = document.getElementById('ai-filter-start')?.value || '-';
-            const dEnd = document.getElementById('ai-filter-end')?.value || '-';
-            const outletEl = document.getElementById('ai-filter-outlet');
-            const outletName = outletEl ? outletEl.options[outletEl.selectedIndex].text : 'Semua Cabang';
-            
-            const omset = document.getElementById('ai-tot-omset')?.innerText || 'Rp 0';
-            const struk = document.getElementById('ai-tot-struk')?.innerText || '0';
-            const hpp = document.getElementById('ai-tot-hpp')?.innerText || 'Rp 0';
-            const laba = document.getElementById('ai-tot-laba')?.innerText || 'Rp 0';
-            const margin = document.getElementById('ai-tot-margin')?.innerText || '0%';
-            const insight = document.getElementById('ai-insight-text')?.innerText || '';
+        // 2. AMBIL METRIK UTAMA DARI DASHBOARD
+        const dStart = document.getElementById('ai-filter-start')?.value || '-';
+        const dEnd = document.getElementById('ai-filter-end')?.value || '-';
+        const outletEl = document.getElementById('ai-filter-outlet');
+        const outletName = outletEl ? outletEl.options[outletEl.selectedIndex].text : 'Semua Cabang';
+        
+        const omset = document.getElementById('ai-tot-omset')?.innerText || 'Rp 0';
+        const struk = document.getElementById('ai-tot-struk')?.innerText || '0';
+        const hpp = document.getElementById('ai-tot-hpp')?.innerText || 'Rp 0';
+        const laba = document.getElementById('ai-tot-laba')?.innerText || 'Rp 0';
+        const margin = document.getElementById('ai-tot-margin')?.innerText || '0%';
+        const insight = document.getElementById('ai-insight-text')?.innerText || '';
 
-            // 3. 🚀 EKSTRAKSI JAM SIBUK (Dibangun ulang jadi HTML murni agar anti-pecah di PDF)
-            let hourlyHtml = '';
-            const hourlyRows = document.querySelectorAll('#ai-hourly-chart > div');
-            if (hourlyRows.length > 0 && !hourlyRows[0].innerText.includes('Belum ada')) {
-                hourlyRows.forEach(row => {
-                    const time = row.children[0]?.innerText || '-';
-                    // Ambil persentase lebar bar dari atribut style
-                    const barDiv = row.children[1]?.querySelector('div');
-                    const barWidth = barDiv ? barDiv.style.width : '0%';
-                    const amount = row.children[2]?.innerText || 'Rp 0';
-                    
-                    hourlyHtml += `
-                    <div style="display: flex; align-items: center; margin-bottom: 6px; font-size: 10px;">
-                        <div style="width: 35px; font-weight: bold; color: #64748b;">${time}</div>
-                        <div style="flex: 1; background: #f1f5f9; height: 10px; border-radius: 4px; margin: 0 8px; overflow: hidden;">
-                            <div style="width: ${barWidth}; background: #6366f1; height: 100%; border-radius: 4px;"></div>
-                        </div>
-                        <div style="width: 50px; text-align: right; font-weight: bold; color: #0f172a;">${amount}</div>
-                    </div>`;
-                });
-            } else {
-                hourlyHtml = '<div style="text-align: center; color: #94a3b8; font-size: 10px; padding: 20px;">Tidak ada data jam sibuk</div>';
-            }
-
-            // 4. EKSTRAKSI BERSIH TABEL PRODUK
-            let cleanProductTable = '';
-            const prodRows = document.querySelectorAll('#ai-product-profit-tbody tr');
-            if (prodRows.length > 0 && !prodRows[0].innerText.includes('Tidak ada')) {
-                prodRows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if(cells.length >= 4) {
-                        cleanProductTable += `
-                        <tr style="page-break-inside: avoid;">
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #1e293b;">${cells[0].innerText}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b;">${cells[1].innerText}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #059669; font-weight: bold;">${cells[2].innerText}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #0f172a;">${cells[3].innerText}</td>
-                        </tr>`;
-                    }
-                });
-            } else {
-                cleanProductTable = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Belum ada penjualan</td></tr>`;
-            }
-
-            // 5. EKSTRAKSI BERSIH TABEL KOMPARASI CABANG
-            let cleanBranchTable = '';
-            const branchRows = document.querySelectorAll('#ai-comparison-tbody tr');
-            if (branchRows.length > 0 && !branchRows[0].innerText.includes('Tidak ada')) {
-                branchRows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if(cells.length >= 4) {
-                        const branchRaw = cells[0].innerText.split('\n');
-                        const bName = branchRaw[0]?.trim() || '-';
-                        const bStruk = branchRaw[1]?.trim() || '';
-                        const bOmset = cells[1].innerText.trim();
-                        const bLaba = cells[2].innerText.trim();
-                        const bMetodeRaw = cells[3].innerText.replace(/\n/g, ' ').trim();
-                        const bMetode = bMetodeRaw.split(' ')[0] || '-'; 
-                        
-                        cleanBranchTable += `
-                        <tr style="page-break-inside: avoid;">
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
-                                <div style="font-weight: bold; color: #1e293b; font-size: 11px;">${bName}</div>
-                                <div style="font-size: 9px; color: #64748b; margin-top: 2px;">${bStruk}</div>
-                            </td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #475569;">${bOmset}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #059669; font-weight: bold;">${bLaba}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-                                <span style="background: #f8fafc; padding: 3px 6px; border-radius: 4px; border: 1px solid #e2e8f0; font-weight: bold; font-size: 9px; color: #0f172a;">Tunai: ${bMetode}</span>
-                            </td>
-                        </tr>`;
-                    }
-                });
-            } else {
-                cleanBranchTable = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Tidak ada komparasi</td></tr>`;
-            }
-
-            // 6. SUSUN TEMPLATE HTML KERTAS A4 MURNI
-            const pdfHtml = `
-                <div style="padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background: #ffffff;">
-                    
-                    <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px;">
-                        <h1 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px;">Laporan Kinerja Keuangan</h1>
-                        <p style="margin: 6px 0 0 0; color: #64748b; font-size: 10px;">Periode: <b>${dStart} s/d ${dEnd}</b> &nbsp;|&nbsp; Outlet: <b>${outletName}</b> &nbsp;|&nbsp; Dicetak: <b>${new Date().toLocaleString('id-ID')}</b></p>
+        // 3. 🚀 EKSTRAKSI JAM SIBUK (Ditingkatkan: Warna lebih selaras)
+        let hourlyHtml = '';
+        const hourlyRows = document.querySelectorAll('#ai-hourly-chart > div');
+        if (hourlyRows.length > 0 && !hourlyRows[0].innerText.includes('Belum ada')) {
+            hourlyRows.forEach(row => {
+                const time = row.children[0]?.innerText || '-';
+                const barDiv = row.children[1]?.querySelector('div');
+                const barWidth = barDiv ? barDiv.style.width : '0%';
+                const amount = row.children[2]?.innerText || 'Rp 0';
+                
+                hourlyHtml += `
+                <div style="display: flex; align-items: center; margin-bottom: 8px; font-size: 10px;">
+                    <div style="width: 40px; font-weight: 600; color: #475569;">${time}</div>
+                    <div style="flex: 1; background: #e2e8f0; height: 8px; border-radius: 8px; margin: 0 10px; overflow: hidden;">
+                        <div style="width: ${barWidth}; background: linear-gradient(90deg, #4f46e5, #6366f1); height: 100%; border-radius: 8px;"></div>
                     </div>
+                    <div style="width: 60px; text-align: right; font-weight: 700; color: #0f172a;">${amount}</div>
+                </div>`;
+            });
+        } else {
+            hourlyHtml = '<div style="text-align: center; color: #94a3b8; font-size: 10px; padding: 20px;">Tidak ada data jam sibuk</div>';
+        }
 
-                    <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 12px 15px; border-radius: 4px; font-size: 11px; line-height: 1.5; margin-bottom: 20px;">
-                        <strong style="color: #4f46e5; font-size: 11px; display: block; margin-bottom: 4px; text-transform: uppercase;">Ringkasan Eksekutif AI</strong>
-                        ${insight}
-                    </div>
+        // 4. EKSTRAKSI BERSIH TABEL PRODUK (Ditingkatkan: Tipografi & Spacing)
+        let cleanProductTable = '';
+        const prodRows = document.querySelectorAll('#ai-product-profit-tbody tr');
+        if (prodRows.length > 0 && !prodRows[0].innerText.includes('Tidak ada')) {
+            prodRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if(cells.length >= 4) {
+                    cleanProductTable += `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">${cells[0].innerText}</td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #64748b;">${cells[1].innerText}</td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #059669; font-weight: 700;">${cells[2].innerText}</td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #0f172a;">
+                            <span style="background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">${cells[3].innerText}</span>
+                        </td>
+                    </tr>`;
+                }
+            });
+        } else {
+            cleanProductTable = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Belum ada penjualan</td></tr>`;
+        }
 
-                    <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 20px; margin-left: -8px; border: none;">
-                        <tr>
-                            <td style="width: 25%; padding: 12px 8px; border-radius: 6px; border: 1px solid #cbd5e1; text-align: center; background: #ffffff; vertical-align: top;">
-                                <div style="font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 6px;">Total Omset Kotor</div>
-                                <div style="font-size: 15px; font-weight: 900; color: #0f172a; margin: 0;">${omset}</div>
-                                <div style="font-size: 8px; color: #94a3b8; margin-top: 4px;">${struk}</div>
-                            </td>
-                            <td style="width: 25%; padding: 12px 8px; border-radius: 6px; border: 1px solid #cbd5e1; text-align: center; background: #ffffff; vertical-align: top;">
-                                <div style="font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 6px;">Total Modal (HPP)</div>
-                                <div style="font-size: 15px; font-weight: 900; color: #ef4444; margin: 0;">${hpp}</div>
-                                <div style="font-size: 8px; color: #94a3b8; margin-top: 4px;">Bahan Terjual</div>
-                            </td>
-                            <td style="width: 25%; padding: 12px 8px; border-radius: 6px; border: 1px solid #059669; text-align: center; background: #10b981; vertical-align: top;">
-                                <div style="font-size: 8px; text-transform: uppercase; color: #d1fae5; font-weight: bold; margin-bottom: 6px;">Laba Bersih</div>
-                                <div style="font-size: 15px; font-weight: 900; color: #ffffff; margin: 0;">${laba}</div>
-                                <div style="font-size: 8px; color: #d1fae5; margin-top: 4px;">Profit Aktual</div>
-                            </td>
-                            <td style="width: 25%; padding: 12px 8px; border-radius: 6px; border: 1px solid #cbd5e1; text-align: center; background: #ffffff; vertical-align: top;">
-                                <div style="font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 6px;">Margin Profit</div>
-                                <div style="font-size: 15px; font-weight: 900; color: #0f172a; margin: 0;">${margin}</div>
-                                <div style="font-size: 8px; color: #94a3b8; margin-top: 4px;">Rasio Laba</div>
-                            </td>
-                        </tr>
-                    </table>
-
-                    <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 25px;">
-                        <tr>
-                            <td style="width: 60%; padding: 0 10px 0 0; vertical-align: top; border: none;">
-                                <div style="font-size: 12px; font-weight: bold; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 12px;">📊 Tren Laba Harian</div>
-                                <div style="width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center; background: #fdfdfd;">
-                                    ${chartImgSrc ? `<img src="${chartImgSrc}" style="max-width: 100%; height: auto; max-height: 160px;" />` : '<div style="font-size:10px; color:#94a3b8;">Grafik Kosong</div>'}
-                                </div>
-                            </td>
-                            <td style="width: 40%; padding: 0 0 0 10px; vertical-align: top; border: none;">
-                                <div style="font-size: 12px; font-weight: bold; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 12px;">⏰ Analitik Jam Sibuk</div>
-                                <div style="width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; background: #ffffff;">
-                                    ${hourlyHtml}
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-
-                    <div style="font-size: 12px; font-weight: bold; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin: 15px 0 10px 0;">🏆 Peringkat Laba Produk (Top Kontributor)</div>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px;">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Nama Produk</th>
-                                <th style="text-align: center; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Kuantitas Terjual</th>
-                                <th style="text-align: right; background-color: #f8fafc; color: #059669; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Total Laba Bersih</th>
-                                <th style="text-align: right; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Margin</th>
-                            </tr>
-                        </thead>
-                        <tbody>${cleanProductTable}</tbody>
-                    </table>
-
-                    <div style="font-size: 12px; font-weight: bold; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin: 15px 0 10px 0;">🏢 Komparasi Performa Antar Cabang</div>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px;">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Cabang</th>
-                                <th style="text-align: right; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Omset Kotor</th>
-                                <th style="text-align: right; background-color: #f8fafc; color: #059669; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Laba Bersih</th>
-                                <th style="text-align: center; background-color: #f8fafc; color: #475569; font-weight: bold; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1;">Rasio Pembayaran</th>
-                            </tr>
-                        </thead>
-                        <tbody>${cleanBranchTable}</tbody>
-                    </table>
+        // 5. EKSTRAKSI BERSIH TABEL KOMPARASI CABANG
+        let cleanBranchTable = '';
+        const branchRows = document.querySelectorAll('#ai-comparison-tbody tr');
+        if (branchRows.length > 0 && !branchRows[0].innerText.includes('Tidak ada')) {
+            branchRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if(cells.length >= 4) {
+                    const branchRaw = cells[0].innerText.split('\n');
+                    const bName = branchRaw[0]?.trim() || '-';
+                    const bStruk = branchRaw[1]?.trim() || '';
+                    const bOmset = cells[1].innerText.trim();
+                    const bLaba = cells[2].innerText.trim();
+                    const bMetodeRaw = cells[3].innerText.replace(/\n/g, ' ').trim();
+                    const bMetode = bMetodeRaw.split(' ')[0] || '-'; 
                     
-                    <div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 30px; font-style: italic;">
-                        Dokumen ini dihasilkan dan diverifikasi secara otomatis oleh Mesin Analitik AI - Sistem POS Ai-Snack.<br>
-                        Data bersifat rahasia dan hanya untuk kalangan internal manajemen.
+                    cleanBranchTable += `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 11px;">${bName}</div>
+                            <div style="font-size: 9px; color: #64748b; margin-top: 3px;">${bStruk}</div>
+                        </td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #475569;">${bOmset}</td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #059669; font-weight: 700;">${bLaba}</td>
+                        <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                            <span style="background: #e0e7ff; color: #4f46e5; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 9px;">Tunai: ${bMetode}</span>
+                        </td>
+                    </tr>`;
+                }
+            });
+        } else {
+            cleanBranchTable = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Tidak ada komparasi</td></tr>`;
+        }
+
+        // 6. SUSUN TEMPLATE HTML KERTAS A4 MURNI (Ditingkatkan secara menyeluruh)
+        const pdfHtml = `
+            <div style="padding: 40px; font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background: #ffffff;">
+                
+                <!-- HEADER LAPORAN -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px;">
+                    <div>
+                        <h1 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Laporan Kinerja Keuangan</h1>
+                        <p style="margin: 8px 0 0 0; color: #64748b; font-size: 11px;">Outlet: <b style="color: #0f172a;">${outletName}</b></p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Periode: <b style="color: #0f172a;">${dStart} s/d ${dEnd}</b></div>
+                        <div style="font-size: 9px; color: #94a3b8;">Dicetak: ${new Date().toLocaleString('id-ID')}</div>
                     </div>
                 </div>
-            `;
 
-            // 7. KONFIGURASI MESIN PDF
-            const opt = { 
-                margin: [0.3, 0.3, 0.3, 0.3], // [top, left, bottom, right]
-                filename: `CFO_Laporan_A4_${new Date().getTime()}.pdf`, 
-                image: { type: 'jpeg', quality: 1.0 }, 
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    logging: false,
-                    letterRendering: true
-                }, 
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['css', 'legacy'] }
-            };
+                <!-- RINGKASAN AI -->
+                <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 15px; border-radius: 0 6px 6px 0; font-size: 11px; line-height: 1.6; margin-bottom: 25px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                        <span style="background: #4f46e5; color: white; font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: bold; margin-right: 8px;">AI INSIGHT</span>
+                        <strong style="color: #1e293b; font-size: 11px; text-transform: uppercase;">Ringkasan Eksekutif</strong>
+                    </div>
+                    <div style="color: #334155;">${insight}</div>
+                </div>
 
-            await html2pdf().set(opt).from(pdfHtml).save();
+                <!-- KARTU METRIK UTAMA -->
+                <table style="width: 100%; border-collapse: separate; border-spacing: 10px 0; margin-bottom: 25px; margin-left: -10px; border: none;">
+                    <tr>
+                        <td style="width: 25%; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; background: #ffffff; vertical-align: top;">
+                            <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px;">Total Omset Kotor</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${omset}</div>
+                            <div style="font-size: 9px; color: #4f46e5; font-weight: 600; margin-top: 6px; background: #e0e7ff; display: inline-block; padding: 2px 6px; border-radius: 4px;">${struk}</div>
+                        </td>
+                        <td style="width: 25%; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; background: #ffffff; vertical-align: top;">
+                            <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px;">Total Modal (HPP)</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #ef4444; margin: 0;">${hpp}</div>
+                            <div style="font-size: 9px; color: #94a3b8; margin-top: 6px;">Bahan Terjual</div>
+                        </td>
+                        <td style="width: 25%; padding: 15px; border-radius: 8px; border: 1px solid #059669; text-align: left; background: #ecfdf5; vertical-align: top;">
+                            <div style="font-size: 9px; text-transform: uppercase; color: #047857; font-weight: 700; margin-bottom: 8px;">Laba Bersih</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #059669; margin: 0;">${laba}</div>
+                            <div style="font-size: 9px; color: #047857; margin-top: 6px;">Profit Aktual</div>
+                        </td>
+                        <td style="width: 25%; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; background: #ffffff; vertical-align: top;">
+                            <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px;">Margin Profit</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${margin}</div>
+                            <div style="font-size: 9px; color: #94a3b8; margin-top: 6px;">Rasio Laba</div>
+                        </td>
+                    </tr>
+                </table>
 
-            this.showToast("PDF A4 Berhasil Diunduh!", "success");
+                <!-- GRAFIK & ANALITIK -->
+                <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 30px;">
+                    <tr>
+                        <td style="width: 58%; padding: 0 15px 0 0; vertical-align: top; border: none;">
+                            <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center;">
+                                <span style="background: #f1f5f9; padding: 4px; border-radius: 4px; margin-right: 8px;">📈</span> Tren Laba Harian
+                            </div>
+                            <div style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; background: #ffffff;">
+                                ${chartImgSrc ? `<img src="${chartImgSrc}" style="max-width: 100%; height: auto; max-height: 180px;" />` : '<div style="font-size:11px; color:#94a3b8; padding: 40px 0;">Grafik Kosong</div>'}
+                            </div>
+                        </td>
+                        <td style="width: 42%; padding: 0 0 0 15px; vertical-align: top; border: none;">
+                            <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center;">
+                                <span style="background: #f1f5f9; padding: 4px; border-radius: 4px; margin-right: 8px;">⏰</span> Analitik Jam Sibuk
+                            </div>
+                            <div style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #ffffff;">
+                                ${hourlyHtml}
+                            </div>
+                        </td>
+                    </tr>
+                </table>
 
-        } catch (error) {
-            console.error("PDF Export Error:", error);
-            this.showToast("Gagal merender PDF.", "error");
-        } finally {
-            this.setLoading(false);
-        }
-    },
+                <!-- TABEL PRODUK -->
+                <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin: 20px 0 12px 0; display: flex; align-items: center;">
+                    <span style="background: #f1f5f9; padding: 4px; border-radius: 4px; margin-right: 8px;">🏆</span> Peringkat Laba Produk
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 10px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Nama Produk</th>
+                            <th style="text-align: center; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Kuantitas</th>
+                            <th style="text-align: right; background-color: #f8fafc; color: #059669; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Laba Bersih</th>
+                            <th style="text-align: right; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>${cleanProductTable}</tbody>
+                </table>
+
+                <!-- TABEL CABANG -->
+                <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin: 20px 0 12px 0; display: flex; align-items: center;">
+                    <span style="background: #f1f5f9; padding: 4px; border-radius: 4px; margin-right: 8px;">🏢</span> Komparasi Performa Antar Cabang
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Cabang</th>
+                            <th style="text-align: right; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Omset Kotor</th>
+                            <th style="text-align: right; background-color: #f8fafc; color: #059669; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Laba Bersih</th>
+                            <th style="text-align: center; background-color: #f8fafc; color: #475569; font-weight: 800; text-transform: uppercase; padding: 10px 8px; border-bottom: 2px solid #cbd5e1;">Rasio Pembayaran</th>
+                        </tr>
+                    </thead>
+                    <tbody>${cleanBranchTable}</tbody>
+                </table>
+                
+                <!-- FOOTER -->
+                <div style="text-align: center; font-size: 9px; color: #94a3b8; margin-top: 40px; padding-top: 15px; border-top: 1px dashed #cbd5e1;">
+                    Dokumen ini dihasilkan dan diverifikasi secara otomatis oleh <b>Mesin Analitik AI - Sistem POS Ai-Snack</b>.<br>
+                    Data bersifat rahasia dan hanya untuk kalangan internal manajemen.
+                </div>
+            </div>
+        `;
+
+        // 7. KONFIGURASI MESIN PDF
+        const opt = { 
+            margin: [0.3, 0.3, 0.3, 0.3], // [top, left, bottom, right]
+            filename: `CFO_Laporan_A4_${new Date().getTime()}.pdf`, 
+            image: { type: 'jpeg', quality: 1.0 }, 
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false,
+                letterRendering: true
+            }, 
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css', 'legacy'] }
+        };
+
+        await html2pdf().set(opt).from(pdfHtml).save();
+
+        this.showToast("PDF A4 Berhasil Diunduh!", "success");
+
+    } catch (error) {
+        console.error("PDF Export Error:", error);
+        this.showToast("Gagal merender PDF.", "error");
+    } finally {
+        this.setLoading(false);
+    }
+},
     
     sendReportToWA: function() {
         // 1. Ambil data rentang tanggal dari filter
@@ -10087,22 +10310,87 @@ executeVoidTrx: async function(trxId) {
     
     
     exportPDF: function() {
-        this.showToast("Mempersiapkan PDF Laporan...");
-        const element = document.getElementById('pdf-export-area'); if(!element) return;
-        element.classList.add('pdf-container'); 
-        
+        this.showToast("Mempersiapkan PDF Laporan, mohon tunggu sebentar...", "info");
+        const element = document.getElementById('pdf-export-area'); 
+        if(!element) return;
+
         // Buka semua tab agar terbaca oleh mesin PDF
         const rct = document.getElementById('report-content-trx'); if(rct) rct.classList.remove('hidden'); 
         const rcr = document.getElementById('report-content-rekap'); if(rcr) rcr.classList.remove('hidden');
         const rck = document.getElementById('report-content-kas'); if(rck) rck.classList.remove('hidden');
         const rcs = document.getElementById('report-content-selisih'); if(rcs) rcs.classList.remove('hidden');
-        
-        const opt = { margin: 0.3, filename: `Laporan_ERP_${new Date().getTime()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save().then(()=> { 
-            element.classList.remove('pdf-container'); 
-            this.toggleReportTab('trx'); // Kembalikan ke tab utama setelah sukses
-            this.showToast("PDF Diunduh!"); 
-        });
+
+        // 🚀 SOLUSI BLANK PUTIH & STYLING AI-SNACK: 
+        // Suntikkan CSS khusus (hanya berlaku saat cetak PDF) untuk memaksa semua elemen membentang penuh 
+        // dan menyulap warnanya menjadi warna identitas Ai-Snack.
+        const style = document.createElement('style');
+        style.id = 'pdf-print-style';
+        style.innerHTML = `
+            .pdf-container { 
+                height: auto !important; 
+                max-height: none !important; 
+                overflow: visible !important; 
+                background-color: #ffffff !important;
+                padding: 15px !important;
+                color: #4A3B32 !important;
+            }
+            /* Paksa semua elemen di dalamnya membentang, matikan scroll dan shadow */
+            .pdf-container * { 
+                overflow: visible !important; 
+                height: auto !important; 
+                max-height: none !important; 
+                box-shadow: none !important;
+            }
+            /* Hapus elemen yang tidak perlu ada di PDF (seperti tombol navigasi/aksi) */
+            .pdf-container button, .pdf-container .hide-on-pdf { display: none !important; }
+            
+            /* Ai-Snack Theme Injection */
+            .pdf-container h2, .pdf-container h3 { color: #E5202B !important; font-weight: 900 !important; border-bottom: 2px solid #FFD874 !important; padding-bottom: 5px !important; margin-top: 20px !important; }
+            .pdf-container h4 { color: #A87B00 !important; font-weight: 900 !important; }
+            .pdf-container table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 15px !important; border-radius: 10px !important; overflow: hidden !important; }
+            .pdf-container th { background-color: #E5202B !important; color: white !important; padding: 12px !important; font-size: 11px !important; text-transform: uppercase !important; }
+            .pdf-container td { border-bottom: 1px solid #FFD874 !important; padding: 10px !important; font-size: 11px !important; font-weight: bold !important; color: #4A3B32 !important; }
+            .pdf-container tr:nth-child(even) { background-color: #FFF5D1 !important; }
+            
+            /* Hapus background bawaan elemen yang mengganggu */
+            .pdf-container .bg-slate-50, .pdf-container .bg-white { background-color: transparent !important; border: none !important; }
+        `;
+        document.head.appendChild(style);
+
+        // Tambahkan class penanda
+        element.classList.add('pdf-container'); 
+
+        // 🚀 KUNCI PERBAIKAN: Beri jeda 800ms agar browser sempat me-render (menggambar) 
+        // tab-tab yang baru saja dibuka dan mengaplikasikan CSS cetak di atas.
+        setTimeout(() => {
+            const opt = { 
+                margin: 0.4, 
+                filename: `Laporan_Terpadu_AiSnack_${new Date().getTime()}.pdf`, 
+                image: { type: 'jpeg', quality: 1 }, 
+                // scrollY: 0 sangat penting agar mesin PDF mulai memotret dari ujung paling atas
+                html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 }, 
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+            };
+            
+            html2pdf().set(opt).from(element).save().then(() => { 
+                // ==== BERSIHKAN KEMBALI SETELAH SUKSES ====
+                element.classList.remove('pdf-container'); 
+                const printStyle = document.getElementById('pdf-print-style');
+                if (printStyle) printStyle.remove();
+                
+                this.toggleReportTab('trx'); // Kembalikan ke tab utama (transaksi)
+                this.showToast("🎉 Laporan PDF Berhasil Diunduh!", "success"); 
+                
+            }).catch(err => {
+                console.error("PDF Export Error: ", err);
+                element.classList.remove('pdf-container');
+                const printStyle = document.getElementById('pdf-print-style');
+                if (printStyle) printStyle.remove();
+                
+                this.showToast("Gagal mencetak PDF. Silakan coba lagi.", "error");
+            });
+            
+        }, 800); // 800 milidetik jeda render
     },
     
     // GUDANG & MASTER DATA
@@ -11416,4 +11704,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
