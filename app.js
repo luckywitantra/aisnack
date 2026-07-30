@@ -116,8 +116,8 @@ const osKeyboard = {
         const preview = document.getElementById('vk-live-preview');
         if (preview && this.targetElement) {
             let val = this.targetElement.value;
-            // Jika kosong, tampilkan efek kursor berkedip
-            preview.innerHTML = val === '' ? '<span class="animate-pulse text-slate-500">_</span>' : val;
+            // Jika kosong, tampilkan efek kursor berkedip (Warna Emas Ai-Snack)
+            preview.innerHTML = val === '' ? '<span class="animate-pulse text-[#FFB800]/50">_</span>' : val;
         }
     },
     
@@ -129,7 +129,7 @@ const osKeyboard = {
         let rows = this.layouts[this.mode];
 
         let maxWidth = this.mode === 'numeric' ? 'max-w-sm' : 'max-w-3xl';
-        html += `<div class="w-full ${maxWidth} mx-auto flex flex-col gap-1.5 sm:gap-2">`;
+        html += `<div class="w-full ${maxWidth} mx-auto flex flex-col gap-2 sm:gap-2.5">`;
 
         // =========================================================
         // 🚀 JURUS 2: LAYAR MONITOR MINI DI ATAS KEYBOARD (LIVE PREVIEW)
@@ -143,30 +143,34 @@ const osKeyboard = {
             label = this.targetElement.previousElementSibling.innerText || placeholderTxt;
         }
         
+        // Desain Monitor Ai-Snack (Cokelat Gelap + Teks Kuning Emas)
         html += `
-        <div class="w-full bg-slate-900 border-2 border-slate-700 rounded-xl p-3 sm:p-4 mb-1 shadow-inner relative flex flex-col justify-end min-h-[70px]">
-            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest absolute top-2 left-3 truncate w-5/6">${label}</span>
-            <div id="vk-live-preview" class="text-xl sm:text-2xl font-mono font-black text-emerald-400 text-right w-full overflow-hidden truncate mt-3">
-                ${currentVal || '<span class="animate-pulse text-slate-500">_</span>'}
+        <div class="w-full bg-[#4A3B32] border-[3px] border-[#FFD874]/30 rounded-2xl p-3 sm:p-4 mb-2 shadow-inner relative flex flex-col justify-end min-h-[76px] overflow-hidden">
+            <div class="absolute inset-0 bg-black/10 pointer-events-none"></div>
+            <span class="text-[9px] font-black text-[#FFD874]/70 uppercase tracking-widest absolute top-2.5 left-3.5 truncate w-5/6 relative z-10">${label}</span>
+            <div id="vk-live-preview" class="text-2xl sm:text-3xl font-mono font-black text-[#FFB800] text-right w-full overflow-hidden truncate mt-3 relative z-10 drop-shadow-md tracking-tight">
+                ${currentVal || '<span class="animate-pulse text-[#FFB800]/50">_</span>'}
             </div>
         </div>`;
         // =========================================================
 
         rows.forEach(row => {
-            let rowGap = this.mode === 'numeric' ? 'gap-2' : 'gap-1 sm:gap-1.5';
+            let rowGap = this.mode === 'numeric' ? 'gap-2.5' : 'gap-1.5 sm:gap-2';
             html += `<div class="flex justify-center ${rowGap} w-full">`;
             
             row.forEach(key => {
-                let baseClass = "flex items-center justify-center font-bold rounded-lg sm:rounded-xl shadow-[0_3px_0_rgba(203,213,225,1)] border border-slate-200 active:shadow-none active:translate-y-[3px] transition-all select-none touch-manipulation";
+                // Efek Tuts Membal (3D Bubbly Button)
+                let baseClass = "flex items-center justify-center font-black rounded-[0.85rem] sm:rounded-[1rem] shadow-[0_4px_0_rgba(203,213,225,0.7)] border border-slate-100 active:shadow-none active:translate-y-[4px] transition-all select-none touch-manipulation hover:bg-[#FFF5D1] hover:text-[#E5202B] hover:border-[#FFD874]/50";
                 
                 let sizeClass = this.mode === 'numeric' 
-                    ? "flex-1 py-4 sm:py-5 text-2xl bg-white text-slate-800" 
-                    : "flex-1 py-3 sm:py-4 text-sm sm:text-lg bg-white text-slate-800";
+                    ? "flex-1 py-4 sm:py-5 text-2xl md:text-3xl bg-white text-[#4A3B32]" 
+                    : "flex-1 py-3 sm:py-4 text-base sm:text-lg bg-white text-[#4A3B32]";
 
                 if (key === 'C') {
+                    // Tombol Clear (Kuning Emas)
                     sizeClass = this.mode === 'numeric'
-                        ? "flex-1 py-4 sm:py-5 text-2xl bg-rose-50 text-rose-500 border-rose-200 shadow-[0_3px_0_rgba(254,205,211,1)]"
-                        : "flex-1 py-3 sm:py-4 text-sm sm:text-lg bg-rose-50 text-rose-500 border-rose-200 shadow-[0_3px_0_rgba(254,205,211,1)]";
+                        ? "flex-1 py-4 sm:py-5 text-2xl md:text-3xl bg-[#FFB800] text-white border-[#FFB800] shadow-[0_4px_0_#D49800] hover:bg-[#F0A800] hover:text-white"
+                        : "flex-1 py-3 sm:py-4 text-base sm:text-lg bg-[#FFB800] text-white border-[#FFB800] shadow-[0_4px_0_#D49800] hover:bg-[#F0A800] hover:text-white";
                     
                     html += `<button type="button" class="${baseClass} ${sizeClass}" onclick="osKeyboard.clear()">${key}</button>`;
                 } else {
@@ -177,23 +181,23 @@ const osKeyboard = {
         });
 
         if (this.mode === 'text') {
-            html += `<div class="flex justify-center gap-1 sm:gap-1.5 w-full mt-0.5">
-                <button type="button" class="flex-[1.5] py-3 bg-slate-200 text-slate-600 font-bold rounded-xl shadow-[0_3px_0_rgba(156,163,175,1)] active:shadow-none active:translate-y-[3px] transition-all flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
+            html += `<div class="flex justify-center gap-1.5 sm:gap-2 w-full mt-1">
+                <button type="button" class="flex-[1.5] py-3.5 bg-slate-200 text-slate-600 hover:text-slate-800 font-black rounded-[1rem] shadow-[0_4px_0_#9CA3AF] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
                     <i class="fas fa-delete-left text-lg"></i>
                 </button>
-                <button type="button" class="flex-[5] py-3 bg-white text-slate-800 font-bold rounded-xl shadow-[0_3px_0_rgba(203,213,225,1)] border border-slate-200 active:shadow-none active:translate-y-[3px] transition-all select-none tracking-widest text-xs sm:text-sm" onclick="osKeyboard.insert(' ')">
+                <button type="button" class="flex-[5] py-3.5 bg-white text-[#4A3B32] hover:bg-[#FFF5D1] hover:text-[#E5202B] font-black rounded-[1rem] shadow-[0_4px_0_rgba(203,213,225,0.7)] border border-slate-100 active:shadow-none active:translate-y-[4px] transition-all select-none tracking-widest text-xs sm:text-sm" onclick="osKeyboard.insert(' ')">
                     SPASI
                 </button>
-                <button type="button" class="flex-[2] py-3 bg-brand-500 text-white font-bold rounded-xl shadow-[0_3px_0_rgba(194,65,12,1)] active:shadow-none active:translate-y-[3px] transition-all flex items-center justify-center gap-1 select-none" onclick="osKeyboard.close()">
+                <button type="button" class="flex-[2] py-3.5 bg-[#E5202B] hover:bg-[#CC1A24] text-white font-black rounded-[1rem] shadow-[0_4px_0_#CC1A24] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-1 select-none border border-[#CC1A24]" onclick="osKeyboard.close()">
                     <i class="fas fa-check"></i> OK
                 </button>
             </div>`;
         } else {
-            html += `<div class="flex justify-center gap-2 w-full mt-1">
-                <button type="button" class="flex-1 py-4 sm:py-5 bg-slate-200 text-slate-700 font-bold rounded-xl shadow-[0_3px_0_rgba(156,163,175,1)] active:shadow-none active:translate-y-[3px] transition-all text-xl flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
+            html += `<div class="flex justify-center gap-2.5 w-full mt-1">
+                <button type="button" class="flex-1 py-4 sm:py-5 bg-slate-200 text-slate-600 hover:text-slate-800 font-black rounded-[1.25rem] shadow-[0_4px_0_#9CA3AF] active:shadow-none active:translate-y-[4px] transition-all text-xl md:text-2xl flex items-center justify-center select-none" onclick="osKeyboard.backspace()">
                     <i class="fas fa-delete-left"></i>
                 </button>
-                <button type="button" class="flex-[2] py-4 sm:py-5 bg-brand-500 text-white font-black rounded-xl shadow-[0_3px_0_rgba(194,65,12,1)] active:shadow-none active:translate-y-[3px] transition-all text-xl flex items-center justify-center gap-2 select-none" onclick="osKeyboard.close()">
+                <button type="button" class="flex-[2] py-4 sm:py-5 bg-[#E5202B] hover:bg-[#CC1A24] text-white font-black rounded-[1.25rem] shadow-[0_4px_0_#CC1A24] active:shadow-none active:translate-y-[4px] transition-all text-xl flex items-center justify-center gap-2 select-none border border-[#CC1A24] tracking-wider" onclick="osKeyboard.close()">
                     <i class="fas fa-check-circle"></i> SELESAI
                 </button>
             </div>`;
