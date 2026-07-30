@@ -4392,7 +4392,7 @@ selectOutlet: function(id) {
             
             outletRowsHtml += `
                 <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 12px; font-weight: 900; color: #4A3B32;">AI-SNACK ${out.toUpperCase()}</td>
+                    <td style="padding: 12px; font-weight: 900; color: #4A3B32;">AI-CHA ${out.toUpperCase()}</td>
                     <td style="padding: 12px; text-align: center; color: #4A3B32; font-weight: bold;">${ob.count} Hari</td>
                     <td style="padding: 12px; text-align: right; font-weight: 900; color: #4A3B32;">Rp ${fmt(ob.sales)}</td>
                     <td style="padding: 12px; text-align: right; color: #E5202B; font-weight: bold;">Rp ${fmt(ob.cash)}</td>
@@ -4432,7 +4432,7 @@ selectOutlet: function(id) {
                 opexRowsHtml += `
                     <tr style="background-color: #FFF5D1; border-bottom: 2px solid #FFD874;">
                         <td colspan="2" style="padding: 10px 15px; font-weight: 900; color: #E5202B; text-align: left; font-size: 13px;">
-                            🏠 OUTLET: AI-SNACK ${out}
+                            🏠 OUTLET: AI-CHA ${out}
                         </td>
                     </tr>
                 `;
@@ -4460,7 +4460,7 @@ selectOutlet: function(id) {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Laporan Keuangan Ai-Snack - ${data.startDateStr} sd ${data.endDateStr}</title>
+                <title>Laporan Keuangan Ai-CHA - ${data.startDateStr} sd ${data.endDateStr}</title>
                 <style>
                     @page { size: A4; margin: 15mm; }
                     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4A3B32; margin: 0; padding: 0; line-height: 1.4; font-size: 12px; }
