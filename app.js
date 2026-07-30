@@ -1704,49 +1704,31 @@ const superApp = {
     // =========================================================
     // 🚀 LOGOUT AMAN & KEMBALI KE LAYAR PIN
     // =========================================================
-    logout: function() {
-        // 1. Bersihkan seluruh memori sesi aktif di objek aplikasi
-        this.currentUser = null;
-        this.userRole = null;
-        this.outlet = null;
-        this.cart = [];
-        this.dailyExpensesList = [];
-
-        // 2. Hapus jejak sesi dari LocalStorage browser
+   logout: function() {
+        // 1. Bersihkan seluruh jejak sesi dari LocalStorage browser 
+        // (Ini sangat penting agar saat refresh, sistem tidak auto-login kembali)
         localStorage.removeItem('aicha_current_user');
         localStorage.removeItem('aisnack_current_user');
         localStorage.removeItem('aicha_active_outlet');
         localStorage.removeItem('aisnack_active_outlet');
 
-        // 🚀 3. BALIKKAN TAMPILAN LAYAR PERSIS SEPERTI SEBELUM LOGIN
-        const sbar = document.getElementById('sidebar'); 
-        if (sbar) sbar.classList.add('hidden');
-        
-        const mainApp = document.getElementById('main-app'); 
-        if (mainApp) mainApp.classList.add('hidden');
+        // Opsional: Bersihkan memori di objek aplikasi (jika dibutuhkan oleh proses lain sebelum refresh)
+        this.currentUser = null;
+        this.userRole = null;
+        this.outlet = null;
+        this.cart = [];
 
-        // Sembunyikan juga semua sub-view yang mungkin sedang terbuka
-        document.querySelectorAll('.app-view').forEach(v => v.classList.add('hidden'));
-
-        // Munculkan kembali layar PIN utama
-        const loginScreen = document.getElementById('login-screen'); 
-        if (loginScreen) {
-            loginScreen.classList.remove('hidden');
-        } else {
-            // Fallback keamanan jika ID di HTML Anda bernama view-login
-            const viewLogin = document.getElementById('view-login');
-            if (viewLogin) viewLogin.classList.remove('hidden');
+        // 2. Beritahu kasir bahwa sistem sedang diperbarui
+        if (typeof this.showToast === 'function') {
+            this.showToast("Berhasil keluar. Memperbarui sistem...", "info");
         }
 
-        // 4. Bersihkan sisa ketikan bulatan PIN sebelumnya
-        if (typeof this.clearPin === 'function') {
-            this.clearPin();
-        } else {
-            this.pinBuffer = '';
-            document.querySelectorAll('.pin-dot').forEach(dot => dot.classList.remove('active'));
-        }
-
-        this.showToast("Berhasil keluar. Silakan masukkan PIN kembali.", "info");
+        // 3. 🚀 REFRESH HALAMAN SECARA PAKSA
+        // Kita beri jeda 1 detik (1000ms) agar pesan Toast sempat terbaca oleh kasir
+        setTimeout(() => {
+            // Perintah ini akan memuat ulang seluruh file HTML, CSS, dan Javascript dari server/cache terbaru
+            window.location.reload(true); 
+        }, 1000);
     },
 
    // ==========================================
@@ -5705,18 +5687,18 @@ refreshData: function() {
     renderProducts: function() {
         const list = document.getElementById('product-list'); if (!list) return;
         
-        // Desain Skeleton Modern (Shimmer Effect) saat memuat data
+        // 🌟 Desain Skeleton Ai-Snack (Shimmer Kuning Pudar) saat memuat data
         if (this.isLoadingData) { 
             list.innerHTML = Array(8).fill(0).map(() => `
-                <div class="bg-white border border-slate-100 rounded-3xl p-3 shadow-2xs flex flex-col h-[200px] sm:h-[220px] md:h-[250px] animate-pulse">
-                    <div class="bg-slate-100 h-[55%] rounded-2xl mb-3 w-full"></div>
+                <div class="bg-white border-2 border-slate-100 rounded-[1.75rem] p-3 shadow-sm flex flex-col h-[200px] sm:h-[220px] md:h-[250px] animate-pulse">
+                    <div class="bg-[#FFF5D1]/80 h-[55%] rounded-2xl mb-3 w-full"></div>
                     <div class="flex-1 flex flex-col justify-between p-1">
-                        <div class="space-y-1.5">
+                        <div class="space-y-2">
                             <div class="bg-slate-100 h-3.5 w-5/6 rounded-lg"></div>
                             <div class="bg-slate-100 h-3 w-1/2 rounded-lg"></div>
                         </div>
                         <div class="flex justify-between items-center pt-2">
-                            <div class="bg-slate-100 h-4 w-2/5 rounded-lg"></div>
+                            <div class="bg-[#FFF5D1] h-4 w-2/5 rounded-lg"></div>
                             <div class="bg-slate-100 h-7 w-7 rounded-full"></div>
                         </div>
                     </div>
@@ -5728,9 +5710,12 @@ refreshData: function() {
         let key = this._lastSearchKey || ''; 
         let itemsToRender = key ? this.filteredProducts.filter(p => String(p.nama || '').toLowerCase().includes(key.toLowerCase())) : this.filteredProducts;
         
-        // Render empty state jika produk tidak ditemukan
+        // ⚠️ Render empty state Ai-Snack jika produk tidak ditemukan
         if (itemsToRender.length === 0) {
-            list.innerHTML = `<div class="col-span-full py-16 text-center text-slate-400 font-bold text-sm bg-white/50 rounded-3xl border-2 border-dashed border-slate-200">Produk yang dicari tidak ditemukan</div>`;
+            list.innerHTML = `<div class="col-span-full py-16 text-center text-[#E5202B] font-black text-sm bg-[#FFF5D1]/50 rounded-[2rem] border-[3px] border-dashed border-[#FFD874] shadow-sm flex flex-col items-center justify-center gap-3">
+                <i class="fas fa-search-minus text-4xl text-[#FFB800] opacity-80"></i>
+                Produk Tidak Ditemukan
+            </div>`;
             return;
         }
 
@@ -5744,36 +5729,38 @@ refreshData: function() {
 
         let img = p.img 
             ? `<img src="${p.img}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x150/f8fafc/94a3b8?text=Err';" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">` 
-            : `<div class="w-full h-full flex items-center justify-center text-3xl text-slate-300 bg-slate-50"><i class="fas fa-utensils"></i></div>`;
+            : `<div class="w-full h-full flex items-center justify-center text-4xl text-[#FFD874]/50 bg-[#FFF5D1]/30"><i class="fas fa-box-open"></i></div>`;
         
         let isHabis = p.maxStok <= 0;
-        let cardInteractiveStyle = isHabis 
-            ? 'opacity-50 grayscale cursor-not-allowed border-transparent' 
-            : 'hover:-translate-y-1.5 hover:shadow-[0_12px_25px_-5px_rgba(0,0,0,0.08)] hover:border-brand-300 border-slate-100/80 active:scale-[0.98]';
         
-        // Lencana Stok Kapsul Kaca (Glass Badge)
+        // 🎨 Gaya interaksi Ai-Snack Bubbly
+        let cardInteractiveStyle = isHabis 
+            ? 'opacity-60 grayscale cursor-not-allowed border-slate-100' 
+            : 'hover:-translate-y-1.5 hover:shadow-[0_15px_30px_-5px_rgba(229,32,43,0.15)] hover:border-[#FFD874] border-slate-100 active:scale-[0.98]';
+        
+        // 🏷️ Lencana Stok (Merah untuk Habis, Kuning Emas untuk Mau Habis, Slate untuk Aman)
         let stokBadgeStyle = isHabis 
-            ? 'bg-rose-500 text-white shadow-rose-500/30' 
-            : (p.maxStok <= 5 ? 'bg-amber-500/90 text-white animate-pulse' : 'bg-slate-900/75 text-white backdrop-blur-md');
+            ? 'bg-[#E5202B] text-white shadow-[0_4px_10px_rgba(229,32,43,0.3)]' 
+            : (p.maxStok <= 5 ? 'bg-[#FFB800] text-white shadow-[0_4px_10px_rgba(255,184,0,0.3)] animate-pulse border border-[#D49800]' : 'bg-slate-900/80 text-white backdrop-blur-md');
         let stokText = isHabis ? 'HABIS' : `STOK: ${p.maxStok}`;
 
-        // Overlay Jumlah Pesanan Bergaya Kaca 3D
+        // 🥤 Overlay Kaca 3D Saat Dimasukkan ke Keranjang
         let overlayQty = qtyInCart > 0 
-            ? `<div class="absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] flex items-center justify-center z-20 transition-all duration-300 animate-[fadeIn_0.2s_ease-out]">
-                   <div class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-900/85 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl transform scale-100">
-                       <span class="text-xl md:text-2xl font-black text-white drop-shadow-md">${qtyInCart}</span>
+            ? `<div class="absolute inset-0 bg-[#E5202B]/10 backdrop-blur-[2px] flex items-center justify-center z-20 transition-all duration-300 animate-[fadeIn_0.2s_ease-out]">
+                   <div class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white border-2 border-[#E5202B] flex items-center justify-center shadow-[0_10px_20px_rgba(229,32,43,0.4)] transform scale-100">
+                       <span class="text-xl md:text-2xl font-black text-[#E5202B] drop-shadow-sm">${qtyInCart}</span>
                    </div>
                </div>` 
             : '';
 
         let namaProduk = p.nama || 'Nama Tidak Tersedia';
 
-        // 🚀 TINGGI KARTU DIKUNCI PRESISI (h-[200px] di HP, h-[250px] di PC)
+        // 🚀 TINGGI KARTU DIKUNCI PRESISI
         return `
         <div onclick="${!isHabis ? `superApp.addToCart('${p.sku}', '${p.nama}', ${p.harga}, ${p.maxStok}, '${p.sku_bahan || ''}', event)` : ''}" 
-            class="bg-white border-2 rounded-[1.25rem] md:rounded-[1.75rem] cursor-pointer shadow-2xs transition-all duration-300 flex flex-col relative group overflow-hidden select-none h-[200px] sm:h-[220px] md:h-[250px] ${cardInteractiveStyle}"> 
+            class="bg-white border-2 rounded-[1.5rem] md:rounded-[2rem] cursor-pointer shadow-sm transition-all duration-300 flex flex-col relative group overflow-hidden select-none h-[200px] sm:h-[220px] md:h-[250px] ${cardInteractiveStyle}"> 
             
-            <span class="absolute top-2.5 right-2.5 md:top-3 md:right-3 ${stokBadgeStyle} text-[9px] md:text-[10px] font-black px-2.5 py-1 rounded-full z-30 shadow-md tracking-wider leading-none">
+            <span class="absolute top-2.5 right-2.5 md:top-3 md:right-3 ${stokBadgeStyle} text-[9px] md:text-[10px] font-black px-2.5 py-1 rounded-lg z-30 tracking-wider leading-none">
                 ${stokText}
             </span>
             
@@ -5782,19 +5769,19 @@ refreshData: function() {
                 ${overlayQty}
             </div>
             
-            <div class="h-[45%] w-full flex flex-col justify-between p-3 md:p-3.5 bg-white">
+            <div class="h-[45%] w-full flex flex-col justify-between p-3 md:p-4 bg-white">
                 
-                <h3 class="font-extrabold text-xs md:text-sm text-slate-800 leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors">
+                <h3 class="font-black text-xs md:text-sm text-[#4A3B32] leading-snug line-clamp-2 group-hover:text-[#E5202B] transition-colors">
                     ${namaProduk}
                 </h3>
                 
                 <div class="flex items-center justify-between w-full mt-auto pt-1">
-                    <p class="text-brand-600 font-black text-xs md:text-sm xl:text-base tracking-tight truncate pr-1">
+                    <p class="text-[#E5202B] font-black text-xs md:text-sm xl:text-base tracking-tight truncate pr-1">
                         Rp ${Number(p.harga || 0).toLocaleString('id-ID')}
                     </p>
                     
-                    <div class="w-7 h-7 md:w-8 md:h-8 rounded-full ${qtyInCart > 0 ? 'bg-gradient-to-tr from-brand-500 to-orange-500 text-white shadow-md shadow-brand-500/30' : 'bg-slate-100 text-slate-600 group-hover:bg-brand-50 group-hover:text-brand-600'} flex items-center justify-center transition-all duration-300 shrink-0">
-                        <i class="fas ${qtyInCart > 0 ? 'fa-check' : 'fa-plus'} text-[10px] md:text-xs"></i>
+                    <div class="w-8 h-8 md:w-9 md:h-9 rounded-xl ${qtyInCart > 0 ? 'bg-gradient-to-tr from-[#E5202B] to-[#CC1A24] text-[#FFF5D1] shadow-[0_4px_10px_rgba(229,32,43,0.3)] border border-[#CC1A24]' : 'bg-[#FFF5D1]/50 text-[#FFB800] border border-[#FFD874]/50 group-hover:bg-[#FFF5D1] group-hover:text-[#E5202B]'} flex items-center justify-center transition-all duration-300 shrink-0">
+                        <i class="fas ${qtyInCart > 0 ? 'fa-check' : 'fa-plus'} text-[11px] md:text-xs drop-shadow-sm"></i>
                     </div>
                 </div>
                 
@@ -5857,19 +5844,20 @@ refreshData: function() {
         this.renderCart(); 
     },
     
-   renderCart: function() {
+  renderCart: function() {
         const cont = document.getElementById('cart-container'); 
         let total = 0, items = 0, html = ''; 
         if (!cont) return;
         
-        // 🚀 FITUR 1: Tombol Hapus Semua Minimalis (Muncul jika keranjang terisi)
+        // 🚀 FITUR 1: Tombol Hapus Semua (Ai-Snack Style)
         if (this.cart.length > 0) {
             html += `
-            <div class="flex justify-between items-center mb-3.5 px-1 shrink-0">
-                <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-1.5">
-                    <i class="fas fa-list-ul text-slate-300"></i> Daftar Pesanan
+            <div class="flex justify-between items-center mb-4 px-1 shrink-0">
+                <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-2">
+                    <div class="w-5 h-5 rounded-md bg-[#FFF5D1] text-[#FFB800] flex items-center justify-center shadow-sm"><i class="fas fa-list-ul text-[10px]"></i></div>
+                    Daftar Pesanan
                 </span>
-                <button onclick="superApp.clearCart()" class="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50/80 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-90 border border-rose-100/60">
+                <button onclick="superApp.clearCart()" class="text-[10px] font-black text-[#E5202B] hover:text-white bg-rose-50 hover:bg-[#E5202B] px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm active:scale-90 border border-rose-200 hover:border-[#E5202B]">
                     <i class="fas fa-trash-alt text-[11px]"></i> Hapus Semua
                 </button>
             </div>`;
@@ -5885,44 +5873,61 @@ refreshData: function() {
             this.cart.forEach(c => { if ((c.sku_bahan || c.sku) === refBahan) sisaBahanDiKeranjang += c.qty; });
             let stokTersisaVisual = i.maxStok - sisaBahanDiKeranjang;
 
-            // Efek visual jika stok limit/habis
+            // Efek visual jika stok limit/habis (Merah & Emas Ai-Snack)
             let stokLimitStyle = stokTersisaVisual <= 0 
-                ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse font-black' 
-                : (stokTersisaVisual <= 5 ? 'bg-amber-50 text-amber-600 border-amber-200 font-extrabold' : 'bg-slate-50 text-slate-400 border-slate-100 font-bold');
+                ? 'bg-[#E5202B] text-white border-[#CC1A24] animate-pulse font-black shadow-sm' 
+                : (stokTersisaVisual <= 5 ? 'bg-[#FFB800] text-white border-[#D49800] font-black shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100 font-bold');
 
             // 🚀 FITUR 2: Wrapper Kartu Pesanan dengan Swipe-to-Delete Modern
             html += `
-            <div class="relative overflow-hidden rounded-2xl mb-2.5 bg-rose-500 shadow-2xs group select-none transition-all">
+            <div class="relative overflow-hidden rounded-[1.25rem] mb-3 bg-[#E5202B] shadow-sm group select-none transition-all">
                 
-                <button onclick="superApp.changeQty(${idx}, -999)" class="absolute inset-y-0 right-0 w-20 flex flex-col items-center justify-center text-white text-[10px] font-black transition-colors hover:bg-rose-600 active:bg-rose-700 tracking-wider">
-                    <i class="fas fa-trash-alt mb-1 text-base drop-shadow-sm group-hover:scale-110 transition-transform"></i> HAPUS
+                <!-- Tombol Hapus Dibalik Kartu -->
+                <button onclick="superApp.changeQty(${idx}, -999)" class="absolute inset-y-0 right-0 w-20 flex flex-col items-center justify-center text-white text-[10px] font-black transition-colors hover:bg-[#CC1A24] active:bg-[#9e1019] tracking-wider">
+                    <i class="fas fa-trash-alt mb-1 text-lg drop-shadow-sm group-hover:scale-110 transition-transform"></i> HAPUS
                 </button>
 
-                <div class="flex bg-white border border-slate-100/80 p-3.5 rounded-2xl items-center gap-3 text-slate-800 transition-transform duration-300 transform relative z-10 w-full hover:border-slate-200"
+                <!-- Kartu Item Utama -->
+                <div class="flex bg-white border border-slate-100 p-3.5 rounded-[1.25rem] items-center gap-3 text-[#4A3B32] transition-transform duration-300 transform relative z-10 w-full hover:border-[#FFD874]/60"
                      ontouchstart="this.startX = event.touches[0].clientX; this.style.transition = 'none';"
                      ontouchmove="let diff = this.startX - event.touches[0].clientX; if(diff > 0 && diff < 100) { this.style.transform = 'translateX(-' + diff + 'px)'; }"
                      ontouchend="let diff = this.startX - event.changedTouches[0].clientX; this.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; if(diff > 45) { this.style.transform = 'translateX(-80px)'; } else { this.style.transform = 'translateX(0)'; }">
                     
                     <div class="flex-1 min-w-0 pr-1">
-                        <h4 class="font-extrabold text-xs md:text-sm truncate text-slate-800 mb-1 leading-snug">${i.nama}</h4>
+                        <h4 class="font-black text-xs md:text-sm truncate text-[#4A3B32] mb-1 leading-snug">${i.nama}</h4>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <p class="text-brand-600 font-black text-xs md:text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
+                            <p class="text-[#E5202B] font-black text-xs md:text-sm tracking-tight">Rp ${(i.price * i.qty).toLocaleString('id-ID')}</p>
                             <span class="text-[9px] border px-1.5 py-0.5 rounded-md ${stokLimitStyle}">Sisa: ${stokTersisaVisual}</span>
                         </div>
                     </div>
 
-                    <div class="flex bg-slate-100/80 rounded-xl border border-slate-200/60 p-1 shrink-0 items-center shadow-inner">
-                        <button onclick="superApp.changeQty(${idx}, -1)" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center font-black text-slate-500 hover:text-rose-600 hover:bg-white rounded-lg transition-all shadow-2xs active:scale-90"><i class="fas fa-minus text-[10px]"></i></button>
-                        <span class="w-7 md:w-8 flex items-center justify-center text-xs md:text-sm font-black text-slate-800 tracking-tight">${i.qty}</span>
-                        <button onclick="superApp.changeQty(${idx}, 1)" class="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center font-black text-slate-500 hover:text-emerald-600 hover:bg-white rounded-lg transition-all shadow-2xs active:scale-90"><i class="fas fa-plus text-[10px]"></i></button>
+                    <!-- Kontrol Kuantitas (Playful Pill) -->
+                    <div class="flex bg-[#FFF5D1]/30 rounded-xl border border-[#FFD874]/40 p-1 shrink-0 items-center shadow-sm">
+                        <button onclick="superApp.changeQty(${idx}, -1)" class="w-8 h-8 flex items-center justify-center font-black text-slate-400 hover:text-[#E5202B] hover:bg-white rounded-lg transition-all shadow-sm active:scale-90 border border-transparent hover:border-rose-100">
+                            <i class="fas fa-minus text-[11px]"></i>
+                        </button>
+                        <span class="w-8 flex items-center justify-center text-xs md:text-sm font-black text-[#4A3B32] tracking-tight">${i.qty}</span>
+                        <button onclick="superApp.changeQty(${idx}, 1)" class="w-8 h-8 flex items-center justify-center font-black text-white bg-[#FFB800] hover:bg-[#F0A800] rounded-lg transition-all shadow-sm active:scale-90 border border-[#D49800]">
+                            <i class="fas fa-plus text-[11px]"></i>
+                        </button>
                     </div>
 
                 </div>
             </div>`;
         });
         
+        // 🚀 FITUR 3: Empty State Playful khas Ai-Snack (Bypass default getEmptyState)
+        let emptyStateHtml = `
+        <div class="flex flex-col items-center justify-center py-16 px-4 text-center h-full opacity-80">
+            <div class="w-24 h-24 bg-[#FFF5D1] rounded-[2rem] flex items-center justify-center text-[#FFB800] text-5xl mb-5 shadow-inner border-2 border-white transform rotate-3">
+                <i class="fas fa-shopping-basket drop-shadow-sm"></i>
+            </div>
+            <h4 class="font-black text-[#4A3B32] text-lg mb-1.5 tracking-tight">Keranjang Kosong</h4>
+            <p class="text-xs font-bold text-slate-400">Yuk, sentuh produk di samping<br>untuk mulai memesan!</p>
+        </div>`;
+
         // Render isi keranjang atau Empty State modern
-        cont.innerHTML = this.cart.length ? html : this.getEmptyState('fa-shopping-basket', 'Keranjang Kosong', 'Yuk, sentuh produk di samping untuk memesan!');
+        cont.innerHTML = this.cart.length ? html : emptyStateHtml;
         
         // Update Total Tagihan & Badge Item
         const totalEl = document.getElementById('total-price'); 
@@ -5947,6 +5952,7 @@ refreshData: function() {
 
         this.syncStorage(); 
     },
+    
     // 🚀 FUNGSI BARU: Kosongkan seluruh isi keranjang
     clearCart: function() {
         if (this.cart.length === 0) return;
@@ -11410,3 +11416,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
