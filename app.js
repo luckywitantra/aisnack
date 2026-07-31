@@ -715,12 +715,13 @@ const superApp = {
    // =========================================================================
     // 🧠 1. ENGINE PENGGABUNG DATA (SUPER KEBAL - ANTI HILANG KETIKA TARIK DATA)
     // =========================================================================
-    mergeDatabase: function(oldDb, newDb) {
+   mergeDatabase: function(oldDb, newDb) {
         // Jika memori lokal HP masih kosong, langsung gunakan data baru
         if (!oldDb || !oldDb.masterProduk) return newDb;
         if (!newDb) return oldDb;
 
         console.log("🛡️ [Smart Merge] Memulai penggabungan data...");
+        console.log(`📊 Sebelum digabung -> Laporan Harian: ${(oldDb.laporanHarian || []).length} baris | Transaksi: ${(oldDb.transactions || []).length} baris`);
 
         let merged = { ...oldDb };
 
@@ -736,43 +737,46 @@ const superApp = {
         const mergeHistoryArray = (oldArr = [], newArr = [], primaryKey, secondaryKey) => {
             let map = new Map();
             
-            // 1. Masukkan data lawas ke dalam Map
-            oldArr.forEach((item) => {
-                // ID Super Kuat: Jika tidak ada ID bawaan, buat ID dari kombinasi data penting
-                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || Math.random()}`;
+            // 1. Masukkan data lawas (Arsip 90 hari / Tahunan) ke dalam Map
+            oldArr.forEach((item, idx) => {
+                // 🚀 PERBAIKAN: Hilangkan kata "old_" agar jika tak ada ID, dia bisa mengenali data yang sama dengan data baru
+                let fallbackId = `${item.Tanggal || ''}_${item.Waktu || ''}_${item.Outlet || idx}`;
                 let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
-                
                 map.set(String(id).trim(), item);
             });
 
-            // 2. Masukkan data baru (Menimpa data lawas secara cerdas jika ID/Fallback sama)
-            newArr.forEach((item) => {
-                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || Math.random()}`;
+            // 2. Masukkan data baru (Tarikan 14/31 Hari Terakhir).
+            // Jika ID sama, data baru otomatis MENIMPA data lawas.
+            newArr.forEach((item, idx) => {
+                // 🚀 PERBAIKAN: Hilangkan kata "new_"
+                let fallbackId = `${item.Tanggal || ''}_${item.Waktu || ''}_${item.Outlet || idx}`;
                 let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
-                
                 map.set(String(id).trim(), item);
             });
 
-            // 3. Kembalikan ke Array (TIDAK BOLEH di-sort paksa disini agar tidak crash karena format DD-MM-YYYY)
-            return Array.from(map.values());
+            // 3. 🚀 PERBAIKAN: Sortir ulang agar urutan waktunya rapi setelah digabung
+            return Array.from(map.values()).sort((a, b) => {
+                let dateA = new Date((a.Tanggal || '') + (a.Waktu ? 'T'+a.Waktu : ''));
+                let dateB = new Date((b.Tanggal || '') + (b.Waktu ? 'T'+b.Waktu : ''));
+                return dateA - dateB;
+            });
         };
 
-        // --- C. TERAPKAN KE SELURUH TABEL RIWAYAT ---
+        // --- C. TERAPKAN KE SELURUH TABEL RIWAYAT TRANSAKSI ---
         merged.laporanHarian = mergeHistoryArray(oldDb.laporanHarian, newDb.laporanHarian, 'ID_Laporan', 'id_laporan');
         merged.transactions = mergeHistoryArray(oldDb.transactions, newDb.transactions, 'ID_TRX', 'id_trx');
         merged.shifts = mergeHistoryArray(oldDb.shifts, newDb.shifts, 'ID_Shift', 'id_shift');
         merged.kasKeluar = mergeHistoryArray(oldDb.kasKeluar, newDb.kasKeluar, 'ID_Kas_Keluar', 'id_kas_keluar');
         
-        // Keamanan Ganda untuk Tabel Opname (Mendukung nama "opname" maupun "riwayatOpname")
-        merged.opname = mergeHistoryArray(oldDb.opname || oldDb.riwayatOpname, newDb.opname || newDb.riwayatOpname, 'ID_Opname', 'id_opname');
-        merged.riwayatOpname = merged.opname; 
+        // 🚀 PERBAIKAN: Ubah 'riwayatOpname' menjadi 'opname' agar terbaca oleh fungsi renderReport
+        merged.opname = mergeHistoryArray(oldDb.opname, newDb.opname, 'ID_Opname', 'id_opname');
         
         merged.mutasi = mergeHistoryArray(oldDb.mutasi, newDb.mutasi, 'ID_Mutasi', 'id_mutasi');
 
         console.log(`✅ [Smart Merge] Sukses! Setelah digabung -> Laporan Harian: ${merged.laporanHarian.length} baris | Transaksi: ${merged.transactions.length} baris`);
         return merged;
     },
-
+    
     // =========================================================================
     // 🚀 2. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI & MENGGUNAKAN MERGE)
     // =========================================================================
