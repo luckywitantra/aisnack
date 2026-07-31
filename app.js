@@ -733,26 +733,33 @@ const superApp = {
         merged.users = newDb.users || oldDb.users;
         merged.pengaturan = newDb.pengaturan || oldDb.pengaturan;
 
-        // --- B. HELPER PENGGABUNG ARRAY RIWAYAT (KEBAL ID BERBEDA & TANPA ID) ---
+        // --- B. HELPER PENGGABUNG ARRAY RIWAYAT (KEBAL ID BERBEDA & ANTI DUPLIKASI) ---
         const mergeHistoryArray = (oldArr = [], newArr = [], primaryKey, secondaryKey) => {
             let map = new Map();
             
             // 1. Masukkan data lawas (Arsip 90 hari / Tahunan) ke dalam Map
             oldArr.forEach((item, idx) => {
-                // Cari ID dari berbagai kemungkinan penulisan, jika tidak ada gunakan gabungan Tanggal+Outlet
-                let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || `old_${idx}_${item.Tanggal || ''}_${item.Outlet || ''}`;
+                // 🚀 PERBAIKAN: Hilangkan kata "old_" agar jika tak ada ID, dia bisa mengenali data yang sama dengan data baru
+                let fallbackId = `${item.Tanggal || ''}_${item.Waktu || ''}_${item.Outlet || idx}`;
+                let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
                 map.set(String(id).trim(), item);
             });
 
             // 2. Masukkan data baru (Tarikan 14/31 Hari Terakhir).
-            // Jika ID sama, data baru otomatis MENIMPA data lawas (untuk update status persetujuan / revisi).
-            // Jika ID tidak ada di data lawas, data baru akan DITAMBAHKAN ke dalam daftar.
+            // Jika ID sama, data baru otomatis MENIMPA data lawas.
             newArr.forEach((item, idx) => {
-                let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || `new_${idx}_${item.Tanggal || ''}_${item.Outlet || ''}`;
+                // 🚀 PERBAIKAN: Hilangkan kata "new_"
+                let fallbackId = `${item.Tanggal || ''}_${item.Waktu || ''}_${item.Outlet || idx}`;
+                let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
                 map.set(String(id).trim(), item);
             });
 
-            return Array.from(map.values());
+            // 3. 🚀 PERBAIKAN: Sortir ulang agar urutan waktunya rapi setelah digabung
+            return Array.from(map.values()).sort((a, b) => {
+                let dateA = new Date((a.Tanggal || '') + (a.Waktu ? 'T'+a.Waktu : ''));
+                let dateB = new Date((b.Tanggal || '') + (b.Waktu ? 'T'+b.Waktu : ''));
+                return dateA - dateB;
+            });
         };
 
         // --- C. TERAPKAN KE SELURUH TABEL RIWAYAT TRANSAKSI ---
@@ -760,7 +767,10 @@ const superApp = {
         merged.transactions = mergeHistoryArray(oldDb.transactions, newDb.transactions, 'ID_TRX', 'id_trx');
         merged.shifts = mergeHistoryArray(oldDb.shifts, newDb.shifts, 'ID_Shift', 'id_shift');
         merged.kasKeluar = mergeHistoryArray(oldDb.kasKeluar, newDb.kasKeluar, 'ID_Kas_Keluar', 'id_kas_keluar');
-        merged.riwayatOpname = mergeHistoryArray(oldDb.riwayatOpname, newDb.riwayatOpname, 'ID_Opname', 'id_opname');
+        
+        // 🚀 PERBAIKAN: Ubah 'riwayatOpname' menjadi 'opname' agar terbaca oleh fungsi renderReport
+        merged.opname = mergeHistoryArray(oldDb.opname, newDb.opname, 'ID_Opname', 'id_opname');
+        
         merged.mutasi = mergeHistoryArray(oldDb.mutasi, newDb.mutasi, 'ID_Mutasi', 'id_mutasi');
 
         console.log(`✅ [Smart Merge] Sukses! Setelah digabung -> Laporan Harian: ${merged.laporanHarian.length} baris | Transaksi: ${merged.transactions.length} baris`);
