@@ -3008,8 +3008,9 @@ const superApp = {
             let cash = Number(item.Cash || 0);
             let qris = Number(item.QRIS || 0);
             
-            // 🛡️ PROTEKSI PENANGKAP: Tangkap Status_Approval dari berbagai variasi penulisan header
             let status = item.Status_Approval || item.status_approval || item['Status Approval'] || 'Disetujui';
+            
+            // 🛡️ CEK OTORITAS OWNER / SPV
             let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
 
             let badgeStatus = '';
@@ -3019,11 +3020,9 @@ const superApp = {
                 badgeStatus = `<span class="mt-1 inline-block bg-rose-100 text-rose-600 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] font-black"><i class="fas fa-xmark mr-1"></i>Revisi Ditolak</span>`;
             }
 
-            // 🛡️ PROTEKSI PENANGKAP REVISI_JSON (Anti-Gagal Tangkap)
             let infoRevisi = '';
             if (status === 'Pending Edit') {
                 try {
-                    // Cari isi revisi baik dari nama kolom Revisi_JSON maupun revisi_json
                     let revObj = item.Revisi_JSON || item.revisi_json || item['Revisi JSON'] || '{}';
                     let rev = typeof revObj === 'string' ? JSON.parse(revObj) : revObj;
                     
@@ -3060,6 +3059,21 @@ const superApp = {
                 </div>
             ` : '';
 
+            // ==========================================================
+            // 🗑️ TOMBOL DELETE KHUSUS OWNER (Hanya dirender jika isOwner === true)
+            // ==========================================================
+            let btnDeleteDesk = isOwner ? `
+                <button type="button" onclick="superApp.deleteDataGaib('Laporan_Harian', '${item.ID_Laporan}')" class="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white p-1.5 rounded-lg text-xs transition" title="Hapus Permanen">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            ` : '';
+
+            let btnDeleteMob = isOwner ? `
+                <button type="button" onclick="superApp.deleteDataGaib('Laporan_Harian', '${item.ID_Laporan}')" class="w-10 bg-rose-50 text-rose-600 rounded-xl text-xs font-black flex items-center justify-center active:scale-95 transition border border-rose-100 shadow-inner">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            ` : '';
+
             deskHtml += `
             <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition text-xs font-bold text-slate-700">
                 <td class="py-3 px-3">
@@ -3074,6 +3088,7 @@ const superApp = {
                 <td class="py-3 px-3 text-center align-top">
                     <div class="flex items-center justify-center gap-1">
                         <button type="button" onclick="superApp.editLaporanHarian('${item.ID_Laporan}')" class="bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white p-1.5 rounded-lg text-xs transition" title="Edit"><i class="fas fa-pen"></i></button>
+                        ${btnDeleteDesk} <!-- Tampil disini jika Owner -->
                         <button type="button" onclick="superApp.resendLaporanHarianWa('${item.ID_Laporan}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-black shadow-2xs flex items-center gap-1 transition"><i class="fab fa-whatsapp"></i> WA</button>
                     </div>
                     ${tombolOwnerDesk}
@@ -3098,7 +3113,8 @@ const superApp = {
                 </div>
                 <div class="flex gap-1.5 pt-0.5">
                     <button type="button" onclick="superApp.editLaporanHarian('${item.ID_Laporan}')" class="w-10 bg-amber-50 text-amber-600 rounded-xl text-xs font-black flex items-center justify-center active:scale-95"><i class="fas fa-pen"></i></button>
-                    <button type="button" onclick="superApp.resendLaporanHarianWa('${item.ID_Laporan}')" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-black shadow-2xs flex items-center justify-center gap-1 active:scale-95"><i class="fab fa-whatsapp"></i> Forward ke WA Grup</button>
+                    ${btnDeleteMob} <!-- Tampil disini jika Owner -->
+                    <button type="button" onclick="superApp.resendLaporanHarianWa('${item.ID_Laporan}')" class="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-xs font-black shadow-2xs flex items-center justify-center gap-1 active:scale-95"><i class="fab fa-whatsapp"></i> WA Grup</button>
                 </div>
                 ${tombolOwnerMob}
             </div>`;
@@ -3107,6 +3123,67 @@ const superApp = {
         if (tbody) tbody.innerHTML = deskHtml || `<tr><td colspan="5" class="py-10 text-center text-slate-400 font-bold text-xs">Belum ada riwayat laporan pada rentang tanggal ini</td></tr>`;
         if (mobCont) mobCont.innerHTML = mobHtml || `<div class="p-6 text-center text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Belum ada riwayat laporan pada rentang tanggal ini</div>`;
         if (document.getElementById('laporan-harian-count')) document.getElementById('laporan-harian-count').innerText = `${count} Laporan`;
+    },
+
+    deleteDataGaib: async function(sheetName, id) {
+        // 1. Konfirmasi Keamanan (Hanya Owner/SPV yang bisa melihat tombolnya, tapi kita beri peringatan ganda)
+        if (!confirm("⚠️ PERINGATAN!\n\nApakah Anda yakin ingin menghapus data ini secara permanen? Data yang sudah dihapus tidak dapat dikembalikan.")) {
+            return;
+        }
+
+        // 2. Kunci State
+        if (this.isProcessing) return;
+        this.setLoading(true, "Menghapus data permanen...");
+
+        // 3. Siapkan Payload untuk Backend (Kode.gs)
+        const payload = {
+            action: 'delete',
+            sheetName: sheetName,
+            id: id,
+            _req_id: 'REQ-DEL-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) // Kunci Anti-Ganda
+        };
+
+        try {
+            let res = await this.apiPost(payload);
+
+            if (res.status === 'sukses') {
+                // 4. HAPUS DARI MEMORI LOKAL (CACHE) AGAR UI LANGSUNG UPDATE TANPA LOADING
+                if (sheetName === 'Laporan_Harian' && this.db.laporanHarian) {
+                    this.db.laporanHarian = this.db.laporanHarian.filter(x => String(x.ID_Laporan).trim() !== String(id).trim());
+                    // Segarkan tampilan tabel riwayat laporan
+                    if (typeof this.renderLaporanHarianHistory === 'function') this.renderLaporanHarianHistory();
+                    
+                } else if (sheetName === 'Transaksi_Header' && this.db.transactions) {
+                    this.db.transactions = this.db.transactions.filter(x => String(x.ID_TRX).trim() !== String(id).trim());
+                    // Segarkan tampilan riwayat POS jika ada
+                    if (typeof this.renderRiwayatTransaksi === 'function') this.renderRiwayatTransaksi();
+                    
+                } else if (sheetName === 'Log_Kas_Keluar' && this.db.kasKeluar) {
+                    this.db.kasKeluar = this.db.kasKeluar.filter(x => String(x.ID_Kas).trim() !== String(id).trim());
+                    if (typeof this.renderKasKeluarHistory === 'function') this.renderKasKeluarHistory();
+                    
+                } else if (sheetName === 'Log_Opname' && this.db.opname) {
+                    this.db.opname = this.db.opname.filter(x => String(x.ID_Opname).trim() !== String(id).trim());
+                    if (typeof this.renderAuditHistory === 'function') this.renderAuditHistory();
+                    
+                } else if (sheetName === 'Log_Mutasi_Stok' && this.db.mutasi) {
+                    this.db.mutasi = this.db.mutasi.filter(x => String(x.ID_Mutasi).trim() !== String(id).trim());
+                    if (typeof this.renderAuditHistory === 'function') this.renderAuditHistory();
+                }
+
+                // 5. Simpan perubahan penghapusan ke localStorage
+                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+
+                this.showToast("Data berhasil dihapus selamanya!", "success");
+            } else {
+                this.showToast("Gagal menghapus data: " + res.pesan, "error");
+            }
+        } catch (e) {
+            console.error("Delete Error:", e);
+            this.showToast("Terjadi kesalahan jaringan saat menghapus.", "error");
+        } finally {
+            this.setLoading(false);
+        }
     },
 
     // =========================================================
