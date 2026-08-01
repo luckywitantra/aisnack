@@ -3228,7 +3228,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=651"></script>
+  <script src="app.js?v=653"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
@@ -3337,8 +3337,10 @@
 <!-- 🔍 MODAL DEEP-DIVE OPNAME FISIK (AI-SNACK PLAYFUL BRANDING)               -->
 <!-- ========================================================================= -->
 <div id="modal-detail-opname" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fade-in opacity-0 transition-opacity duration-300">
-    <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(229,32,43,0.15)] border border-white w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] transform scale-95 transition-transform duration-400">
+    <!-- PERBAIKAN: Menghapus flex flex-col pada container utama jika menyebabkan ruang melar yang tidak perlu -->
+    <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(229,32,43,0.15)] border border-white w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-400">
         
+        <!-- HEADER (Tetap) -->
         <div class="bg-gradient-to-br from-[#E5202B] to-[#CC1A24] p-6 relative shrink-0 overflow-hidden">
             <!-- Glow Latar Belakang -->
             <div class="absolute -right-10 -top-10 w-32 h-32 bg-white/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -3357,12 +3359,13 @@
             </div>
         </div>
         
-        <div class="p-5 md:p-6 overflow-y-auto custom-scroll flex-1 bg-[#FFF5D1]/20">
+        <!-- BODY (PERBAIKAN KUNCI: Menambahkan pembatas tinggi relatif agar scroll jalan, namun tidak mendorong modal jadi raksasa) -->
+        <div class="p-5 md:p-6 overflow-y-auto custom-scroll shrink relative bg-[#FFF5D1]/20">
             <div class="space-y-3" id="opname-item-list"></div>
         </div>
         
-        <!-- Wadah Tombol Otorisasi (Otomatis Muncul Jika Pending) -->
-        <div id="opname-modal-footer" class="p-5 bg-white border-t border-slate-100 hidden shrink-0 rounded-b-[2.5rem]"></div>
+        <!-- FOOTER (Wadah Tombol Otorisasi) -->
+        <div id="opname-modal-footer" class="p-5 bg-white border-t border-slate-100 hidden shrink-0 relative z-20"></div>
     </div>
 </div>
 
@@ -3370,7 +3373,8 @@
 <!-- 📦 MODAL DEEP-DIVE BARANG MASUK (AI-SNACK PLAYFUL BRANDING)               -->
 <!-- ========================================================================= -->
 <div id="modal-detail-restok" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fade-in opacity-0 transition-opacity duration-300">
-    <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(255,184,0,0.15)] border border-white w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] transform scale-95 transition-transform duration-400">
+    <!-- PERBAIKAN: Menghapus flex flex-col agar modal tidak melar dan memakan ruang kosong -->
+    <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(255,184,0,0.15)] border border-white w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-400">
         
         <div class="bg-gradient-to-br from-[#FFB800] to-orange-500 p-6 relative shrink-0 overflow-hidden">
             <!-- Glow Latar Belakang -->
@@ -3390,7 +3394,8 @@
             </div>
         </div>
         
-        <div class="p-5 md:p-6 overflow-y-auto custom-scroll flex-1 bg-slate-50">
+        <!-- PERBAIKAN KUNCI: Ubah flex-1 menjadi shrink relative agar tingginya pas dengan konten -->
+        <div class="p-5 md:p-6 overflow-y-auto custom-scroll shrink relative bg-slate-50">
             <table class="w-full text-left whitespace-nowrap text-xs bg-white rounded-[1.25rem] overflow-hidden shadow-sm border border-slate-100">
                 <thead class="bg-slate-50/90 backdrop-blur-sm text-slate-400 font-black uppercase tracking-widest text-[9px] border-b border-slate-100">
                     <tr>
@@ -3405,7 +3410,7 @@
         </div>
         
         <!-- Wadah Tombol Otorisasi (Otomatis Muncul Jika Pending) -->
-        <div id="restok-modal-footer" class="p-5 bg-white border-t border-slate-100 hidden shrink-0 rounded-b-[2.5rem]"></div>
+        <div id="restok-modal-footer" class="p-5 bg-white border-t border-slate-100 hidden shrink-0 relative z-20"></div>
     </div>
 </div>
 
