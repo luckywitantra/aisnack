@@ -2694,10 +2694,10 @@ const superApp = {
             expText = expValid.map(x => `▪️ ${x.nama}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('\n');
         }
 
-        let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-Snack*`;
+        let labelJudul = (statusApp === 'Pending Edit') ? `*[ PENGAJUAN REVISI LAPORAN ]*` : `*Laporan Harian Ai-CHA*`;
         
         let waTextFinal = `${labelJudul}\n`;
-        waTextFinal += `Update Sales Report Outlet: *Ai-Snack ${cleanCurrOutlet}*\n`;
+        waTextFinal += `Update Sales Report Outlet: *Ai-CHA ${cleanCurrOutlet}*\n`;
         waTextFinal += `Tanggal: ${tglTeks}\n`;
         waTextFinal += `Cuaca: ${cuaca}\n\n`;
         waTextFinal += `Net Sales: *Rp ${netSales.toLocaleString('id-ID')}*\n`;
