@@ -316,13 +316,18 @@ const superApp = {
     autoCheckUpdateOnStart: async function() {
         console.log("📡 Memeriksa versi aplikasi terbaru di latar belakang...");
         try {
-            // Tarik data sangat ringan (history=1 hari saja) agar server merespons kilat (< 1 detik)
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=1", { 
                 method: 'GET',
                 cache: 'no-store'
             });
             
-            const data = await res.json();
+            // 🛡️ TAMENG ANTI-HTML CRASH (Menjaga console tetap bersih dari error JSON)
+            const rawText = await res.text();
+            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
+                throw new Error("Server Google sibuk (HTML Error).");
+            }
+            
+            const data = JSON.parse(rawText);
             
             if (data && data.status === 'sukses') {
                 let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
@@ -338,7 +343,7 @@ const superApp = {
                         // 1. Kunci versi baru di memori
                         localStorage.setItem('app_version', serverVersion.Nilai);
                         
-                        // 2. Notifikasi (opsional, jika toast sudah ada)
+                        // 2. Notifikasi
                         if (typeof this.showToast === 'function') {
                             this.showToast("Pembaruan Sistem Ditemukan. Memuat ulang...", "success");
                         }
@@ -355,7 +360,7 @@ const superApp = {
                             for(let reg of regs) { await reg.unregister(); }
                         }
                         
-                        // 5. Muat ulang halaman secara paksa setelah setengah detik
+                        // 5. Muat ulang halaman secara paksa
                         setTimeout(() => {
                             window.location.reload(true);
                         }, 500);
@@ -373,7 +378,7 @@ const superApp = {
     // STARTUP & LOGIN (INIT)
     // =========================================================================
     init: async function() {
-      
+        
         // 🚀 JALANKAN RADAR UPDATE SILUMAN SEBELUM KASIR LOGIN
         this.autoCheckUpdateOnStart();
 
