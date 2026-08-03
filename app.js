@@ -373,6 +373,8 @@ const superApp = {
     // STARTUP & LOGIN (INIT)
     // =========================================================================
     init: async function() {
+        // Nyalakan fitur Swipe ke Bawah (Pull to Refresh)
+        this.initPullToRefresh();
         // 🚀 JALANKAN RADAR UPDATE SILUMAN SEBELUM KASIR LOGIN
         this.autoCheckUpdateOnStart();
 
@@ -446,7 +448,7 @@ const superApp = {
             }
 
             // =====================================================================
-            // 🚀 ENGINE PENARIK DATA STABIL 
+            // 🚀 ENGINE PENARIK DATA STABIL (ANTI-HTML CRASH & EXPONENTIAL BACKOFF)
             // =====================================================================
             let performFetch = async () => {
                 let data = null;
@@ -457,12 +459,26 @@ const superApp = {
                             redirect: 'follow',
                             cache: 'no-store'
                         }); 
-                        data = await res.json(); 
-                        if (data && data.status === 'sukses') break; 
+                        
+                        // 🛡️ PROTEKSI 1: Baca respon sebagai teks mentah terlebih dahulu
+                        const rawText = await res.text();
+                        
+                        // 🛡️ PROTEKSI 2: Cegat jika Google mengirim halaman error HTML
+                        if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
+                            throw new Error("Server Google sibuk (Membalas dengan HTML Error).");
+                        }
+                        
+                        // 🛡️ PROTEKSI 3: Ubah ke JSON dengan aman
+                        data = JSON.parse(rawText);
+                        
+                        if (data && data.status === 'sukses') break; // Sukses? Langsung keluar loop!
                     } catch (e) { 
                         console.warn(`Percobaan ke-${i+1} gagal:`, e.message);
-                        if (logStat && !this.db) logStat.innerText = `Mencoba ulang koneksi (${i+1}/3)...`; 
-                        await new Promise(r => setTimeout(r, 2000)); 
+                        if (logStat && !this.db) logStat.innerText = `Menunggu server Google (${i+1}/3)...`; 
+                        
+                        // ⏱️ EXPONENTIAL BACKOFF: Jeda tunggu diperlama agar Google tidak memblokir (2s -> 4s -> 6s)
+                        let waitTime = (i === 0) ? 2000 : (i === 1) ? 4000 : 6000;
+                        await new Promise(r => setTimeout(r, waitTime)); 
                     }
                 }
                 
@@ -490,15 +506,12 @@ const superApp = {
                     logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
-                // 🚀 FITUR BARU: Pembaruan antarmuka otomatis
                 if (this.currentUser) {
                     this.refreshData();
                     this.showToast("⚡ Database otomatis diperbarui dari server!", "success");
                 }
 
-                // =====================================================================
                 // 🚀 INJECT PENARIK DATA LATAR BELAKANG
-                // =====================================================================
                 setTimeout(() => {
                     if (typeof this.pullBackgroundData === 'function') {
                         console.log("⏰ Memicu penarikan data latar belakang (90 Hari)...");
@@ -712,7 +725,7 @@ const superApp = {
         this.isProcessing = false;
     },
     
-   pullFreshData: async function(silent = false) {
+  pullFreshData: async function(silent = false) {
         if (this.isProcessing && !silent) return; 
         
         if (!silent) this.setLoading(true, "Menyinkronkan Database Terkini...");
@@ -721,23 +734,29 @@ const superApp = {
         let data = null;
 
         try {
-            // 🚀 PERBAIKAN KRITIS: Menggunakan sistem 3x percobaan TANPA AbortController
             for (let i = 0; i < 3; i++) {
                 try {
-                    // DIET PAYLOAD: 31 hari
                     const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=31", { 
                         method: 'GET',
                         redirect: 'follow',
                         cache: 'no-store'
                     }); 
                     
-                    data = await res.json();
+                    // 🛡️ PROTEKSI ANTI-HTML CRASH
+                    const rawText = await res.text();
+                    if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
+                        throw new Error("Server Google sibuk (HTML 502 Error).");
+                    }
+                    data = JSON.parse(rawText);
+                    
                     if (data && data.status === 'sukses') break; 
                 } catch (e) {
                     console.warn(`[Tarik Data] Percobaan ke-${i+1}/3 gagal:`, e.message);
                     if (!silent && i < 2) {
-                        this.setLoading(true, `Mencoba ulang koneksi (${i+2}/3)...`);
-                        await new Promise(r => setTimeout(r, 1500));
+                        this.setLoading(true, `Menunggu server Google (${i+2}/3)...`);
+                        // ⏱️ EXPONENTIAL BACKOFF
+                        let waitTime = (i === 0) ? 2000 : 4000;
+                        await new Promise(r => setTimeout(r, waitTime));
                     }
                 }
             }
@@ -774,18 +793,14 @@ const superApp = {
                 }
             }
             
-            // =================================================================
             // 🚀 STRICT SMART MERGE 
-            // =================================================================
             if (typeof this.mergeDatabase === 'function') {
                 this.db = this.mergeDatabase(this.db, data);
             } else {
-                console.error("❌ Peringatan: Fungsi mergeDatabase tidak ditemukan! Data terpaksa ditimpa.");
                 this.db = data;
             }
             localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
-            // JEMBATAN PENGATURAN PERSONALISASI
             let configs = [
                 { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
                 { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
@@ -810,12 +825,108 @@ const superApp = {
         } catch (e) { 
             console.warn("Fetch Error pullFreshData:", e.message);
             if (!silent) {
-                this.showToast("Gagal menarik data. Cek koneksi internet Anda.", "error"); 
+                this.showToast("Gagal menarik data. Server sedang sibuk, coba lagi nanti.", "error"); 
             }
         } finally {
             this.isProcessing = false;
             if (!silent) this.setLoading(false);
         }
+    },
+
+   initPullToRefresh: function() {
+        const ptrEl = document.getElementById('pull-to-refresh-indicator');
+        const ptrIcon = document.getElementById('ptr-icon');
+        const ptrIconBox = document.getElementById('ptr-icon-box');
+        const ptrText = document.getElementById('ptr-text');
+        if (!ptrEl) return;
+
+        let startY = 0;
+        let startX = 0; // Tambahan: Untuk mendeteksi arah sumbu X
+        let currentY = 0;
+        let isPulling = false;
+        let isAxisLocked = false; // Tambahan: Kunci arah usapan
+        
+        // 🚀 PERBAIKAN 1: Threshold dinaikkan agar kasir harus benar-benar niat menariknya
+        const threshold = 150; 
+
+        const handleStart = (e) => {
+            if (window.scrollY === 0) {
+                startY = e.touches ? e.touches[0].screenY : e.screenY;
+                startX = e.touches ? e.touches[0].screenX : e.screenX;
+                isPulling = true;
+                isAxisLocked = false;
+                ptrEl.style.transition = 'none';
+            }
+        };
+
+        const handleMove = (e) => {
+            if (!isPulling) return;
+            
+            let currentX = e.touches ? e.touches[0].screenX : e.screenX;
+            currentY = e.touches ? e.touches[0].screenY : e.screenY;
+            
+            let pullDistance = currentY - startY;
+            let swipeHorizontal = Math.abs(currentX - startX);
+
+            // 🚀 PERBAIKAN 2: Jika tarikan menyamping lebih besar dari tarikan ke bawah, batalkan! (Mencegah salah tarik)
+            if (!isAxisLocked) {
+                if (swipeHorizontal > pullDistance) {
+                    isPulling = false;
+                    return;
+                }
+                isAxisLocked = true;
+            }
+
+            if (pullDistance > 0 && window.scrollY === 0) {
+                // Cegah browser melakukan scroll default (memantul bawaan HP)
+                if (e.cancelable) e.preventDefault(); 
+                
+                // 🚀 PERBAIKAN 3: Efek Karet (Friction). Tarikan terasa lebih berat (dikali 0.3)
+                let visualDistance = Math.min(pullDistance * 0.3, threshold - 20); 
+                ptrEl.style.transform = `translateY(${visualDistance}px)`;
+                
+                ptrIcon.style.transform = `rotate(${pullDistance}deg)`;
+                
+                if (pullDistance > threshold) {
+                    ptrIconBox.classList.replace('from-[#E5202B]', 'from-[#25D366]');
+                    ptrIconBox.classList.replace('to-[#FFB800]', 'to-[#128C7E]');
+                    ptrText.innerText = "Lepaskan untuk Refresh!";
+                    ptrText.classList.replace('text-[#4A3B32]', 'text-[#128C7E]');
+                } else {
+                    ptrIconBox.classList.replace('from-[#25D366]', 'from-[#E5202B]');
+                    ptrIconBox.classList.replace('to-[#128C7E]', 'to-[#FFB800]');
+                    ptrText.innerText = "Tarik Lebih Jauh...";
+                    ptrText.classList.replace('text-[#128C7E]', 'text-[#4A3B32]');
+                }
+            }
+        };
+
+        const handleEnd = () => {
+            if (!isPulling) return;
+            isPulling = false;
+            let pullDistance = currentY - startY;
+            
+            ptrEl.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            
+            if (pullDistance > threshold && window.scrollY === 0) {
+                ptrEl.style.transform = `translateY(40px)`; 
+                ptrIcon.classList.add('fa-spin');
+                ptrText.innerText = "Menyegarkan Sistem...";
+                
+                if (navigator.vibrate) navigator.vibrate(50);
+                
+                setTimeout(() => {
+                    window.location.reload(true);
+                }, 800);
+            } else {
+                ptrEl.style.transform = `translateY(-100%)`;
+            }
+        };
+
+        // Tambahkan opsi passive: false pada touchmove agar e.preventDefault() bisa bekerja mencegah scroll membal bawaan browser
+        document.addEventListener('touchstart', handleStart, { passive: true });
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
     },
 
     mergeDatabase: function(oldDb, newDb) {
