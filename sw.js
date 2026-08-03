@@ -1,5 +1,5 @@
 // 🛑 ATURAN EMAS 1: Setiap upload versi baru ke GitHub/Server, NAIKKAN ANGKA VERSI INI!
-const CACHE_NAME = 'aisnack-erp-v662'; // <-- Contoh dinaikkan ke 605
+const CACHE_NAME = 'aisnack-erp-v663'; // <-- Contoh dinaikkan ke 605
 
 const urlsToCache = [
   './index.html',
