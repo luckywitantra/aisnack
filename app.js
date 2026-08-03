@@ -832,7 +832,6 @@ const superApp = {
         }
     },
 
- 
 
     mergeDatabase: function(oldDb, newDb) {
         // Jika memori lokal HP masih kosong, langsung gunakan data baru
@@ -849,7 +848,7 @@ const superApp = {
         merged.outlets = newDb.outlets || oldDb.outlets;
         merged.hargaStokOutlet = newDb.hargaStokOutlet || oldDb.hargaStokOutlet;
         
-        // 🚀 TAMBAHAN KRITIS: PASTIKAN DATA BARANG MASUK JUGA DITIMPA (TIDAK SEMPAT TERSENTUH FUNGSI MERGE SEBELUMNYA)
+        // 🚀 TAMBAHAN KRITIS: PASTIKAN DATA BARANG MASUK JUGA DITIMPA 
         merged.barangMasuk = newDb.barangMasuk || newDb.mutasi || oldDb.barangMasuk || oldDb.mutasi || [];
         
         merged.users = newDb.users || oldDb.users;
@@ -861,7 +860,8 @@ const superApp = {
             
             // 1. Masukkan data lawas ke dalam Map
             oldArr.forEach((item) => {
-                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || Math.random()}`;
+                // 🛠️ PERBAIKAN 1: Hapus Math.random() agar ID fallback selalu konsisten (Deterministik)
+                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || '0'}`;
                 let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
                 
                 map.set(String(id).trim(), item);
@@ -869,7 +869,7 @@ const superApp = {
 
             // 2. Masukkan data baru (Menimpa data lawas secara cerdas)
             newArr.forEach((item) => {
-                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || Math.random()}`;
+                let fallbackId = `${item.Tanggal || item.Tanggal_Laporan || ''}_${item.Waktu || ''}_${item.Outlet || item.Cabang || ''}_${item.Total_Bayar || item.Nominal || item.Selisih || '0'}`;
                 let id = item[primaryKey] || item[secondaryKey] || item['ID'] || item['id'] || fallbackId;
                 
                 map.set(String(id).trim(), item);
@@ -885,9 +885,9 @@ const superApp = {
         merged.shifts = mergeHistoryArray(oldDb.shifts, newDb.shifts, 'ID_Shift', 'id_shift');
         merged.kasKeluar = mergeHistoryArray(oldDb.kasKeluar, newDb.kasKeluar, 'ID_Kas_Keluar', 'id_kas_keluar');
         
-        // 🚀 KEAMANAN GANDA UNTUK TABEL OPNAME (Mendukung kedua versi penamaan API Anda)
+        // 🚀 KEAMANAN GANDA UNTUK TABEL OPNAME
         merged.opname = mergeHistoryArray(oldDb.opname || oldDb.riwayatOpname, newDb.opname || newDb.riwayatOpname, 'ID_Opname', 'id_opname');
-        merged.riwayatOpname = merged.opname; // Supaya fungsi lama yang memanggil riwayatOpname tidak error
+        merged.riwayatOpname = merged.opname; 
         
         merged.mutasi = mergeHistoryArray(oldDb.mutasi, newDb.mutasi, 'ID_Mutasi', 'id_mutasi');
 
@@ -907,10 +907,15 @@ const superApp = {
                 cache: 'no-store'
             });
 
-            const data = await res.json();
+            // 🛠️ PERBAIKAN 2: TAMENG ANTI-HTML CRASH (Google 502 Error Protection)
+            const rawText = await res.text();
+            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
+                throw new Error("Server Google sibuk (HTML Error).");
+            }
+            
+            const data = JSON.parse(rawText);
             
             if (data && data.status === 'sukses') {
-                // 🚀 WAJIB MERGE: Agar jika kasir baru saja edit laporan, editannya tidak tertimpa data latar belakang
                 this.db = this.mergeDatabase(this.db, data);
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 
@@ -929,14 +934,12 @@ const superApp = {
         }
     },
 
-    
     // =========================================================================
     // 🚀 ENGINE KHUSUS ARSIP LAWAS (DENGAN POP-UP KONFIRMASI CANTIK)
     // =========================================================================
     pullDeepArchiveData: async function() {
         if (this.isProcessing) return;
         
-        // 🚀 PANGGIL POP-UP MODERN KITA DENGAN PROMISE (AWAIT)
         const confirmed = typeof this.customConfirm === 'function' ? await this.customConfirm({
             title: "Unduh Arsip Tahunan?",
             message: "Proses ini akan menarik <b class='text-amber-600 dark:text-amber-400'>seluruh riwayat transaksi & pembukuan</b> dari hari pertama toko buka.<br><br>⏳ Waktu unduh sekitar <b>15–30 detik</b> tergantung jumlah data tahunan Anda.",
@@ -957,16 +960,20 @@ const superApp = {
                 cache: 'no-store'
             });
 
-            const data = await res.json();
+            // 🛠️ PERBAIKAN 3: TAMENG ANTI-HTML CRASH UNTUK ARSIP TAHUNAN
+            const rawText = await res.text();
+            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
+                throw new Error("Server Google sibuk (HTML Error).");
+            }
+            
+            const data = JSON.parse(rawText);
             
             if (data && data.status === 'sukses') {
-                // Khusus arsip tahunan, kita timpa total karena ini adalah data 100% lengkap dari hari pertama
                 this.db = data;
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
                 
                 this.showToast("✅ Seluruh arsip data lawas berhasil dimuat!", "success");
                 
-                // 🚀 PERBAIKAN: Segarkan juga tabel riwayat Laporan Ai-Cha agar arsip tahunan langsung muncul!
                 if (typeof this.renderReport === 'function') this.renderReport();
                 if (typeof this.renderLaporanHarianHistory === 'function') this.renderLaporanHarianHistory();
                 if (typeof this.generateAIReport === 'function') this.generateAIReport();
@@ -11869,3 +11876,6 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
+
