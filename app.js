@@ -318,6 +318,7 @@ const superApp = {
         try {
             const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=1", { 
                 method: 'GET',
+                redirect: 'follow',
                 cache: 'no-store'
             });
             
