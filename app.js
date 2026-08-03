@@ -373,8 +373,7 @@ const superApp = {
     // STARTUP & LOGIN (INIT)
     // =========================================================================
     init: async function() {
-        // Nyalakan fitur Swipe ke Bawah (Pull to Refresh)
-        this.initPullToRefresh();
+      
         // 🚀 JALANKAN RADAR UPDATE SILUMAN SEBELUM KASIR LOGIN
         this.autoCheckUpdateOnStart();
 
@@ -833,126 +832,7 @@ const superApp = {
         }
     },
 
-  initPullToRefresh: function() {
-        const ptrEl = document.getElementById('pull-to-refresh-indicator');
-        const ptrIcon = document.getElementById('ptr-icon');
-        const ptrIconBox = document.getElementById('ptr-icon-box');
-        const ptrText = document.getElementById('ptr-text');
-        if (!ptrEl) return;
-
-        let startY = 0;
-        let startX = 0; 
-        let currentY = 0;
-        let isPulling = false;
-        let isAxisLocked = false; 
-        const threshold = 150; 
-
-        // 🛡️ FUNGSI PENDETEKSI AREA SCROLL
-        // Mengecek apakah elemen yang disentuh (atau induknya) adalah area yang bisa di-scroll
-        const isTouchOnScrollableArea = (element) => {
-            let current = element;
-            while (current && current !== document.body && current !== document.documentElement) {
-                // Cek apakah elemen tersebut memiliki kelas overflow-y-auto, overflow-auto, atau custom-scroll
-                const style = window.getComputedStyle(current);
-                if (
-                    style.overflowY === 'auto' || 
-                    style.overflowY === 'scroll' ||
-                    current.classList.contains('overflow-y-auto') ||
-                    current.classList.contains('custom-scroll')
-                ) {
-                    // Pastikan elemen tersebut BENAR-BENAR sedang memiliki scrollbar (kontennya lebih panjang dari wadahnya)
-                    if (current.scrollHeight > current.clientHeight) {
-                        // Jika posisinya TIDAK di paling mentok atas, berarti masih butuh scroll biasa, PTR diblokir
-                        if (current.scrollTop > 0) {
-                            return true;
-                        }
-                    }
-                }
-                current = current.parentNode;
-            }
-            return false;
-        };
-
-        const handleStart = (e) => {
-            // 🛡️ PROTEKSI: Cek apakah jari kasir menyentuh area yang bisa di-scroll
-            if (isTouchOnScrollableArea(e.target)) {
-                return; // Batalkan PTR! Biarkan jari dipakai untuk scroll menu
-            }
-
-            if (window.scrollY === 0) {
-                startY = e.touches ? e.touches[0].screenY : e.screenY;
-                startX = e.touches ? e.touches[0].screenX : e.screenX;
-                isPulling = true;
-                isAxisLocked = false;
-                ptrEl.style.transition = 'none';
-            }
-        };
-
-        const handleMove = (e) => {
-            if (!isPulling) return;
-            
-            let currentX = e.touches ? e.touches[0].screenX : e.screenX;
-            currentY = e.touches ? e.touches[0].screenY : e.screenY;
-            
-            let pullDistance = currentY - startY;
-            let swipeHorizontal = Math.abs(currentX - startX);
-
-            if (!isAxisLocked) {
-                if (swipeHorizontal > pullDistance) {
-                    isPulling = false;
-                    return;
-                }
-                isAxisLocked = true;
-            }
-
-            if (pullDistance > 0 && window.scrollY === 0) {
-                if (e.cancelable) e.preventDefault(); 
-                
-                let visualDistance = Math.min(pullDistance * 0.3, threshold - 20); 
-                ptrEl.style.transform = `translateY(${visualDistance}px)`;
-                
-                ptrIcon.style.transform = `rotate(${pullDistance}deg)`;
-                
-                if (pullDistance > threshold) {
-                    ptrIconBox.classList.replace('from-[#E5202B]', 'from-[#25D366]');
-                    ptrIconBox.classList.replace('to-[#FFB800]', 'to-[#128C7E]');
-                    ptrText.innerText = "Lepaskan untuk Refresh!";
-                    ptrText.classList.replace('text-[#4A3B32]', 'text-[#128C7E]');
-                } else {
-                    ptrIconBox.classList.replace('from-[#25D366]', 'from-[#E5202B]');
-                    ptrIconBox.classList.replace('to-[#128C7E]', 'to-[#FFB800]');
-                    ptrText.innerText = "Tarik Lebih Jauh...";
-                    ptrText.classList.replace('text-[#128C7E]', 'text-[#4A3B32]');
-                }
-            }
-        };
-
-        const handleEnd = () => {
-            if (!isPulling) return;
-            isPulling = false;
-            let pullDistance = currentY - startY;
-            
-            ptrEl.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            
-            if (pullDistance > threshold && window.scrollY === 0) {
-                ptrEl.style.transform = `translateY(40px)`; 
-                ptrIcon.classList.add('fa-spin');
-                ptrText.innerText = "Menyegarkan Sistem...";
-                
-                if (navigator.vibrate) navigator.vibrate(50);
-                
-                setTimeout(() => {
-                    window.location.reload(true);
-                }, 800);
-            } else {
-                ptrEl.style.transform = `translateY(-100%)`;
-            }
-        };
-
-        document.addEventListener('touchstart', handleStart, { passive: true });
-        document.addEventListener('touchmove', handleMove, { passive: false });
-        document.addEventListener('touchend', handleEnd);
-    },
+ 
 
     mergeDatabase: function(oldDb, newDb) {
         // Jika memori lokal HP masih kosong, langsung gunakan data baru
