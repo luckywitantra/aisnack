@@ -78,10 +78,22 @@
 </head>
 <body class="text-slate-800 h-[100dvh] flex overflow-hidden relative transition-colors duration-300 bg-slate-50">
 
+   <!-- ================= PULL TO REFRESH INDICATOR (PLAYFUL) ================= -->
+<div id="pull-to-refresh-indicator" class="fixed top-0 left-0 right-0 flex justify-center z-[99999] pointer-events-none transform -translate-y-full transition-transform duration-300">
+    <div class="bg-white/95 backdrop-blur-xl shadow-[0_15px_35px_rgba(229,32,43,0.15)] border-2 border-[#FFD874]/60 rounded-full px-5 py-2.5 flex items-center gap-3 mt-4">
+        <div id="ptr-icon-box" class="w-8 h-8 bg-gradient-to-br from-[#E5202B] to-[#FFB800] rounded-full flex items-center justify-center shadow-inner transition-colors duration-300">
+            <i id="ptr-icon" class="fas fa-rotate-right text-sm text-white transition-transform duration-300"></i>
+        </div>
+        <span id="ptr-text" class="text-[11px] font-black tracking-widest uppercase text-[#4A3B32]">Tarik ke Bawah...</span>
+    </div>
+</div>
+
   <div id="app-loader" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[99999] hidden flex-col items-center justify-center transition-all duration-300">
     <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_rgba(249,115,22,0.5)]"></div>
     <p id="loader-text" class="text-white font-bold tracking-widest uppercase text-sm drop-shadow-md">Memproses...</p>
   </div>
+
+ 
 
  <!-- ========================================================================= -->
 <!-- 🖥️ VIEW: CUSTOMER FACING DISPLAY / CFD (AI-SNACK PLAYFUL BRANDING)      -->
@@ -3234,7 +3246,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=654"></script>
+  <script src="app.js?v=658"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
