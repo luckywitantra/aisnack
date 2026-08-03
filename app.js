@@ -833,7 +833,7 @@ const superApp = {
         }
     },
 
-   initPullToRefresh: function() {
+  initPullToRefresh: function() {
         const ptrEl = document.getElementById('pull-to-refresh-indicator');
         const ptrIcon = document.getElementById('ptr-icon');
         const ptrIconBox = document.getElementById('ptr-icon-box');
@@ -841,15 +841,44 @@ const superApp = {
         if (!ptrEl) return;
 
         let startY = 0;
-        let startX = 0; // Tambahan: Untuk mendeteksi arah sumbu X
+        let startX = 0; 
         let currentY = 0;
         let isPulling = false;
-        let isAxisLocked = false; // Tambahan: Kunci arah usapan
-        
-        // 🚀 PERBAIKAN 1: Threshold dinaikkan agar kasir harus benar-benar niat menariknya
+        let isAxisLocked = false; 
         const threshold = 150; 
 
+        // 🛡️ FUNGSI PENDETEKSI AREA SCROLL
+        // Mengecek apakah elemen yang disentuh (atau induknya) adalah area yang bisa di-scroll
+        const isTouchOnScrollableArea = (element) => {
+            let current = element;
+            while (current && current !== document.body && current !== document.documentElement) {
+                // Cek apakah elemen tersebut memiliki kelas overflow-y-auto, overflow-auto, atau custom-scroll
+                const style = window.getComputedStyle(current);
+                if (
+                    style.overflowY === 'auto' || 
+                    style.overflowY === 'scroll' ||
+                    current.classList.contains('overflow-y-auto') ||
+                    current.classList.contains('custom-scroll')
+                ) {
+                    // Pastikan elemen tersebut BENAR-BENAR sedang memiliki scrollbar (kontennya lebih panjang dari wadahnya)
+                    if (current.scrollHeight > current.clientHeight) {
+                        // Jika posisinya TIDAK di paling mentok atas, berarti masih butuh scroll biasa, PTR diblokir
+                        if (current.scrollTop > 0) {
+                            return true;
+                        }
+                    }
+                }
+                current = current.parentNode;
+            }
+            return false;
+        };
+
         const handleStart = (e) => {
+            // 🛡️ PROTEKSI: Cek apakah jari kasir menyentuh area yang bisa di-scroll
+            if (isTouchOnScrollableArea(e.target)) {
+                return; // Batalkan PTR! Biarkan jari dipakai untuk scroll menu
+            }
+
             if (window.scrollY === 0) {
                 startY = e.touches ? e.touches[0].screenY : e.screenY;
                 startX = e.touches ? e.touches[0].screenX : e.screenX;
@@ -868,7 +897,6 @@ const superApp = {
             let pullDistance = currentY - startY;
             let swipeHorizontal = Math.abs(currentX - startX);
 
-            // 🚀 PERBAIKAN 2: Jika tarikan menyamping lebih besar dari tarikan ke bawah, batalkan! (Mencegah salah tarik)
             if (!isAxisLocked) {
                 if (swipeHorizontal > pullDistance) {
                     isPulling = false;
@@ -878,10 +906,8 @@ const superApp = {
             }
 
             if (pullDistance > 0 && window.scrollY === 0) {
-                // Cegah browser melakukan scroll default (memantul bawaan HP)
                 if (e.cancelable) e.preventDefault(); 
                 
-                // 🚀 PERBAIKAN 3: Efek Karet (Friction). Tarikan terasa lebih berat (dikali 0.3)
                 let visualDistance = Math.min(pullDistance * 0.3, threshold - 20); 
                 ptrEl.style.transform = `translateY(${visualDistance}px)`;
                 
@@ -923,7 +949,6 @@ const superApp = {
             }
         };
 
-        // Tambahkan opsi passive: false pada touchmove agar e.preventDefault() bisa bekerja mencegah scroll membal bawaan browser
         document.addEventListener('touchstart', handleStart, { passive: true });
         document.addEventListener('touchmove', handleMove, { passive: false });
         document.addEventListener('touchend', handleEnd);
