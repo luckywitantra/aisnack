@@ -9738,17 +9738,40 @@ openDetailStokOpname: function(sku) {
 
         // --- 4. EKSTRAKSI DATA DETAIL DARI TABEL LAYAR ---
         
-        // A. Ekstrak Rekap Jualan (Item)
+        // A. Ekstrak Rekap Jualan (Item) dan Urutkan Berdasarkan Pendapatan
         let rekapTbody = document.getElementById('report-rekap-tbody');
         let rekapText = '';
         if (rekapTbody && rekapTbody.rows.length > 0 && rekapTbody.rows[0].cells.length >= 3) {
+            let rekapItems = [];
+            
             for (let row of rekapTbody.rows) {
                 // Abaikan teks kosong "Belum Ada Penjualan" jika tabel masih kosong
                 if (row.cells[0].innerText.includes('Belum Ada Penjualan')) continue;
-                rekapText += `▪️ ${row.cells[0].innerText} = ${row.cells[1].innerText} (${row.cells[2].innerText})\n`;
+                
+                let nama = row.cells[0].innerText;
+                let qty = row.cells[1].innerText;
+                let omsetStr = row.cells[2].innerText;
+                
+                // Bersihkan string "Rp 150.000" menjadi angka 150000 agar bisa disorting matematika
+                let omsetNum = Number(String(omsetStr).replace(/[^0-9]/g, '')) || 0;
+                
+                rekapItems.push({ nama, qty, omsetStr, omsetNum });
             }
-            if(rekapText === '') rekapText = "▪️ Nihil / Tidak ada penjualan.\n";
-        } else { rekapText = "▪️ Nihil / Tidak ada penjualan.\n"; }
+            
+            if (rekapItems.length > 0) {
+                // Urutkan array dari omset tertinggi ke terendah (Descending)
+                rekapItems.sort((a, b) => b.omsetNum - a.omsetNum);
+                
+                // Rangkai kembali menjadi teks WhatsApp
+                rekapItems.forEach(item => {
+                    rekapText += `▪️ ${item.nama} = ${item.qty} (${item.omsetStr})\n`;
+                });
+            } else {
+                rekapText = "▪️ Nihil / Tidak ada penjualan.\n";
+            }
+        } else { 
+            rekapText = "▪️ Nihil / Tidak ada penjualan.\n"; 
+        }
 
         // B. Ekstrak Kas Keluar
         let kasTbody = document.getElementById('report-kas-tbody');
@@ -9761,10 +9784,8 @@ openDetailStokOpname: function(sku) {
             if(kasText === '') kasText = "▪️ Nihil / Tidak ada pengeluaran.\n";
         } else { kasText = "▪️ Nihil / Tidak ada pengeluaran.\n"; }
 
-        // BAGIAN AUDIT FISIK TELAH DIHAPUS
-
         // --- 5. SUSUN TEKS PESAN WHATSAPP ---
-        let text = `*📊 LAPORAN OPERASIONAL AI-SNACK*\n`;
+        let text = `*📊 Update Sales Report Ai-Snack*\n`;
         text += `📍 Cabang: *${outletName}*\n`;
         text += `📅 Periode: *${startDate} s/d ${endDate}*\n`;
         text += `👤 User: ${this.currentUser ? this.currentUser.Username : 'Sistem'}\n`;
@@ -9819,7 +9840,6 @@ openDetailStokOpname: function(sku) {
             const title = modalWa.querySelector('h3');
             const desc = modalWa.querySelector('p');
             if(title) title.innerText = "Laporan Siap!";
-            // Teks deskripsi di dalam modal juga sudah diubah agar tidak menyebut Audit lagi
             if(desc) desc.innerText = "Seluruh rincian jualan dan kas sudah dirangkum otomatis. Lanjutkan kirim ke Grup WhatsApp?";
         }
     },
@@ -10765,28 +10785,31 @@ executeVoidTrx: async function(trxId) {
     // =========================================================
     // 🚀 ENGINE: CFO DASHBOARD DEEP DIVE ANALYSIS (POPUP)
     // =========================================================
-  openAIDeepDive: function(type, param) {
+openAIDeepDive: function(type, param) {
         const fStartEl = document.getElementById('ai-filter-start');
         const fEndEl = document.getElementById('ai-filter-end');
         let dStart = fStartEl && fStartEl.value ? fStartEl.value : '';
         let dEnd = fEndEl && fEndEl.value ? fEndEl.value : '';
         
-        // Fallback Tanggal Super Aman
         let dateStart = dStart ? new Date(dStart + "T00:00:00") : new Date(0); 
         let dateEnd = dEnd ? new Date(dEnd + "T23:59:59") : new Date(8640000000000000); 
         let selOut = document.getElementById('ai-filter-outlet')?.value || 'Semua';
 
         let title = '';
-        let subtitle = dStart && dEnd ? `Periode: ${dStart} s/d ${dEnd}` : `Semua Periode Aktif`;
+        let subtitle = dStart && dEnd ? `${dStart} s/d ${dEnd}` : `Semua Periode`;
         let details = [];
+        
         let totalVal = 0;
         let totalPcs = 0;
-        
-        let productTotalQris = 0;
-        let productTotalCash = 0;
+        let totalQris = 0;
+        let totalCash = 0;
+        let globalOmsetPeriode = 0; 
+
         let sysStock = 0;
         let lastFisik = '-';
         let skuTarget = '';
+        
+        let sparkData = {}; 
 
         const isDataValid = (dateString, outletString) => {
             if (!dateString) return false;
@@ -10801,14 +10824,12 @@ executeVoidTrx: async function(trxId) {
             return true;
         };
 
-        // 🚀 PENJINAK WAKTU GLOBAL (Mencegah NaN pada Sorting Transaksi & Mutasi)
         const getTimeSafe = (timeStr, backupTimeStr = '00:00:00') => {
             if (!timeStr) return 0;
             let parts = String(timeStr).trim().split(' ');
             let dStr = parts[0];
             let tStr = parts[1] || backupTimeStr;
             
-            // Ubah titik ke titik dua untuk jam (09.50 -> 09:50)
             tStr = String(tStr).replace(/\./g, ':');
             let tParts = tStr.split(':');
             let hh = (tParts[0] || '00').padStart(2, '0');
@@ -10825,21 +10846,24 @@ executeVoidTrx: async function(trxId) {
             return new Date(timeStr).getTime() || 0;
         };
 
+        const filterCmd = `onclick="window.aiFilterList(this.innerText.trim()); event.stopPropagation();"`;
+        const outBadge = (outName) => `<span ${filterCmd} class="cursor-pointer hover:bg-slate-200 bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[8px] border border-slate-200 font-extrabold uppercase tracking-widest transition-colors"><i class="fas fa-store mr-0.5 opacity-70"></i>${outName}</span>`;
+        const getPayBadge = (method) => String(method).trim().toLowerCase().includes('qris') ? 
+            `<span ${filterCmd} class="cursor-pointer hover:bg-sky-100 bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-sky-200 tracking-wider transition-colors"><i class="fas fa-qrcode mr-0.5"></i>QRIS</span>` : 
+            `<span ${filterCmd} class="cursor-pointer hover:bg-emerald-100 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-emerald-200 tracking-wider transition-colors"><i class="fas fa-money-bill-wave mr-0.5"></i>CASH</span>`;
+
         // ====================================================================
-        // 🚀 1. PENCARIAN SKU BRUTAL (KHUSUS MODE PRODUK)
+        // 🚀 1. PENCARIAN SKU BRUTAL
         // ====================================================================
         if (type === 'product') {
             let paramLower = String(param).trim().toLowerCase();
             
-            // A. Cari di Master Produk
             for (let p of (this.db.masterProduk || [])) {
                 if (String(p.Nama_Produk).trim().toLowerCase() === paramLower) {
                     skuTarget = (p.SKU_Bahan && String(p.SKU_Bahan).trim() !== '') ? p.SKU_Bahan : p.SKU;
                     break;
                 }
             }
-            
-            // B. Cari di Riwayat Transaksi (Fallback)
             if (!skuTarget) {
                 for (let t of (this.db.transactions || [])) {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
@@ -10852,12 +10876,9 @@ executeVoidTrx: async function(trxId) {
                     if (skuTarget) break;
                 }
             }
-            
-            // C. Hitung Stok Sistem dan Fisik Terakhir
             if (skuTarget || paramLower) {
                 let skuLower = String(skuTarget).trim().toLowerCase();
                 let origSkuLower = '';
-                
                 let masterData = (this.db.masterProduk || []).find(p => String(p.Nama_Produk).trim().toLowerCase() === paramLower);
                 if (masterData) origSkuLower = String(masterData.SKU).trim().toLowerCase();
 
@@ -10871,10 +10892,7 @@ executeVoidTrx: async function(trxId) {
                     if (isMatchSku(s.SKU) || isMatchSku(s.Nama_Produk)) {
                         let out = String(s.ID_Outlet || s.Outlet || 'Pusat').replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
                         let filterOut = selOut.replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
-                        
-                        if (selOut === 'Semua' || out === filterOut) {
-                            sysStock += Number(s.Stok_Toko || s.Stok || 0);
-                        }
+                        if (selOut === 'Semua' || out === filterOut) sysStock += Number(s.Stok_Toko || s.Stok || 0);
                     }
                 });
                 
@@ -10884,7 +10902,6 @@ executeVoidTrx: async function(trxId) {
                     if (selOut !== 'Semua') {
                         let filterOut = selOut.replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
                         let cabangOpname = opnameList.filter(o => String(o.Outlet).replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase() === filterOut);
-                        
                         if (cabangOpname.length > 0) {
                             cabangOpname.sort((a, b) => getTimeSafe(a.Waktu || a.Tanggal) - getTimeSafe(b.Waktu || b.Tanggal));
                             lastFisik = cabangOpname[cabangOpname.length - 1].Stok_Fisik;
@@ -10894,12 +10911,10 @@ executeVoidTrx: async function(trxId) {
                         opnameList.forEach(o => {
                             let outKey = String(o.Outlet).replace(/^Ai\-Snack\s+/i, '').trim().toLowerCase();
                             let oTime = getTimeSafe(o.Waktu || o.Tanggal);
-                            
                             if (!latestByOutlet[outKey] || oTime > latestByOutlet[outKey].time) {
                                 latestByOutlet[outKey] = { time: oTime, fisik: Number(o.Stok_Fisik || 0) };
                             }
                         });
-                        
                         let totalFisikSemuaCabang = 0; let adaData = false;
                         for (let key in latestByOutlet) { totalFisikSemuaCabang += latestByOutlet[key].fisik; adaData = true; }
                         if (adaData) lastFisik = totalFisikSemuaCabang;
@@ -10909,7 +10924,7 @@ executeVoidTrx: async function(trxId) {
         }
 
         // ====================================================================
-        // 🚀 2. KUMPULKAN TRANSAKSI & RINCIAN
+        // 🚀 2. KUMPULKAN TRANSAKSI & PREPARE SPARKLINE DATA
         // ====================================================================
         if (['hourly', 'branch', 'product', 'payment', 'pcs'].includes(type)) {
             (this.db.transactions || []).forEach(t => {
@@ -10921,48 +10936,59 @@ executeVoidTrx: async function(trxId) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 let pcsInTrx = items.reduce((sum, it) => sum + Number(it.qty || 0), 0);
                 
-                // Gunakan TimeSafe Global
                 let sortTime = getTimeSafe(`${t.Tanggal} ${t.Waktu || '00:00:00'}`);
+                let isQris = String(t.Metode_Bayar).trim().toLowerCase().includes('qris');
+                let nominalTrx = Number(t.Total_Bayar);
+                
+                globalOmsetPeriode += nominalTrx; 
+                let dateKey = String(t.Tanggal).split(' ')[0].substring(0, 5); 
 
                 if (type === 'hourly' && jam === parseInt(param)) {
-                    title = `Transaksi Pukul ${String(param).padStart(2,'0')}:00`;
-                    details.push({ sortTime, icon: 'fa-clock', color: 'text-indigo-500', bg: 'bg-indigo-100', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir} • Cabang ${tOut}`, nom: Number(t.Total_Bayar), label: 'Rp', extra: `${pcsInTrx} Pcs` });
-                    totalVal += Number(t.Total_Bayar); totalPcs += pcsInTrx;
+                    title = `Pukul ${String(param).padStart(2,'0')}:00`;
+                    details.push({ sortTime, icon: 'fa-clock', color: 'text-indigo-500', bg: 'bg-indigo-100', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir}`, nom: nominalTrx, label: 'Rp', extra: `${pcsInTrx} Pcs`, badges: `${outBadge(tOut)} ${getPayBadge(t.Metode_Bayar)}` });
+                    totalVal += nominalTrx; totalPcs += pcsInTrx;
+                    if (isQris) totalQris += nominalTrx; else totalCash += nominalTrx;
+                    sparkData[dateKey] = (sparkData[dateKey] || 0) + nominalTrx;
                 } 
                 else if (type === 'branch' && tOut === param) {
-                    title = `Kinerja Cabang ${param}`;
-                    details.push({ sortTime, icon: 'fa-store', color: 'text-brand-500', bg: 'bg-brand-50', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Metode: ${t.Metode_Bayar} • Kasir: ${t.Kasir}`, nom: Number(t.Total_Bayar), label: 'Rp', extra: `${pcsInTrx} Pcs` });
-                    totalVal += Number(t.Total_Bayar); totalPcs += pcsInTrx;
+                    title = `Cabang ${param}`;
+                    details.push({ sortTime, icon: 'fa-store', color: 'text-brand-500', bg: 'bg-brand-50', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir}`, nom: nominalTrx, label: 'Rp', extra: `${pcsInTrx} Pcs`, badges: `${outBadge(tOut)} ${getPayBadge(t.Metode_Bayar)}` });
+                    totalVal += nominalTrx; totalPcs += pcsInTrx;
+                    if (isQris) totalQris += nominalTrx; else totalCash += nominalTrx;
+                    sparkData[dateKey] = (sparkData[dateKey] || 0) + nominalTrx;
                 } 
                 else if (type === 'payment' && String(t.Metode_Bayar).trim().toLowerCase() === String(param).trim().toLowerCase()) {
-                    title = `Pembayaran via ${param.toUpperCase()}`;
-                    let isCash = param.toLowerCase().includes('cash');
-                    let clr = isCash ? 'text-emerald-500' : 'text-sky-500';
-                    let bgClr = isCash ? 'bg-emerald-100' : 'bg-sky-100';
-                    let icn = isCash ? 'fa-money-bill-wave' : 'fa-qrcode';
-                    details.push({ sortTime, icon: icn, color: clr, bg: bgClr, wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir} • Cabang ${tOut}`, nom: Number(t.Total_Bayar), label: 'Rp', extra: `${pcsInTrx} Pcs` });
-                    totalVal += Number(t.Total_Bayar); totalPcs += pcsInTrx;
+                    title = `Via ${param.toUpperCase()}`;
+                    let clr = isQris ? 'text-sky-500' : 'text-emerald-500';
+                    let bgClr = isQris ? 'bg-sky-100' : 'bg-emerald-100';
+                    let icn = isQris ? 'fa-qrcode' : 'fa-money-bill-wave';
+                    details.push({ sortTime, icon: icn, color: clr, bg: bgClr, wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir}`, nom: nominalTrx, label: 'Rp', extra: `${pcsInTrx} Pcs`, badges: `${outBadge(tOut)} ${getPayBadge(t.Metode_Bayar)}` });
+                    totalVal += nominalTrx; totalPcs += pcsInTrx;
+                    if (isQris) totalQris += nominalTrx; else totalCash += nominalTrx;
+                    sparkData[dateKey] = (sparkData[dateKey] || 0) + nominalTrx;
                 }
                 else if (type === 'pcs') {
-                    title = `Rincian Pcs Terjual`;
-                    details.push({ sortTime, icon: 'fa-box-open', color: 'text-amber-500', bg: 'bg-amber-100', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir} • Cabang ${tOut}`, nom: pcsInTrx, label: 'Pcs', extra: `Rp ${Number(t.Total_Bayar).toLocaleString('id-ID')}` });
-                    totalVal += Number(t.Total_Bayar); totalPcs += pcsInTrx;
+                    title = `Rincian Penjualan`;
+                    details.push({ sortTime, icon: 'fa-box-open', color: 'text-amber-500', bg: 'bg-amber-100', wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir}`, nom: pcsInTrx, label: 'Pcs', extra: `Rp ${nominalTrx.toLocaleString('id-ID')}`, badges: `${outBadge(tOut)} ${getPayBadge(t.Metode_Bayar)}` });
+                    totalVal += nominalTrx; totalPcs += pcsInTrx;
+                    if (isQris) totalQris += nominalTrx; else totalCash += nominalTrx;
+                    sparkData[dateKey] = (sparkData[dateKey] || 0) + pcsInTrx; 
                 }
                 else if (type === 'product') {
-                    title = `Produk: ${param}`;
+                    title = `${param}`;
                     items.forEach(it => {
                         let safeNama = it.nama || 'Unknown';
                         if (String(safeNama).trim().toLowerCase() === String(param).trim().toLowerCase()) {
                             let omsetIt = Number(it.qty) * Number(it.price);
                             details.push({ 
                                 sortTime, icon: 'fa-shopping-bag', color: 'text-fuchsia-500', bg: 'bg-fuchsia-100', 
-                                wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Cabang ${tOut} (Oleh: ${t.Kasir})`, 
-                                nom: omsetIt, label: 'Rp', extra: `${it.qty} Pcs • ${t.Metode_Bayar}` 
+                                wkt: `${t.Tanggal} ${t.Waktu}`, ref: t.ID_TRX, desc: `Kasir: ${t.Kasir}`, 
+                                nom: omsetIt, label: 'Rp', extra: `${it.qty} Pcs`, badges: `${outBadge(tOut)} ${getPayBadge(t.Metode_Bayar)}` 
                             });
                             totalVal += omsetIt; totalPcs += Number(it.qty);
+                            if (isQris) totalQris += omsetIt; else totalCash += omsetIt;
                             
-                            if (String(t.Metode_Bayar).trim().toLowerCase() === 'qris') productTotalQris += omsetIt;
-                            else productTotalCash += omsetIt;
+                            sparkData[dateKey] = (sparkData[dateKey] || 0) + Number(it.qty); 
                         }
                     });
                 }
@@ -10970,7 +10996,7 @@ executeVoidTrx: async function(trxId) {
         }
         
         else if (type === 'opname') {
-            title = `Pergerakan Opname Stok`;
+            title = `Opname Stok`;
             (this.db.opname || this.db.riwayatOpname || []).forEach(o => {
                 if (!isDataValid(o.Waktu || o.Tanggal, o.Outlet)) return;
                 
@@ -10979,101 +11005,172 @@ executeVoidTrx: async function(trxId) {
                 let clr = isMinus ? 'text-rose-500' : (selisih > 0 ? 'text-emerald-500' : 'text-slate-400');
                 let bgClr = isMinus ? 'bg-rose-100' : (selisih > 0 ? 'bg-emerald-100' : 'bg-slate-100');
                 let sortTime = getTimeSafe(o.Waktu || o.Tanggal);
+                let dateKey = String(o.Waktu || o.Tanggal).split(' ')[0].substring(0, 5);
                 
                 details.push({ 
                     sortTime, icon: 'fa-clipboard-check', color: clr, bg: bgClr, 
-                    wkt: o.Waktu || o.Tanggal, ref: `SKU: ${o.SKU}`, desc: `Cabang ${o.Outlet} • Oleh ${o.Kasir}`, 
-                    nom: selisih, label: 'Pcs', extra: `Sistem: ${o.Stok_Sistem} ➔ Fisik: ${o.Stok_Fisik}` 
+                    wkt: o.Waktu || o.Tanggal, ref: `SKU: ${o.SKU}`, desc: `Oleh: ${o.Kasir}`, 
+                    nom: selisih, label: 'Pcs', extra: `Sys: ${o.Stok_Sistem} ➔ Fsk: ${o.Stok_Fisik}`, badges: outBadge(o.Outlet) 
                 });
                 totalPcs += selisih;
+                sparkData[dateKey] = (sparkData[dateKey] || 0) + selisih;
             });
         }
         
         else if (type === 'mutasi') {
-            title = `Barang Masuk & Distribusi`;
+            title = `Barang Masuk`;
             (this.db.mutasi || this.db.barangMasuk || []).forEach(m => {
                 if (!isDataValid(m.Waktu || m.Tanggal, m.Outlet_Tujuan || m.Outlet)) return;
                 
                 let qty = Number(m.Qty || m.qty || m.Jumlah || 0); 
                 let sortTime = getTimeSafe(m.Waktu || m.Tanggal);
                 let status = String(m.Status_Approval || 'Pending').trim();
+                let dateKey = String(m.Waktu || m.Tanggal).split(' ')[0].substring(0, 5);
                 
-                // 💡 FITUR: Smart Badge Color untuk Mutasi
                 let isApprove = status.toLowerCase() === 'disetujui' || status.toLowerCase() === 'sukses';
-                let stIcon = isApprove ? 'fa-check-circle text-emerald-500' : 'fa-clock text-amber-500';
+                let stBadge = isApprove ? `<span class="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-emerald-200 tracking-wider"><i class="fas fa-check-circle mr-0.5"></i>OK</span>` : `<span class="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-amber-200 tracking-wider"><i class="fas fa-clock mr-0.5"></i>PEND</span>`;
+                let outName = m.Outlet_Tujuan || m.Outlet || '';
                 
                 details.push({ 
                     sortTime, icon: 'fa-truck-loading', color: 'text-blue-500', bg: 'bg-blue-100', 
-                    wkt: m.Waktu || m.Tanggal, ref: `${m.SKU} (${m.ID_Mutasi || 'MUT'})`, desc: `Ke: ${m.Outlet_Tujuan || m.Outlet} • ${m.Keterangan || 'Restok'}`, 
-                    nom: qty, label: 'Pcs', extra: `<i class="fas ${stIcon}"></i> ${status}` 
+                    wkt: m.Waktu || m.Tanggal, ref: `${m.SKU} (${m.ID_Mutasi || 'MUT'})`, desc: `${m.Keterangan || 'Restok'}`, 
+                    nom: qty, label: 'Pcs', extra: `Ke: ${outName}`, badges: `${outBadge(outName)} ${stBadge}` 
                 });
                 totalPcs += qty;
+                sparkData[dateKey] = (sparkData[dateKey] || 0) + qty;
             });
         }
 
-        // Urutkan dari Terbaru ke Terlama (Kronologis)
         details.sort((a, b) => b.sortTime - a.sortTime);
 
         // ====================================================================
-        // 🚀 3. HEADER & HTML GENERATOR
+        // 🚀 3. ANALITIK SPARKLINE & PREDIKSI CERDAS
         // ====================================================================
-        let totalHtml = '';
-        if (type === 'product') {
-            let avgDaily = dStart && dEnd ? (totalPcs / (Math.max(1, (dateEnd - dateStart) / (1000 * 60 * 60 * 24)))).toFixed(1) : '-';
-            totalHtml = `
-                <div class="flex flex-col gap-2 mt-3">
-                    <div class="flex flex-wrap gap-2">
-                        <span class="text-emerald-600 bg-emerald-100 px-3 py-1.5 rounded-lg shadow-sm border border-emerald-200 flex items-center gap-1.5 text-[11px] font-extrabold"><i class="fas fa-money-bill-wave"></i> Cash: Rp ${productTotalCash.toLocaleString('id-ID')}</span>
-                        <span class="text-sky-600 bg-sky-100 px-3 py-1.5 rounded-lg shadow-sm border border-sky-200 flex items-center gap-1.5 text-[11px] font-extrabold"><i class="fas fa-qrcode"></i> QRIS: Rp ${productTotalQris.toLocaleString('id-ID')}</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <span class="text-amber-600 bg-amber-100 px-3 py-1.5 rounded-lg shadow-sm border border-amber-200 flex items-center gap-1.5 text-[11px] font-extrabold"><i class="fas fa-desktop"></i> Sistem: ${sysStock.toLocaleString('id-ID')} Pcs</span>
-                        <span class="text-rose-600 bg-rose-100 px-3 py-1.5 rounded-lg shadow-sm border border-rose-200 flex items-center gap-1.5 text-[11px] font-extrabold"><i class="fas fa-box-open"></i> Fisik Terakhir: ${lastFisik !== '-' ? lastFisik + ' Pcs' : 'N/A'}</span>
-                    </div>
-                    <div class="text-xs font-black text-slate-700 flex flex-wrap items-center gap-2 mt-1">
-                        Total Terjual: <span class="text-brand-600 bg-brand-50 px-2 py-0.5 rounded shadow-sm border border-brand-200">Rp ${totalVal.toLocaleString('id-ID')} (${totalPcs} Pcs)</span>
-                        ${avgDaily !== '-' ? `<span class="text-slate-500 bg-slate-100 px-2 py-0.5 rounded shadow-sm border border-slate-200">Rata-rata: ${avgDaily} Pcs/Hari</span>` : ''}
-                    </div>
-                </div>
-            `;
-        } else if (['opname', 'mutasi', 'pcs'].includes(type)) {
-            totalHtml = `<div class="mt-3"><span class="text-indigo-600 bg-indigo-100 px-3 py-1 rounded-full shadow-inner border border-indigo-200 font-black">${totalPcs.toLocaleString('id-ID')} Pcs</span></div>`;
-        } else {
-            totalHtml = `
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <span class="text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full shadow-inner border border-emerald-200 font-black">Rp ${totalVal.toLocaleString('id-ID')}</span>
-                    <span class="text-amber-600 bg-amber-100 px-3 py-1 rounded-full shadow-inner border border-amber-200 font-black">${totalPcs.toLocaleString('id-ID')} Pcs</span>
-                </div>
+        let sparkHtml = '';
+        let sparkKeys = Object.keys(sparkData).sort(); 
+        
+        if (sparkKeys.length > 0) {
+            let maxVal = Math.max(...Object.values(sparkData).map(Math.abs));
+            let bars = sparkKeys.slice(-15).map(k => {
+                let val = Math.abs(sparkData[k]);
+                let pct = maxVal > 0 ? (val / maxVal) * 100 : 50; 
+                let isMinus = sparkData[k] < 0;
+                let bColor = isMinus ? 'bg-rose-500' : 'bg-blue-400';
+                return `<div class="w-2.5 md:w-3 ${bColor} rounded-t-[3px] mx-[1px] opacity-100 hover:opacity-80 transition-all cursor-pointer shadow-sm border border-slate-200/50" style="height: ${Math.max(10, pct)}%;" title="Tgl ${k} = ${sparkData[k]}"></div>`;
+            }).join('');
+            
+            sparkHtml = `
+            <div class="absolute right-0 top-0 h-11 flex items-end justify-end border-b border-slate-200/50 pb-[1px] z-10 opacity-100" title="Grafik 15 Hari Terakhir">
+             ${bars}
+            </div>
             `;
         }
 
-        let listHtml = details.length === 0 ? `<div class="p-10 flex flex-col items-center justify-center text-slate-400 opacity-70"><i class="fas fa-ghost text-4xl mb-3"></i><p class="text-xs font-bold tracking-widest uppercase">Data Kosong</p></div>` :
+        // 🚀 PERBAIKAN: Gunakan totalCash dan totalQris secara langsung
+        let trxSummaryHtml = `
+            <div class="flex flex-wrap gap-1 mt-1.5 z-20 relative">
+                <span ${filterCmd} class="cursor-pointer text-emerald-600 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-md shadow-sm border border-emerald-200 flex items-center gap-1 text-[9px] font-extrabold transition-colors"><i class="fas fa-money-bill-wave"></i> Tunai: Rp ${totalCash.toLocaleString('id-ID')}</span>
+                <span ${filterCmd} class="cursor-pointer text-sky-600 bg-sky-100 hover:bg-sky-200 px-2 py-1 rounded-md shadow-sm border border-sky-200 flex items-center gap-1 text-[9px] font-extrabold transition-colors"><i class="fas fa-qrcode"></i> QRIS: Rp ${totalQris.toLocaleString('id-ID')}</span>
+            </div>
+        `;
+
+        let totalHtml = '';
+        if (type === 'product') {
+            let passedDays = Math.max(1, (dateEnd - dateStart) / (1000 * 60 * 60 * 24));
+            let avgDaily = dStart && dEnd ? (totalPcs / passedDays).toFixed(1) : '-';
+            
+            let numFisik = Number(lastFisik);
+            let contribution = globalOmsetPeriode > 0 ? ((totalVal / globalOmsetPeriode) * 100).toFixed(1) : '0';
+            let estDays = avgDaily > 0 && !isNaN(numFisik) && lastFisik !== '-' ? Math.floor(numFisik / avgDaily) : '-';
+            
+            let estBadge = estDays !== '-' ? (estDays < 3 ? `<span class="text-rose-600 animate-pulse font-black"><i class="fas fa-exclamation-triangle"></i> Sisa ${estDays} Hr</span>` : `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle"></i> Aman ${estDays} Hr</span>`) : '';
+
+            totalHtml = `
+                <div class="flex flex-col gap-1 mt-1.5 relative w-full">
+                    ${sparkHtml}
+                    ${trxSummaryHtml}
+                    <div class="flex flex-wrap gap-1 relative z-20 mt-0.5">
+                        <span class="text-amber-600 bg-amber-100 px-2 py-1 rounded-md shadow-sm border border-amber-200 flex items-center gap-1 text-[9px] font-extrabold"><i class="fas fa-desktop"></i> Sys: ${sysStock.toLocaleString('id-ID')}</span>
+                        <span class="text-rose-600 bg-rose-100 px-2 py-1 rounded-md shadow-sm border border-rose-200 flex items-center gap-1 text-[9px] font-extrabold"><i class="fas fa-box-open"></i> Fisik: ${lastFisik !== '-' ? lastFisik : 'N/A'}</span>
+                    </div>
+                    <div class="text-[9px] font-black text-slate-700 flex flex-wrap items-center gap-1 mt-1 relative z-20">
+                        <span class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded border border-brand-200" title="Omset (Kontribusi)">Total: Rp ${totalVal.toLocaleString('id-ID')} (${contribution}%)</span>
+                        ${avgDaily !== '-' ? `<span class="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"><i class="fas fa-chart-line mr-0.5 text-brand-400"></i>${avgDaily}/Hr</span>` : ''}
+                        ${estBadge ? `<span class="bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">${estBadge}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        } else if (['hourly', 'branch', 'payment', 'pcs'].includes(type)) {
+            totalHtml = `
+                <div class="flex flex-col gap-1 mt-1.5 relative w-full">
+                    ${sparkHtml}
+                    ${trxSummaryHtml}
+                    <div class="flex flex-wrap gap-1 mt-1 relative z-20">
+                        <span class="text-brand-600 bg-brand-100 px-2 py-1 rounded-md shadow-sm border border-brand-200 font-black text-[10px]">Total: Rp ${totalVal.toLocaleString('id-ID')}</span>
+                        <span class="text-amber-600 bg-amber-100 px-2 py-1 rounded-md shadow-sm border border-amber-200 font-black text-[10px]">${totalPcs.toLocaleString('id-ID')} Pcs</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            totalHtml = `
+                <div class="mt-2.5 relative w-full h-12">
+                    ${sparkHtml}
+                    <span class="text-indigo-600 bg-indigo-100 px-2 py-1 rounded-md shadow-sm border border-indigo-200 font-black text-[10px] absolute bottom-0 left-0 z-20">${totalPcs.toLocaleString('id-ID')} Pcs</span>
+                </div>`;
+        }
+
+        // ====================================================================
+        // 🚀 4. INJEKSI LIVE SEARCH & HTML BARIS
+        // ====================================================================
+        window.aiFilterList = function(val) {
+            let v = String(val).toLowerCase().trim();
+            let inp = document.getElementById('ai-search-input');
+            if(inp && inp.value !== val) inp.value = val;
+            
+            document.querySelectorAll('.ai-deepdive-row').forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(v) ? 'flex' : 'none';
+            });
+        };
+
+        let searchBarHtml = `
+            <div class="px-3 md:px-4 py-2 border-b border-slate-100 bg-slate-50 sticky top-0 z-30 shadow-[0_4px_10px_rgba(0,0,0,0.02)]">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input id="ai-search-input" oninput="window.aiFilterList(this.value)" type="text" class="w-full bg-white border border-slate-200 rounded-full pl-8 pr-8 py-1.5 text-[10px] md:text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-300 shadow-inner transition-all" placeholder="Cari trx, kasir, qris, cabang...">
+                    <button onclick="window.aiFilterList(''); document.getElementById('ai-search-input').value='';" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-rose-500 rounded-full hover:bg-rose-50 transition-colors"><i class="fas fa-times text-[9px]"></i></button>
+                </div>
+            </div>
+        `;
+
+        let listHtml = details.length === 0 ? `<div class="p-6 flex flex-col items-center justify-center text-slate-400 opacity-70"><i class="fas fa-ghost text-3xl mb-2"></i><p class="text-[9px] font-bold tracking-widest uppercase">Data Kosong</p></div>` :
             details.map((d, idx) => `
-                <div class="flex items-center justify-between p-4 border-b border-slate-100 hover:bg-slate-50 transition-all duration-300 group animate-slide-up" style="animation-delay: ${idx * 30 > 600 ? 0 : idx * 30}ms; animation-fill-mode: both;">
-                    <div class="flex items-center flex-1 min-w-0 pr-3 gap-4">
-                        <div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${d.bg} ${d.color} shadow-sm group-hover:scale-110 transition-transform duration-300">
-                            <i class="fas ${d.icon} text-lg"></i>
+                <div class="ai-deepdive-row flex items-center justify-between p-2.5 md:p-3 border-b border-slate-100 hover:bg-slate-50 transition-all duration-300 group animate-slide-up" style="animation-delay: ${idx * 30 > 600 ? 0 : idx * 30}ms; animation-fill-mode: both;">
+                    <div class="flex items-center flex-1 min-w-0 pr-2 gap-2.5">
+                        <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${d.bg} ${d.color} shadow-sm group-hover:scale-110 transition-transform duration-300">
+                            <i class="fas ${d.icon} text-sm"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div class="font-extrabold text-[13px] text-slate-800 truncate group-hover:text-brand-600 transition-colors cursor-pointer" onclick="navigator.clipboard.writeText('${d.ref}'); superApp.showToast('ID Referensi disalin!','success')">${d.ref}</div>
-                            <div class="text-[10px] font-bold text-slate-400 mt-1 flex flex-col sm:flex-row gap-1 sm:gap-3">
-                                <span><i class="far fa-clock mr-1 opacity-70"></i>${d.wkt}</span>
-                                <span class="text-slate-500 font-semibold truncate">${d.desc}</span>
+                            <div class="font-extrabold text-[11px] text-slate-800 truncate group-hover:text-brand-600 transition-colors cursor-pointer" onclick="navigator.clipboard.writeText('${d.ref}'); superApp.showToast('ID disalin!','success')">${d.ref}</div>
+                            <div class="text-[9px] font-bold text-slate-400 mt-0.5 flex flex-wrap gap-1 items-center">
+                                <span><i class="far fa-clock mr-0.5 opacity-70"></i>${String(d.wkt).split(' ')[1] || d.wkt}</span>
+                                <span class="text-slate-500 truncate max-w-[100px] sm:max-w-[150px]">${d.desc}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${d.badges || ''}
                             </div>
                         </div>
                     </div>
-                    <div class="text-right shrink-0 flex flex-col items-end">
-                        <div class="font-black ${d.nom < 0 ? 'text-rose-500' : 'text-slate-800'} text-sm md:text-base tracking-tight">
+                    <div class="text-right shrink-0 flex flex-col items-end justify-center">
+                        <div class="font-black ${d.nom < 0 ? 'text-rose-500' : 'text-slate-800'} text-xs md:text-sm tracking-tight">
                             ${d.nom > 0 && type === 'opname' ? '+' : ''}${d.label === 'Rp' ? 'Rp ' : ''}${d.nom.toLocaleString('id-ID')} ${d.label === 'Pcs' ? 'Pcs' : ''}
                         </div>
-                        <div class="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md mt-1 border border-slate-200">
+                        <div class="text-[8px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-0.5 border border-slate-200">
                             ${d.extra}
                         </div>
                     </div>
                 </div>
             `).join('');
 
-        // Teks untuk disalin ke Clipboard (Laporan Instan WA)
         let copyText = `*DEEP DIVE: ${title}*\n${subtitle}\n------------------\nTotal: ${totalVal > 0 ? 'Rp '+totalVal.toLocaleString('id-ID') : ''} ${totalPcs > 0 ? '('+totalPcs.toLocaleString('id-ID')+' Pcs)' : ''}\n\n`;
         details.slice(0, 20).forEach(d => { copyText += `• ${d.wkt} | ${d.ref}\n  ${d.desc}\n  Total: ${d.label==='Rp'?'Rp ':''}${d.nom.toLocaleString('id-ID')} ${d.label==='Pcs'?'Pcs':''}\n\n`; });
         if(details.length > 20) copyText += `... dan ${details.length - 20} data lainnya.\n`;
@@ -11082,44 +11179,43 @@ executeVoidTrx: async function(trxId) {
         let existingModal = document.getElementById('ai-deepdive-modal');
         if (existingModal) existingModal.remove();
         if (!document.getElementById('deepdive-style')) {
-            document.head.insertAdjacentHTML('beforeend', `<style id="deepdive-style">@keyframes slideUpFade { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } } .animate-slide-up { animation: slideUpFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }</style>`);
+            document.head.insertAdjacentHTML('beforeend', `<style id="deepdive-style">@keyframes slideUpFade { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } } .animate-slide-up { animation: slideUpFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }</style>`);
         }
 
         let modalHtml = `
-        <div id="ai-deepdive-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4 opacity-0 transition-opacity duration-400">
-            <div class="bg-white w-full md:max-w-2xl md:rounded-[2rem] rounded-t-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.15)] flex flex-col h-[85vh] md:h-[80vh] transform translate-y-full md:translate-y-12 md:scale-90 transition-transform duration-500 overflow-hidden border-t-4 border-brand-500 md:border-4 md:border-white">
-                <div class="p-5 md:p-6 bg-gradient-to-br from-slate-50 to-white flex justify-between items-start shrink-0 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-brand-50 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                    <div class="relative z-10 w-full pr-24">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-brand-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30 transform -rotate-3 shrink-0">
-                                <i class="fas fa-search-dollar text-xl"></i>
+        <div id="ai-deepdive-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-end md:items-center justify-center p-0 md:p-4 opacity-0 transition-opacity duration-400">
+            <div class="bg-white w-full md:max-w-xl rounded-t-[1.5rem] md:rounded-[1.5rem] shadow-[0_10px_40px_rgba(0,0,0,0.15)] flex flex-col max-h-[85vh] transform translate-y-full md:translate-y-8 md:scale-95 transition-transform duration-500 overflow-hidden border-t-4 border-brand-500 md:border-2 md:border-white relative">
+                <div class="p-4 pb-3 bg-gradient-to-br from-slate-50 to-white flex justify-between items-start shrink-0 relative overflow-hidden z-20 border-b border-slate-100">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-brand-50 rounded-full blur-xl -mr-8 -mt-8 pointer-events-none z-0"></div>
+                    <div class="relative z-10 w-full pr-16">
+                        <div class="flex items-center gap-2.5 mb-1">
+                            <div class="w-8 h-8 bg-brand-500 text-white rounded-lg flex items-center justify-center shadow-md shadow-brand-500/30 transform -rotate-3 shrink-0">
+                                <i class="fas fa-search-dollar text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <h3 class="font-black text-slate-800 text-base md:text-lg tracking-tight truncate">Deep Dive: ${title}</h3>
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">${subtitle}</p>
+                                <h3 class="font-black text-slate-800 text-sm tracking-tight truncate">${title}</h3>
+                                <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">${subtitle}</p>
                             </div>
                         </div>
                         ${totalHtml}
                     </div>
                     
-                    <div class="absolute top-5 right-5 flex gap-2 z-20">
-                        <button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCopy}')); superApp.showToast('Laporan berhasil disalin ke clipboard!', 'success');" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border-2 border-slate-100 text-brand-500 hover:bg-brand-50 hover:border-brand-200 transition-all duration-300 active:scale-90 shadow-sm shrink-0" title="Salin Laporan Text">
-                            <i class="fas fa-copy"></i>
+                    <div class="absolute top-3 right-3 flex gap-1.5 z-30">
+                        <button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCopy}')); superApp.showToast('Laporan disalin!', 'success');" class="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-slate-200 text-brand-500 hover:bg-brand-50 hover:border-brand-300 transition-all duration-300 active:scale-90 shadow-sm shrink-0" title="Salin Teks">
+                            <i class="fas fa-copy text-[10px]"></i>
                         </button>
-                        <button onclick="document.getElementById('ai-deepdive-modal').classList.remove('opacity-100'); document.getElementById('ai-deepdive-modal').firstElementChild.classList.add('translate-y-full', 'md:translate-y-12', 'md:scale-90'); setTimeout(()=>document.getElementById('ai-deepdive-modal').remove(), 400)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white border-2 border-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all duration-300 active:scale-90 shadow-sm shrink-0 group">
-                            <i class="fas fa-times group-hover:rotate-90 transition-transform duration-300"></i>
+                        <button onclick="document.getElementById('ai-deepdive-modal').classList.remove('opacity-100'); document.getElementById('ai-deepdive-modal').firstElementChild.classList.add('translate-y-full', 'md:translate-y-8', 'md:scale-95'); setTimeout(()=>document.getElementById('ai-deepdive-modal').remove(), 400)" class="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all duration-300 active:scale-90 shadow-sm shrink-0 group">
+                            <i class="fas fa-times text-[10px] group-hover:rotate-90 transition-transform duration-300"></i>
                         </button>
                     </div>
                 </div>
-                
-                <div class="bg-slate-800 text-white text-[9px] md:text-[10px] font-bold text-center py-1.5 shadow-inner">
-                    <i class="fas fa-lightbulb text-amber-400 mr-1"></i> Klik pada ID/Referensi transaksi untuk menyalin kodenya
-                </div>
 
-                <div class="flex-1 overflow-y-auto custom-scroll p-3 md:p-5 bg-slate-50 border-t border-slate-100 relative">
-                    <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden pb-2 relative z-10">
-                        ${listHtml}
+                <div class="flex-1 flex flex-col overflow-hidden relative z-10 min-h-0 bg-slate-50">
+                    ${details.length > 0 ? searchBarHtml : ''}
+                    <div class="flex-1 overflow-y-auto custom-scroll p-2 md:p-3 relative">
+                        <div class="bg-white border border-slate-100 rounded-[1.25rem] shadow-sm overflow-hidden pb-1 relative z-10">
+                            ${listHtml}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -11131,7 +11227,7 @@ executeVoidTrx: async function(trxId) {
             let el = document.getElementById('ai-deepdive-modal');
             if(el) {
                 el.classList.remove('opacity-0'); el.classList.add('opacity-100');
-                el.firstElementChild.classList.remove('translate-y-full', 'md:translate-y-12', 'md:scale-90');
+                el.firstElementChild.classList.remove('translate-y-full', 'md:translate-y-8', 'md:scale-95');
                 el.firstElementChild.classList.add('translate-y-0', 'md:translate-y-0', 'md:scale-100');
                 if (navigator.vibrate) navigator.vibrate(40);
             }
