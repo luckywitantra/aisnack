@@ -313,65 +313,53 @@ const superApp = {
     // =========================================================================
     // 🚀 RADAR SILUMAN: CEK UPDATE OTOMATIS SAAT APLIKASI DIBUKA
     // =========================================================================
-    autoCheckUpdateOnStart: async function() {
-        console.log("📡 Memeriksa versi aplikasi terbaru di latar belakang...");
+   // =========================================================================
+    // 🚀 RADAR UPDATE SILUMAN (VERSI OPTIMASI TANPA FETCH GANDA)
+    // =========================================================================
+    checkVersionFromData: async function(pengaturanData) {
         try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=1", { 
-                method: 'GET',
-                redirect: 'follow', 
-                cache: 'no-store'
-            });
+            if (!pengaturanData || !Array.isArray(pengaturanData)) return;
             
-            // 🛡️ TAMENG ANTI-HTML CRASH (Menjaga console tetap bersih dari error JSON)
-            const rawText = await res.text();
-            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
-                throw new Error("Server Google sibuk (HTML Error).");
-            }
-            
-            const data = JSON.parse(rawText);
-            
-            if (data && data.status === 'sukses') {
-                let serverVersion = (data.pengaturan || []).find(x => x.Pengaturan === 'Versi_Aplikasi');
-                if (serverVersion) {
-                    let localVersion = localStorage.getItem('app_version');
+            let serverVersion = pengaturanData.find(x => x.Pengaturan === 'Versi_Aplikasi');
+            if (serverVersion) {
+                let localVersion = localStorage.getItem('app_version');
+                
+                if (!localVersion) {
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                } 
+                else if (localVersion !== serverVersion.Nilai) {
+                    console.log(`🚀 Versi baru terdeteksi! (Lokal: ${localVersion} -> Server: ${serverVersion.Nilai})`);
                     
-                    if (!localVersion) {
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                    } 
-                    else if (localVersion !== serverVersion.Nilai) {
-                        console.log(`🚀 Versi baru terdeteksi! (Lokal: ${localVersion} -> Server: ${serverVersion.Nilai})`);
-                        
-                        // 1. Kunci versi baru di memori
-                        localStorage.setItem('app_version', serverVersion.Nilai);
-                        
-                        // 2. Notifikasi
-                        if (typeof this.showToast === 'function') {
-                            this.showToast("Pembaruan Sistem Ditemukan. Memuat ulang...", "success");
-                        }
-                        
-                        // 3. BAKAR CACHE LAWAS AGAR TIDAK BENTROK
-                        if ('caches' in window) {
-                            const cacheNames = await caches.keys();
-                            await Promise.all(cacheNames.map(name => caches.delete(name)));
-                        }
-
-                        // 4. CABUT PAKSA SERVICE WORKER LAWAS
-                        if ('serviceWorker' in navigator) {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            for(let reg of regs) { await reg.unregister(); }
-                        }
-                        
-                        // 5. Muat ulang halaman secara paksa
-                        setTimeout(() => {
-                            window.location.reload(true);
-                        }, 500);
-                    } else {
-                        console.log("✅ Aplikasi sudah menggunakan versi paling mutakhir.");
+                    // 1. Kunci versi baru di memori
+                    localStorage.setItem('app_version', serverVersion.Nilai);
+                    
+                    // 2. Notifikasi Playful
+                    if (typeof this.showToast === 'function') {
+                        this.showToast("✨ Yeay! Versi baru tersedia. Memuat ulang...", "success");
                     }
+                    
+                    // 3. BAKAR CACHE LAWAS AGAR TIDAK BENTROK
+                    if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    }
+
+                    // 4. CABUT PAKSA SERVICE WORKER LAWAS
+                    if ('serviceWorker' in navigator) {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for(let reg of regs) { await reg.unregister(); }
+                    }
+                    
+                    // 5. Muat ulang halaman secara paksa dengan jeda dramatis agar toast terlihat
+                    setTimeout(() => {
+                        window.location.reload(true);
+                    }, 1500);
+                } else {
+                    console.log("✅ Aplikasi sudah menggunakan versi paling mutakhir.");
                 }
             }
         } catch (e) {
-            console.warn("📡 Cek update latar belakang dilewati (Offline/Gangguan):", e.message);
+            console.warn("📡 Gagal mengecek versi dari data:", e.message);
         }
     },
 
@@ -380,9 +368,6 @@ const superApp = {
     // =========================================================================
     init: async function() {
         
-        // 🚀 JALANKAN RADAR UPDATE SILUMAN SEBELUM KASIR LOGIN
-        this.autoCheckUpdateOnStart();
-
         // --- 🚀 SERVICE WORKER REGISTRATION ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
@@ -442,12 +427,12 @@ const superApp = {
             if (cacheDb) { 
                 this.db = JSON.parse(cacheDb); 
                 if (logStat) { 
-                    logStat.innerText = 'Data Lokal Siap. Mencari Update Server...'; 
+                    logStat.innerText = 'Data Lokal Siap. Menyinkronkan Server...'; 
                     logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
                 } 
             } else { 
                 if (logStat) { 
-                    logStat.innerText = 'Mengunduh Database Google Pertama Kali...'; 
+                    logStat.innerText = 'Mengunduh Database Toko Pertama Kali...'; 
                     logStat.className = 'text-[10px] text-brand-500 font-bold uppercase tracking-widest text-center animate-pulse'; 
                 } 
             }
@@ -493,6 +478,11 @@ const superApp = {
                 this.db = data; 
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
                 
+                // 🚀 CEK VERSI APLIKASI LANGSUNG DARI DATA YANG BARU DATANG! (Tanpa Fetch tambahan)
+                if (data.pengaturan) {
+                    this.checkVersionFromData(data.pengaturan);
+                }
+                
                 let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
                 if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
                 let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
@@ -508,7 +498,7 @@ const superApp = {
 
                 if (logStat) { 
                     logStat.innerText = 'Sistem Terkoneksi. Silakan Masukkan PIN.'; 
-                    logStat.className = 'text-[10px] text-green-500 font-bold uppercase tracking-widest text-center'; 
+                    logStat.className = 'text-[10px] text-emerald-500 font-bold uppercase tracking-widest text-center'; 
                 }
 
                 if (this.currentUser) {
@@ -544,11 +534,11 @@ const superApp = {
                 logStat.innerText = 'Offline Mode Aktif (Gunakan PIN Anda)'; 
                 logStat.className = 'text-[10px] text-orange-500 font-bold uppercase tracking-widest text-center'; 
             } else if (logStat) { 
-                logStat.innerHTML = `<span class="text-red-500 block mb-1">Gagal Menghubungkan ke Server.</span>
-                                     <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-[10px] font-black shadow-md active:scale-95 transition-all">
-                                         <i class="fas fa-rotate-right mr-1"></i> Klik untuk Coba Lagi
+                logStat.innerHTML = `<span class="text-rose-500 block mb-1">Gagal Menghubungkan ke Server.</span>
+                                     <button onclick="window.location.reload(true)" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 mx-auto">
+                                         <i class="fas fa-rotate-right"></i> Coba Lagi
                                      </button>`; 
-                logStat.className = 'text-[10px] font-bold tracking-wider text-center';
+                logStat.className = 'text-[10px] font-bold tracking-wider text-center w-full';
             }
         }
     },
