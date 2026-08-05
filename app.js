@@ -3689,167 +3689,10 @@ selectOutlet: function(id) {
         }
     },
 
+     // =========================================================
+    // 🚀 RENDER DASHBOARD EKSEKUTIF DENGAN KARTU MINI INTERAKTIF
     // =========================================================
-    // 🚀 CONTROLLER POPUP ANALISIS SUPER DETAIL PER OUTLET
-    // =========================================================
-    openDetailOutletModal: function(outName) {
-        const modal = document.getElementById('modal-detail-outlet-eksekutif');
-        const titleEl = document.getElementById('modal-detail-outlet-name');
-        const contEl = document.getElementById('modal-detail-outlet-content');
-        if (!modal || !contEl) return;
-
-        if (titleEl) titleEl.innerText = `Ai-CHA ${outName}`;
-        modal.classList.remove('hidden');
-
-        // 1. Baca filter tanggal eksekutif aktif
-        const startInput = document.getElementById('exec-filter-start');
-        const endInput = document.getElementById('exec-filter-end');
-        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
-        if (startObj) startObj.setHours(0, 0, 0, 0);
-        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
-        if (endObj) endObj.setHours(23, 59, 59, 999);
-
-        // 2. Kumpulkan metrik khusus cabang ini
-        let totSales = 0, totCash = 0, totQris = 0, totExp = 0, totBill = 0, totPcs = 0;
-        let expItemMap = {};
-        let repCount = 0;
-
-        (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
-            let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            if (repOutlet !== outName) return;
-
-            if (startObj || endObj) {
-                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
-                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                if (match) {
-                    let repDate = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
-                    if (startObj && repDate < startObj) return;
-                    if (endObj && repDate > endObj) return;
-                } else return;
-            }
-
-            repCount++;
-            totSales += Number(rep.Net_Sales || 0);
-            totCash += Number(rep.Cash || 0);
-            totQris += Number(rep.QRIS || 0);
-            totExp += Number(rep.Total_Pengeluaran || 0);
-            totBill += Number(rep.Bill || 0);
-            totPcs += Number(rep.Pcs || 0);
-
-            try {
-                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
-                expArr.forEach(x => {
-                    let nm = String(x.nama || 'LAINNYA').toUpperCase().trim();
-                    let nmNom = Number(x.nominal || 0);
-                    if (nm !== '' && nmNom > 0) {
-                        if (!expItemMap[nm]) expItemMap[nm] = 0;
-                        expItemMap[nm] += nmNom;
-                    }
-                });
-            } catch(e){}
-        });
-
-        // 3. Kalkulasi Target Cabang & Rata-rata
-        let avgBill = totBill > 0 ? Math.round(totSales / totBill) : 0;
-        let avgPcs = totPcs > 0 ? Math.round(totSales / totPcs) : 0;
-        let netLaci = totCash - totExp;
-
-        let targetCabang = 180000000;
-        let savedT = localStorage.getItem('aicha_target_bulanan_' + outName);
-        if (savedT && !isNaN(savedT)) targetCabang = Number(savedT);
-        let pctTarget = Math.min(Math.round((totSales / targetCabang) * 100), 100);
-
-        // Render Rincian Item Biaya Cabang
-        let expKeys = Object.keys(expItemMap).sort((a,b) => expItemMap[b] - expItemMap[a]);
-        let expHtml = expKeys.length === 0 
-            ? `<div class="text-xs text-slate-400 italic py-2">Tidak ada pengeluaran dicatat</div>` 
-            : expKeys.map(k => `
-                <div class="flex justify-between items-center bg-slate-800/80 p-2 rounded-xl text-xs border border-slate-700/50">
-                    <span class="font-extrabold text-slate-300">▪️ ${k}</span>
-                    <span class="font-black text-amber-400">Rp ${expItemMap[k].toLocaleString('id-ID')}</span>
-                </div>`).join('');
-
-        // 4. Rakit HTML Popup Super Lengkap
-        contEl.innerHTML = `
-            <!-- Kartu Progres Target Cabang -->
-            <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700">
-                <div class="flex justify-between text-xs font-bold mb-2">
-                    <span class="text-slate-300">Target Pencapaian Cabang</span>
-                    <span class="font-black text-rose-400">${pctTarget}% (Rp ${totSales.toLocaleString('id-ID')} / Rp ${targetCabang.toLocaleString('id-ID')})</span>
-                </div>
-                <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
-                    <div class="bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-400 h-full rounded-full transition-all duration-700" style="width: ${pctTarget}%"></div>
-                </div>
-            </div>
-
-            <!-- Matriks Rangkuman KPI -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Net Sales Bersih</span>
-                    <span class="text-base font-black text-rose-400">Rp ${totSales.toLocaleString('id-ID')}</span>
-                </div>
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Cash Laci</span>
-                    <span class="text-base font-black text-emerald-400">Rp ${totCash.toLocaleString('id-ID')}</span>
-                </div>
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total QRIS</span>
-                    <span class="text-base font-black text-blue-400">Rp ${totQris.toLocaleString('id-ID')}</span>
-                </div>
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Total Pengeluaran</span>
-                    <span class="text-base font-black text-amber-400">Rp ${totExp.toLocaleString('id-ID')}</span>
-                </div>
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Rata-rata / Bill (${totBill} Bill)</span>
-                    <span class="text-base font-black text-purple-400">Rp ${avgBill.toLocaleString('id-ID')}</span>
-                </div>
-                <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Rata-rata / Pcs (${totPcs} Pcs)</span>
-                    <span class="text-base font-black text-teal-400">Rp ${avgPcs.toLocaleString('id-ID')}</span>
-                </div>
-            </div>
-
-            <!-- Net Cash Bersih -->
-            <div class="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 p-3.5 rounded-2xl border border-emerald-500/30 flex justify-between items-center">
-                <span class="text-xs font-bold text-emerald-200">💵 Net Cash Bersih Tersedia di Toko (Cash - Biaya):</span>
-                <span class="text-base font-black text-emerald-400">Rp ${netLaci.toLocaleString('id-ID')}</span>
-            </div>
-
-            <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60 flex flex-col min-h-[220px]">
-                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-700/60">
-                    <h5 class="text-xs font-black text-amber-400 flex items-center gap-2">
-                        <i class="fas fa-list"></i> Breakdown Cabang ${outName}
-                    </h5>
-                    <div class="flex items-center gap-2">
-                        <div class="relative flex-1 sm:w-36">
-                            <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[9px]"></i>
-                            <input type="text" id="detail-expense-search" oninput="superApp.renderDetailOutletExpenseList()" placeholder="Cari..." class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-bold rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-amber-500 transition-colors shadow-inner">
-                        </div>
-                        <select id="detail-expense-sort" onchange="superApp.renderDetailOutletExpenseList()" class="bg-slate-900 border border-slate-700 text-slate-200 text-[10px] font-bold rounded-lg px-2 py-1.5 outline-none focus:border-amber-500 cursor-pointer shadow-sm">
-                            <option value="nominal">Tertinggi</option>
-                            <option value="az">A - Z</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- Area Daftar Interaktif -->
-                <div class="flex-1 overflow-y-auto custom-scroll pr-1 mt-3" id="detail-outlet-expense-list"></div>
-            </div>
-        `;
-        
-        // 🚀 PENTING: Simpan data ke variabel global dan render list
-        this.detailExpenseData = expItemMap;
-        this.renderDetailOutletExpenseList();
-    },
-
-    closeDetailOutletModal: function() {
-        const modal = document.getElementById('modal-detail-outlet-eksekutif');
-        if (modal) modal.classList.add('hidden');
-    },
-
-    // =========================================================
+   // =========================================================
     // 🚀 RENDER DASHBOARD EKSEKUTIF DENGAN KARTU MINI INTERAKTIF
     // =========================================================
     renderExecutiveDashboard: function() {
@@ -3964,29 +3807,29 @@ selectOutlet: function(id) {
         let sisaTarget = Math.max(targetTotal - totSales, 0);
 
         if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totSales.toLocaleString('id-ID')}`;
-        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetTotal.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Target: Rp ${targetTotal.toLocaleString('id-ID')}`;
         if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pctExec}%`;
-        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pctExec}%`;
+        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `${pctExec}%`;
         if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${sisaTarget.toLocaleString('id-ID')}`;
 
-        // 4. Render Kartu Mini Outlet
+        // 4. Render Kartu Mini Outlet (Compact Version)
         const cardsGrid = document.getElementById('exec-outlet-cards-grid');
         if (cardsGrid) {
             let outletKeys = Object.keys(outletMap).sort((a,b) => outletMap[b].sales - outletMap[a].sales);
             cardsGrid.innerHTML = outletKeys.length === 0 
-                ? `<div class="col-span-full text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-700 rounded-2xl">Belum ada transaksi di periode ini</div>`
+                ? `<div class="col-span-full text-[10px] text-slate-400 italic text-center py-4 border border-dashed border-slate-700/50 rounded-xl">Belum ada transaksi di periode ini</div>`
                 : outletKeys.map(outName => {
                     let oData = outletMap[outName];
                     let pct = totSales > 0 ? Math.round((oData.sales / totSales) * 100) : 0;
                     return `
-                    <div onclick="superApp.openDetailOutletModal('${outName}')" class="bg-slate-800/80 hover:bg-slate-700/90 p-3.5 rounded-2xl border border-slate-700 hover:border-rose-500/50 cursor-pointer transition-all active:scale-95 shadow-md flex flex-col justify-between group">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-black text-white text-sm group-hover:text-rose-400 transition">Ai-CHA ${outName}</span>
-                            <span class="text-[9px] font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">${pct}%</span>
+                    <div onclick="superApp.openDetailOutletModal('${outName}')" class="bg-slate-800/80 hover:bg-slate-700/90 p-2.5 rounded-xl border border-slate-700 hover:border-rose-500/50 cursor-pointer transition-all active:scale-95 shadow-sm flex flex-col justify-between group">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-black text-white text-[10px] md:text-xs group-hover:text-rose-400 transition truncate pr-2">Ai-CHA ${outName}</span>
+                            <span class="text-[8px] font-bold bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/30 shrink-0">${pct}%</span>
                         </div>
                         <div>
-                            <span class="text-[10px] text-slate-400 block uppercase font-bold">Sales Cabang</span>
-                            <span class="font-black text-rose-400 text-base block tracking-tight">Rp ${oData.sales.toLocaleString('id-ID')}</span>
+                            <span class="text-[8px] text-slate-400 block uppercase font-bold">Sales</span>
+                            <span class="font-black text-rose-400 text-sm block tracking-tight">Rp ${oData.sales.toLocaleString('id-ID')}</span>
                         </div>
                     </div>`;
                 }).join('');
@@ -3996,6 +3839,162 @@ selectOutlet: function(id) {
         this.execTotalExpense = totExp;
         this.renderExecExpenseList();
     },
+
+    // =========================================================
+    // 🚀 CONTROLLER POPUP ANALISIS SUPER DETAIL PER OUTLET
+    // =========================================================
+    openDetailOutletModal: function(outName) {
+        const modal = document.getElementById('modal-detail-outlet-eksekutif');
+        const titleEl = document.getElementById('modal-detail-outlet-name');
+        const contEl = document.getElementById('modal-detail-outlet-content');
+        if (!modal || !contEl) return;
+
+        if (titleEl) titleEl.innerText = `Ai-CHA ${outName}`;
+        modal.classList.remove('hidden');
+
+        // 1. Baca filter tanggal eksekutif aktif
+        const startInput = document.getElementById('exec-filter-start');
+        const endInput = document.getElementById('exec-filter-end');
+        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
+        if (startObj) startObj.setHours(0, 0, 0, 0);
+        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
+        if (endObj) endObj.setHours(23, 59, 59, 999);
+
+        // 2. Kumpulkan metrik khusus cabang ini
+        let totSales = 0, totCash = 0, totQris = 0, totExp = 0, totBill = 0, totPcs = 0;
+        let expItemMap = {};
+        let repCount = 0;
+
+        (this.db.laporanHarian || []).forEach(rep => {
+            if (rep.Status_Approval === 'Ditolak') return;
+            let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            if (repOutlet !== outName) return;
+
+            if (startObj || endObj) {
+                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
+                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    let repDate = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
+                    if (startObj && repDate < startObj) return;
+                    if (endObj && repDate > endObj) return;
+                } else return;
+            }
+
+            repCount++;
+            totSales += Number(rep.Net_Sales || 0);
+            totCash += Number(rep.Cash || 0);
+            totQris += Number(rep.QRIS || 0);
+            totExp += Number(rep.Total_Pengeluaran || 0);
+            totBill += Number(rep.Bill || 0);
+            totPcs += Number(rep.Pcs || 0);
+
+            try {
+                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                expArr.forEach(x => {
+                    let nm = String(x.nama || 'LAINNYA').toUpperCase().trim();
+                    let nmNom = Number(x.nominal || 0);
+                    if (nm !== '' && nmNom > 0) {
+                        if (!expItemMap[nm]) expItemMap[nm] = 0;
+                        expItemMap[nm] += nmNom;
+                    }
+                });
+            } catch(e){}
+        });
+
+        // 3. Kalkulasi Target Cabang & Rata-rata
+        let avgBill = totBill > 0 ? Math.round(totSales / totBill) : 0;
+        let avgPcs = totPcs > 0 ? Math.round(totSales / totPcs) : 0;
+        let netLaci = totCash - totExp;
+
+        let targetCabang = 180000000;
+        let savedT = localStorage.getItem('aicha_target_bulanan_' + outName);
+        if (savedT && !isNaN(savedT)) targetCabang = Number(savedT);
+        let pctTarget = Math.min(Math.round((totSales / targetCabang) * 100), 100);
+
+        // 4. Rakit HTML Popup Super Compact
+        contEl.innerHTML = `
+            <!-- Kartu Progres Target Cabang -->
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700 shadow-sm">
+                <div class="flex justify-between items-end mb-1.5">
+                    <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Target Cabang</span>
+                    <span class="text-[10px] font-black text-rose-400">${pctTarget}% <span class="text-[8px] text-slate-400 font-normal">(Rp ${totSales.toLocaleString('id-ID')} / Rp ${targetCabang.toLocaleString('id-ID')})</span></span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-700">
+                    <div class="bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-400 h-full rounded-full transition-all duration-700" style="width: ${pctTarget}%"></div>
+                </div>
+            </div>
+
+            <!-- Matriks Rangkuman KPI (Grid Compact) -->
+            <div class="grid grid-cols-2 gap-2">
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Net Sales</span>
+                    <span class="text-sm font-black text-rose-400 leading-none">Rp ${totSales.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Total Cash</span>
+                    <span class="text-sm font-black text-emerald-400 leading-none">Rp ${totCash.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Total QRIS</span>
+                    <span class="text-sm font-black text-blue-400 leading-none">Rp ${totQris.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Total OPEX</span>
+                    <span class="text-sm font-black text-amber-400 leading-none">Rp ${totExp.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Avg/Bill <span class="text-[7px] text-slate-500 font-normal">(${totBill})</span></span>
+                    <span class="text-sm font-black text-purple-400 leading-none">Rp ${avgBill.toLocaleString('id-ID')}</span>
+                </div>
+                <div class="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60 flex flex-col justify-center">
+                    <span class="text-[8px] text-slate-400 font-bold uppercase block mb-0.5">Avg/Pcs <span class="text-[7px] text-slate-500 font-normal">(${totPcs})</span></span>
+                    <span class="text-sm font-black text-teal-400 leading-none">Rp ${avgPcs.toLocaleString('id-ID')}</span>
+                </div>
+            </div>
+
+            <!-- Net Cash Bersih (Pill Style) -->
+            <div class="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 p-2.5 rounded-xl border border-emerald-500/30 flex justify-between items-center shadow-inner">
+                <div class="flex items-center gap-1.5">
+                    <i class="fas fa-wallet text-emerald-400 text-xs"></i>
+                    <span class="text-[9px] font-bold text-emerald-200">Net Laci (Cash - OPEX):</span>
+                </div>
+                <span class="text-sm font-black text-emerald-400 drop-shadow-sm">Rp ${netLaci.toLocaleString('id-ID')}</span>
+            </div>
+
+            <!-- Breakdown Pengeluaran Box -->
+            <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/60 flex flex-col min-h-[180px]">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2.5 border-b border-slate-700/60 shrink-0">
+                    <h5 class="text-[10px] font-black text-amber-400 flex items-center gap-1.5 uppercase tracking-widest">
+                        <i class="fas fa-list text-[9px]"></i> Breakdown Biaya
+                    </h5>
+                    <div class="flex items-center gap-1.5">
+                        <div class="relative flex-1 sm:w-28">
+                            <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[8px]"></i>
+                            <input type="text" id="detail-expense-search" oninput="superApp.renderDetailOutletExpenseList()" placeholder="Cari..." class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[9px] font-bold rounded-md pl-6 pr-2 py-1 outline-none focus:border-amber-500 transition-colors shadow-inner">
+                        </div>
+                        <select id="detail-expense-sort" onchange="superApp.renderDetailOutletExpenseList()" class="bg-slate-900 border border-slate-700 text-slate-200 text-[9px] font-bold rounded-md px-1.5 py-1 outline-none focus:border-amber-500 cursor-pointer shadow-sm">
+                            <option value="nominal">Highest</option>
+                            <option value="az">A - Z</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Area Daftar Interaktif (Akan dirender JS) -->
+                <div class="flex-1 overflow-y-auto custom-scroll pr-1 mt-2" id="detail-outlet-expense-list"></div>
+            </div>
+        `;
+        
+        // 🚀 PENTING: Simpan data ke variabel global dan render list
+        this.detailExpenseData = expItemMap;
+        this.renderDetailOutletExpenseList();
+    },
+
+    closeDetailOutletModal: function() {
+        const modal = document.getElementById('modal-detail-outlet-eksekutif');
+        if (modal) modal.classList.add('hidden');
+    },
+
+   
 
     // =========================================================
     // 🚀 CONTROLLER DATEPICKER INPUT KUSTOM YANG CANTIK
@@ -7908,25 +7907,49 @@ openDetailStokOpname: function(sku) {
     closeDetailOpnameModal: function() {
         const modal = document.getElementById('modal-detail-opname');
         if (modal) {
+            // 1. Hilangkan transparansi
             modal.classList.remove('opacity-100');
+            
+            // 2. Luncurkan kotak ke bawah (Khusus HP) dan perkecil ukurannya
             if(modal.firstElementChild) {
-                modal.firstElementChild.classList.remove('scale-100');
-                modal.firstElementChild.classList.add('scale-95');
+                modal.firstElementChild.classList.remove('scale-100', 'translate-y-0');
+                modal.firstElementChild.classList.add('scale-95', 'translate-y-full', 'md:translate-y-0');
             }
-            setTimeout(() => modal.classList.add('hidden'), 300);
+            
+            // 3. Setelah 300ms (animasi selesai), sembunyikan sepenuhnya
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                
+                // 🧹 PERBAIKAN: Bersihkan efek "meluncur ke bawah" secara diam-diam
+                // Agar saat dibuka lagi, posisinya langsung kembali ke tengah/normal!
+                if(modal.firstElementChild) {
+                    modal.firstElementChild.classList.remove('translate-y-full', 'md:translate-y-0');
+                }
+            }, 300);
         }
     },
-
 
     closeDetailRestokModal: function() {
         const modal = document.getElementById('modal-detail-restok');
         if (modal) {
+            // 1. Hilangkan transparansi
             modal.classList.remove('opacity-100');
+            
+            // 2. Luncurkan kotak ke bawah (Khusus HP) dan perkecil ukurannya
             if(modal.firstElementChild) {
-                modal.firstElementChild.classList.remove('scale-100');
-                modal.firstElementChild.classList.add('scale-95');
+                modal.firstElementChild.classList.remove('scale-100', 'translate-y-0');
+                modal.firstElementChild.classList.add('scale-95', 'translate-y-full', 'md:translate-y-0');
             }
-            setTimeout(() => modal.classList.add('hidden'), 300);
+            
+            // 3. Setelah 300ms (animasi selesai), sembunyikan sepenuhnya
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                
+                // 🧹 PERBAIKAN: Bersihkan efek "meluncur ke bawah" secara diam-diam
+                if(modal.firstElementChild) {
+                    modal.firstElementChild.classList.remove('translate-y-full', 'md:translate-y-0');
+                }
+            }, 300);
         }
     },
 
@@ -12750,3 +12773,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
+
