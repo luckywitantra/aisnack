@@ -1104,23 +1104,34 @@
                     </div>
 
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-1.5 mb-2.5">
-                        <div class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10">
-                            <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Net Sales</span>
-                            <span class="font-black text-xs md:text-sm text-white mt-0.5 block truncate drop-shadow-md" id="exec-total-sales">Rp 0</span>
-                        </div>
-                        <div class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10">
-                            <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Cash Laci</span>
-                            <span class="font-black text-xs md:text-sm text-emerald-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-cash">Rp 0</span>
-                        </div>
-                        <div class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10">
-                            <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">QRIS Masuk</span>
-                            <span class="font-black text-xs md:text-sm text-blue-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-qris">Rp 0</span>
-                        </div>
-                        <div class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10">
-                            <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Total OPEX</span>
-                            <span class="font-black text-xs md:text-sm text-rose-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-expense">Rp 0</span>
-                        </div>
-                    </div>
+    <!-- 🚀 Kartu Net Sales Global -->
+    <div onclick="superApp.openKpiDetailModal('sales', 'global')" class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10 cursor-pointer hover:bg-white/20 transition-all active:scale-95 group relative overflow-hidden shadow-sm">
+        <i class="fas fa-external-link-alt absolute top-2 right-2 text-white/30 group-hover:text-white transition-colors text-[8px]"></i>
+        <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Net Sales</span>
+        <span class="font-black text-xs md:text-sm text-white mt-0.5 block truncate drop-shadow-md" id="exec-total-sales">Rp 0</span>
+    </div>
+    
+    <!-- 🚀 Kartu Cash Laci Global -->
+    <div onclick="superApp.openKpiDetailModal('cash', 'global')" class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10 cursor-pointer hover:bg-white/20 transition-all active:scale-95 group relative overflow-hidden shadow-sm">
+        <i class="fas fa-external-link-alt absolute top-2 right-2 text-white/30 group-hover:text-emerald-300 transition-colors text-[8px]"></i>
+        <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Cash Laci</span>
+        <span class="font-black text-xs md:text-sm text-emerald-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-cash">Rp 0</span>
+    </div>
+    
+    <!-- 🚀 Kartu QRIS Masuk Global -->
+    <div onclick="superApp.openKpiDetailModal('qris', 'global')" class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10 cursor-pointer hover:bg-white/20 transition-all active:scale-95 group relative overflow-hidden shadow-sm">
+        <i class="fas fa-external-link-alt absolute top-2 right-2 text-white/30 group-hover:text-blue-300 transition-colors text-[8px]"></i>
+        <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">QRIS Masuk</span>
+        <span class="font-black text-xs md:text-sm text-blue-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-qris">Rp 0</span>
+    </div>
+    
+    <!-- 🚀 Kartu Total OPEX Global -->
+    <div onclick="superApp.openKpiDetailModal('opex', 'global')" class="bg-white/10 backdrop-blur-sm p-2 rounded-xl border border-white/10 cursor-pointer hover:bg-white/20 transition-all active:scale-95 group relative overflow-hidden shadow-sm">
+        <i class="fas fa-external-link-alt absolute top-2 right-2 text-white/30 group-hover:text-rose-300 transition-colors text-[8px]"></i>
+        <span class="text-[8px] font-black text-[#FFD874] uppercase tracking-widest block drop-shadow-sm">Total OPEX</span>
+        <span class="font-black text-xs md:text-sm text-rose-300 mt-0.5 block truncate drop-shadow-md" id="exec-total-expense">Rp 0</span>
+    </div>
+</div>
 
                     <div class="mb-2.5">
                         <h4 class="font-black text-[10px] md:text-[11px] text-white flex items-center gap-1.5 mb-1.5"><i class="fas fa-store text-[#FFB800]"></i> Performa Outlet</h4>
@@ -3286,7 +3297,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=681"></script>
+  <script src="app.js?v=682"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
