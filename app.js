@@ -4167,7 +4167,6 @@ selectOutlet: function(id) {
             }, 250);
         }
     },
-
    
 
     // =========================================================
@@ -12940,17 +12939,10 @@ openAIDeepDive: function(type, param) {
 
 window.onload = () => superApp.init();
 
-// Tambahkan ini di bawah window.onload = () => superApp.init();
 setInterval(() => {
-    // 1. Cek apakah layar utama POS (Kasir) sedang aktif / terbuka
     const viewPos = document.getElementById('view-pos');
     const isPosActive = viewPos && !viewPos.classList.contains('hidden');
-
-    // 2. HANYA tarik data gaib jika: 
-    // - Internet nyala
-    // - Keranjang kosong (tidak ganggu transaksi)
-    // - Staf sedang standby di halaman POS (bukan di halaman Opname/Terima Barang)
-    if (superApp.isOnline && superApp.cart.length === 0 && isPosActive) {
+    if (superApp.isOnline && superApp.cart.length === 0 && isPosActive && !superApp.isProcessing && !superApp.isLoadingData) {
         superApp.pullFreshData(true); 
     }
 }, 300000);
