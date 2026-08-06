@@ -54,7 +54,7 @@
     };
 })();
 
-const API_URL = "https://script.google.com/macros/s/AKfycbxuk1xqgB2a3Aw7IvFQWvowtb1ExeNKy3bel8SFaq9asAEV-98_9UiY7tVljxkVOchNcA/exec"; // <-- GANTI DENGAN URL API ANDA
+const API_URL = "https://script.google.com/macros/s/AKfycbzoHPRf0NHtRk1CP0sz5jLXQRDhDJSQ8FIR6w-4LnZCXja0IO_xkwdCF0WZB2gVSb-eag/exec"; // <-- GANTI DENGAN URL API ANDA
 
 /* ========================================== */
 /* 1. MESIN VIRTUAL KEYBOARD (ENTERPRISE OSK) */
