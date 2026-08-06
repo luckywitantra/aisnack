@@ -6667,31 +6667,42 @@ refreshData: function() {
             let kat = String(m.Kategori || '').toLowerCase();
             if (kat === 'bahan' || kat === 'pendukung') {
                 
-                // --- BARIS TABEL DESKTOP ---
+                // --- BARIS TABEL DESKTOP (UX DIPERBAIKI) ---
                 let strHtml = `
                 <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors group">
-                    <td class="py-3.5 px-5 min-w-[200px] whitespace-normal">
+                    <td class="py-3 px-4 min-w-[200px] whitespace-normal">
                         <div class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</div>
                         <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</div>
                     </td>
-                    <td class="py-3.5 px-5 text-center w-[180px]">
-                        <input type="text" id="trm-qty-${m.SKU}" class="w-24 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-center outline-none font-black text-emerald-600 transition-all shadow-inner cursor-pointer text-sm" readonly onclick="osKeyboard.open('trm-qty-${m.SKU}', 'numeric')" placeholder="0">
+                    
+                    <!-- PERBAIKAN UX: Input Angka Mencolok Tema Emerald -->
+                    <td class="py-3 px-4 text-center bg-emerald-50/30 border-x-2 border-emerald-500/40">
+                        <input type="text" id="trm-qty-${m.SKU}" class="w-20 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-500 rounded-xl px-2 py-2 text-center outline-none font-black text-emerald-700 transition-all shadow-inner cursor-pointer text-sm mx-auto" readonly onclick="osKeyboard.open('trm-qty-${m.SKU}', 'numeric')" placeholder="0">
                     </td>
-                    <td class="py-3.5 px-5 min-w-[250px]">
-                        <input type="text" id="trm-note-${m.SKU}" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl px-3.5 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('trm-note-${m.SKU}', 'text')" placeholder="Keterangan kurir / kondisi fisik...">
+                    
+                    <!-- PERBAIKAN UX: Input Keterangan Standar -->
+                    <td class="py-3 px-4 min-w-[200px]">
+                        <input type="text" id="trm-note-${m.SKU}" class="w-full bg-white hover:bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 outline-none text-xs font-normal text-slate-600 transition-all cursor-pointer shadow-sm" readonly onclick="osKeyboard.open('trm-note-${m.SKU}', 'text')" placeholder="Catatan kurir / kondisi fisik...">
                     </td>
                 </tr>`;
                 
-                // --- KARTU PADAT MOBILE ---
+                // --- KARTU PADAT MOBILE (UX SANGAT LEGA - STACKED) ---
                 let strMobile = `
-                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex flex-col gap-2.5 group">
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col gap-2 group">
                     <div class="flex justify-between items-start gap-2">
-                        <h4 class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
-                        <span class="text-[9px] text-slate-400 font-bold bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shrink-0 uppercase">${m.SKU}</span>
+                        <div class="flex-1">
+                            <h4 class="font-extrabold text-xs md:text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
+                            <div class="text-[9px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-1.5"><i class="fas fa-barcode"></i> SKU: ${m.SKU}</div>
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="text" id="trm-qty-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 rounded-xl px-2 py-2 text-center outline-none font-black text-emerald-600 transition-all shadow-inner cursor-pointer text-sm" readonly onclick="osKeyboard.open('trm-qty-mob-${m.SKU}', 'numeric')" placeholder="Qty">
-                        <input type="text" id="trm-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('trm-note-mob-${m.SKU}', 'text')" placeholder="Catatan fisik/kurir...">
+                    
+                    <!-- PERBAIKAN UX: Input Angka & Teks Disusun Vertikal -->
+                    <div class="flex flex-col gap-2 pt-2 border-t border-slate-100 mt-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black text-emerald-600 uppercase tracking-wider flex-1"><i class="fas fa-box-open mr-1"></i> Jumlah (Pcs) :</span>
+                            <input type="text" id="trm-qty-mob-${m.SKU}" class="w-24 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-500 rounded-xl px-2 py-2 text-center outline-none font-black text-emerald-700 text-sm cursor-pointer shadow-inner shrink-0" readonly onclick="osKeyboard.open('trm-qty-mob-${m.SKU}', 'numeric')" placeholder="0">
+                        </div>
+                        <input type="text" id="trm-note-mob-${m.SKU}" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2.5 outline-none text-xs font-normal text-slate-600 cursor-pointer shadow-sm" readonly onclick="osKeyboard.open('trm-note-mob-${m.SKU}', 'text')" placeholder="Tulis kondisi fisik/kurir...">
                     </div>
                 </div>`;
                 
@@ -6738,10 +6749,9 @@ refreshData: function() {
                 let sys = sData ? Number(sData.Stok_Toko) : 0;
                 autoFillData.push({ idDesk: `opn-fisik-${m.SKU}`, idMob: `opn-fisik-mob-${m.SKU}`, val: sys });
 
-                // 🛡️ Amankan nama produk dari tanda kutip tunggal agar onclick tidak error
+                // 🛡️ Amankan nama produk dari tanda kutip tunggal
                 let safeNama = String(m.Nama_Produk || '').replace(/'/g, "\\'");
 
-                // 🚀 UPDATE: Panggil fungsi openStokDetail dengan 3 parameter (SKU, Nama, Outlet)
                 let sysHtmlDesk = isAdmin 
                     ? `<button onclick="superApp.openStokDetail('${m.SKU}', '${safeNama}', '${this.outlet}')" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-xl border border-indigo-200/60 hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 mx-auto w-full max-w-[80px]" title="Lihat Analisis & Tren"><i class="fas fa-chart-area"></i> <span id="opn-sys-${m.SKU}" class="font-black">${sys}</span></button>` 
                     : `<span id="opn-sys-${m.SKU}" class="font-black text-indigo-600 text-base">${sys}</span>`;
@@ -6753,36 +6763,44 @@ refreshData: function() {
                 // --- BARIS TABEL DESKTOP ---
                 let desk = `
                 <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors group">
-                    <td class="py-3.5 px-5 min-w-[200px] whitespace-normal">
+                    <td class="py-3 px-4 min-w-[200px] whitespace-normal">
                         <div class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</div>
                         <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SKU: ${m.SKU}</div>
                     </td>
-                    <td class="py-3.5 px-5 text-center">${sysHtmlDesk}</td>
-                    <td class="py-3.5 px-5 text-center">
-                        <input type="text" id="opn-fisik-${m.SKU}" class="w-24 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-center outline-none font-black text-purple-600 transition-all shadow-inner cursor-pointer text-sm" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
+                    <td class="py-3 px-4 text-center border-l border-slate-100/50">${sysHtmlDesk}</td>
+                    
+                    <td class="py-3 px-4 text-center bg-[#FFF5D1]/30 border-x-2 border-[#FFB800]/50">
+                        <input type="text" id="opn-fisik-${m.SKU}" class="w-20 bg-[#FFF5D1]/80 hover:bg-[#FFD874]/50 border-2 border-[#FFB800] rounded-xl px-2 py-2 text-center outline-none font-black text-[#A87B00] transition-all shadow-inner cursor-pointer text-sm" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-${m.SKU}', 'numeric')" oninput="superApp.calcOpname('${m.SKU}')">
                     </td>
-                    <td class="py-3.5 px-5 text-right font-black text-slate-300 text-xl" id="opn-selisih-${m.SKU}">0</td>
-                    <td class="py-3.5 px-5 min-w-[250px]">
-                        <input type="text" id="opn-note-${m.SKU}" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 outline-none text-xs font-bold text-slate-700 transition-all cursor-pointer" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik...">
+                    
+                    <td class="py-3 px-4 text-right font-black text-slate-300 text-xl border-r border-slate-100/50" id="opn-selisih-${m.SKU}">0</td>
+                    
+                    <td class="py-3 px-4 min-w-[200px]">
+                        <input type="text" id="opn-note-${m.SKU}" class="w-full bg-white hover:bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 outline-none text-xs font-normal text-slate-600 transition-all cursor-pointer shadow-sm" readonly onclick="osKeyboard.open('opn-note-${m.SKU}', 'text')" placeholder="Kondisi Fisik / Alasan...">
                     </td>
                 </tr>`;
                 
-                // --- KARTU PADAT MOBILE ---
+                // --- KARTU PADAT MOBILE (UX SANGAT LEGA - STACKED) ---
                 let mob = `
-                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm transition-all flex flex-col gap-2.5 group">
-                    <div class="flex justify-between items-center gap-2">
-                        <div>
-                            <h4 class="font-extrabold text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
-                            <div class="text-[10px] text-slate-400 font-bold uppercase mt-0.5 flex items-center gap-1.5">Sys: ${sysHtmlMob}</div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col gap-2 group">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1">
+                            <h4 class="font-extrabold text-xs md:text-sm text-slate-800 leading-snug">${m.Nama_Produk}</h4>
+                            <div class="text-[9px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-1.5">Sys: ${sysHtmlMob}</div>
                         </div>
-                        <div class="text-right shrink-0">
-                            <span class="text-[8px] text-slate-400 uppercase font-black tracking-wider block">Selisih</span>
-                            <span class="font-black text-slate-300 text-xl leading-none" id="opn-selisih-mob-${m.SKU}">0</span>
+                        <div class="text-center shrink-0 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-100">
+                            <span class="text-[8px] text-slate-400 uppercase font-black tracking-wider block mb-0.5">Selisih</span>
+                            <span class="font-black text-slate-300 text-lg leading-none" id="opn-selisih-mob-${m.SKU}">0</span>
                         </div>
                     </div>
-                    <div class="flex gap-2 pt-1 border-t border-slate-50">
-                        <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-20 bg-slate-50 border-2 border-slate-200 focus:border-purple-500 rounded-xl px-2 py-2 text-center outline-none font-black text-purple-600 text-sm cursor-pointer" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
-                        <input type="text" id="opn-note-mob-${m.SKU}" class="flex-1 bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 outline-none text-xs font-bold text-slate-700 cursor-pointer" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Alasan selisih...">
+                    
+                    <!-- PERBAIKAN UX: Input Angka & Teks Disusun Vertikal -->
+                    <div class="flex flex-col gap-2 pt-2 border-t border-slate-100 mt-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black text-[#A87B00] uppercase tracking-wider flex-1"><i class="fas fa-hand-holding-box mr-1"></i> Fisik Aktual :</span>
+                            <input type="text" id="opn-fisik-mob-${m.SKU}" class="w-24 bg-[#FFF5D1]/80 hover:bg-[#FFD874]/50 border-2 border-[#FFB800] rounded-xl px-2 py-2 text-center outline-none font-black text-[#A87B00] text-sm cursor-pointer shadow-inner shrink-0" value="${sys}" readonly onclick="osKeyboard.open('opn-fisik-mob-${m.SKU}', 'numeric')" oninput="superApp.calcOpnameMob('${m.SKU}')">
+                        </div>
+                        <input type="text" id="opn-note-mob-${m.SKU}" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2.5 outline-none text-xs font-normal text-slate-600 cursor-pointer shadow-sm" readonly onclick="osKeyboard.open('opn-note-mob-${m.SKU}', 'text')" placeholder="Tulis alasan jika ada selisih...">
                     </div>
                 </div>`;
 
@@ -6791,23 +6809,19 @@ refreshData: function() {
             }
         });
 
-        // Injeksi ke Tabel Desktop
         const tU = document.getElementById('opname-tbody-utama'); 
         if (tU) tU.innerHTML = hu || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-box-open', 'Belum Ada Bahan', 'Tambahkan bahan di menu gudang')}</td></tr>`;
         const tP = document.getElementById('opname-tbody-pendukung'); 
         if (tP) tP.innerHTML = hp || `<tr><td colspan="5" class="py-12">${this.getEmptyState('fa-pump-soap', 'Belum Ada Barang', 'Tambahkan pendukung di gudang')}</td></tr>`;
         
-        // Injeksi ke Kartu Mobile
         const mU = document.getElementById('opname-mob-utama'); 
         if (mU) mU.innerHTML = hum || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada bahan utama</div>';
         const mP = document.getElementById('opname-mob-pendukung'); 
         if (mP) mP.innerHTML = hpm || '<div class="text-center py-10 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">Tidak ada barang pendukung</div>';
 
-        // Update Angka Badge pada Sub-Tab
         const bU = document.getElementById('count-opname-utama'); if(bU) bU.innerText = cUtama;
         const bP = document.getElementById('count-opname-pendukung'); if(bP) bP.innerText = cPend;
 
-        // Auto-fill Nilai Stok Sistem ke Input Fisik (Setelah DOM Selesai Render)
         setTimeout(() => {
             autoFillData.forEach(item => {
                 let elDesk = document.getElementById(item.idDesk); 
@@ -6817,7 +6831,6 @@ refreshData: function() {
             });
         }, 50); 
     },
-    
   
    submitTerimaBarang: async function() {
         let items = []; let totalPcs = 0; let waText = `*LAPORAN BARANG DATANG PUSAT*\n📍 Cabang: ${this.outlet}\n👤 Kasir: ${this.currentUser ? this.currentUser.Username : 'Kasir'}\n📅 Waktu: ${new Date().toLocaleString('id-ID')}\n\n*_Mohon cek aplikasi menu Audit untuk memverifikasi agar stok masuk ke sistem_*\n\n`;
@@ -6952,14 +6965,6 @@ refreshData: function() {
         else {
             let confirmKirim = confirm("✅ Laporan Berhasil Disimpan ke Sistem!\n\nKlik 'OK' untuk langsung mengirimkan laporan audit ke WhatsApp.");
             if (confirmKirim) window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-        }
-    },
-
-    closeWaShareModal: function() {
-        const modal = document.getElementById('modal-wa-share');
-        if (modal) {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
         }
     },
 
@@ -7595,7 +7600,7 @@ openDetailStokOpname: function(sku) {
         let pendingData = this.getGroupedOpname().filter(x => x.Status === 'Pending');
 
         if (pendingData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 italic text-xs border border-dashed border-slate-200 rounded-xl">Tidak ada pengajuan Opname yang menunggu persetujuan</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50/50">Tidak ada pengajuan Opname yang menunggu persetujuan</td></tr>`;
             return;
         }
 
@@ -7617,24 +7622,38 @@ openDetailStokOpname: function(sku) {
             });
 
             let isAkurat = akuratCount === op.Items.length;
+            
+            // 🎨 PERBAIKAN: Badge status disesuaikan ukurannya agar semanis gambar target
             let statusBadge = isAkurat
-                ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px]">Akurat</span>`
-                : `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[9px]">Ada Selisih</span>`;
+                ? `<span class="bg-emerald-100/80 text-emerald-700 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wide shadow-sm">Akurat</span>`
+                : `<span class="bg-rose-100/80 text-rose-600 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wide shadow-sm">Ada Selisih</span>`;
 
-            // Tampilkan jumlah item yang selisih & total pcs deviasinya
-            let selisihTeks = isAkurat ? '-' : `<span class="text-rose-600 font-black">${op.Items.length - akuratCount} Brg</span> <span class="text-slate-400 text-[9px]">(Deviasi ${totalDeviasi})</span>`;
+            // 🎨 PERBAIKAN: Teks selisih dibuat identik (Merah tebal untuk jumlah, abu-abu untuk deviasi)
+            let selisihTeks = isAkurat 
+                ? '<span class="text-slate-400 font-bold">-</span>' 
+                : `<span class="text-rose-600 font-black text-[11px]">${op.Items.length - akuratCount} Brg</span> <span class="text-slate-400 text-[10px] font-bold ml-0.5">(Deviasi ${totalDeviasi})</span>`;
+            
             let catatanTeks = catatanKasir ? catatanKasir : '-';
 
+            // 🎨 PERBAIKAN: Tombol Item Laporan diubah menjadi Pill rapi tanpa Underline
             return `
-            <tr class="hover:bg-slate-50 transition border-b border-slate-50">
-                <td class="py-3 px-4 text-[11px]">${op.Waktu}</td>
-                <td class="py-3 px-4"><span class="text-indigo-600 font-black">Ai-CHA ${op.Outlet}</span><br><span class="text-[9px] text-slate-400">Oleh: ${op.Kasir}</span></td>
-                <td class="py-3 px-4 text-center">
-                    <button onclick="superApp.openDetailOpnameModal('${op.Waktu}', '${op.Outlet}')" class="text-indigo-500 underline text-[10px] font-black bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition"><i class="fas fa-tasks mr-1"></i> ${op.Items.length} Item</button>
+            <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100/70">
+                <td class="py-4 px-4 text-[11px] font-bold text-slate-700 align-middle">${op.Waktu}</td>
+                
+                <td class="py-4 px-4 align-middle">
+                    <div class="text-indigo-600 font-black text-xs tracking-tight">Ai-CHA ${op.Outlet}</div>
+                    <div class="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Oleh: ${op.Kasir}</div>
                 </td>
-                <td class="py-3 px-4 text-center">${statusBadge}</td>
-                <td class="py-3 px-4 text-right text-[11px]">${selisihTeks}</td>
-                <td class="py-3 px-4 text-[10px] text-slate-500 italic max-w-[150px] truncate" title="${catatanTeks}">${catatanTeks}</td>
+                
+                <td class="py-4 px-4 align-middle text-center md:text-left">
+                    <button onclick="superApp.openDetailOpnameModal('${op.Waktu}', '${op.Outlet}')" class="text-indigo-600 text-[10px] font-black bg-indigo-50/80 border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition active:scale-95 inline-flex items-center gap-1.5 shadow-sm">
+                        <i class="fas fa-list-ul"></i> ${op.Items.length} Item
+                    </button>
+                </td>
+                
+                <td class="py-4 px-4 align-middle">${statusBadge}</td>
+                <td class="py-4 px-4 align-middle">${selisihTeks}</td>
+                <td class="py-4 px-4 text-[10px] font-bold text-slate-500 max-w-[150px] truncate align-middle" title="${catatanTeks}">${catatanTeks}</td>
             </tr>`;
         }).join('');
     },
@@ -8201,40 +8220,24 @@ openDetailStokOpname: function(sku) {
     },
 
     renderAudit: function() {
-        const tbodyOp = document.getElementById('audit-opname-tbody');
-        if (tbodyOp) {
-            let html = '';
-            (this.db.opname || []).forEach(op => {
-                if (op.Status_Approval === 'Pending') {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === op.SKU)?.Nama_Produk || op.SKU || 'Unknown';
-                    let selColor = op.Selisih < 0 ? 'text-red-500' : (op.Selisih > 0 ? 'text-green-500' : 'text-slate-500');
-                    let wStr = this.cleanDateOnly(op.Waktu) + ' ' + this.cleanTimeOnly(op.Waktu);
+        // =====================================================================
+        // 🚀 PERBAIKAN KRITIS: 
+        // Rendering tabel 'Pending Opname' DIHAPUS DARI SINI karena sudah 
+        // dikerjakan secara elegan (Grouped) oleh fungsi renderAuditOpname().
+        // Jika tidak dihapus, kodingan ini akan merusak/menimpa tabel tersebut.
+        // =====================================================================
 
-                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-opname w-5 h-5 rounded cursor-pointer accent-brand-500" value="${op.Waktu}|${op.SKU}|${op.Outlet}|${op.Stok_Fisik}" onchange="superApp.checkBulkAudit()"></td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(op.Outlet)}<br><span class="text-brand-500 inline-block mt-1">${op.Kasir}</span></td>
-                        <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
-                        <td class="py-3 px-4 text-center text-xs whitespace-nowrap">Sys: ${op.Stok_Sistem} <i class="fas fa-arrow-right mx-1 text-slate-300"></i> Fisik: ${op.Stok_Fisik}</td>
-                        <td class="py-3 px-4 text-right font-black ${selColor}">${op.Selisih > 0 ? '+'+op.Selisih : op.Selisih}</td>
-                        <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${op.Keterangan_Fisik || '-'}</td>
-                    </tr>`;
-                }
-            });
-            tbodyOp.innerHTML = html || `<tr><td colspan="7" class="text-center py-6 h-32">${this.getEmptyState('fa-clipboard-check', 'Audit Bersih', 'Tidak ada laporan opname yang pending')}</td></tr>`;
-        }
-
+        // Fungsi ini sekarang HANYA FOKUS merender tabel 'Pending Terima Barang'
         const tbodyTr = document.getElementById('audit-terima-tbody');
         if (tbodyTr) {
             let html = '';
             
-            // Kita hitung dulu berapa kali tiap outlet sudah melakukan mutasi hari ini
+            // Hitung dulu berapa kali tiap outlet sudah melakukan mutasi hari ini
             let mutasiHistoryHariIni = {};
             (this.db.mutasi || []).forEach(mt => {
                 if (mt.Status_Approval === 'Disetujui' && mt.Waktu) {
                     let tgl = this.cleanDateOnly(mt.Waktu);
                     if (tgl) {
-                        // 🚀 PERBAIKAN: Gunakan data mentah untuk membuat Key Kamus Memori
                         let key = `${mt.Outlet_Tujuan}_${tgl}`;
                         mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
                     }
@@ -8243,49 +8246,59 @@ openDetailStokOpname: function(sku) {
 
             (this.db.mutasi || []).forEach(mt => {
                 if (mt.Status_Approval === 'Pending') {
-                    let itemName = this.db.masterProduk.find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
+                    let itemName = (this.db.masterProduk || []).find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
                     let tgl = this.cleanDateOnly(mt.Waktu);
                     
-                    // 🚀 PERBAIKAN: Gunakan data mentah yang sama untuk mengecek Key
                     let key = `${mt.Outlet_Tujuan}_${tgl}`;
                     let sudahAda = mutasiHistoryHariIni[key] || 0;
                     
                     let warningBadge = sudahAda > 0 ? 
-                        `<span class="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded shadow-sm animate-pulse block mt-1">⚠️ Sudah ${sudahAda}x kirim hari ini!</span>` : '';
+                        `<span class="text-[10px] font-black bg-rose-100/80 text-rose-600 px-2 py-0.5 rounded shadow-sm animate-pulse block mt-1">⚠️ Sudah ${sudahAda}x kirim hari ini!</span>` : '';
 
                     let wStr = mt.Waktu ? (this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu)) : '-';
 
-                    html += `<tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td class="py-3 px-4 text-center w-12"><input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-brand-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()"></td>
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${wStr}</td>
+                    // 🎨 Tabel Terima Barang ini tetap dipertahankan sesuai aslinya
+                    html += `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100/70">
+                        <td class="py-4 px-4 text-center w-12 align-middle">
+                            <input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-indigo-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()">
+                        </td>
+                        <td class="py-4 px-4 text-[11px] font-bold text-slate-700 whitespace-nowrap align-middle">${wStr}</td>
                         
-                        <td class="py-3 px-4 text-xs whitespace-nowrap">${this.getOutletBadge(mt.Outlet_Tujuan)}<br><span class="text-brand-500 inline-block mt-1">${mt.Kasir || '-'}</span>${warningBadge}</td>
+                        <td class="py-4 px-4 whitespace-nowrap align-middle">
+                            ${this.getOutletBadge(mt.Outlet_Tujuan)}<br>
+                            <span class="text-slate-400 font-bold text-[9px] uppercase mt-0.5 inline-block">Oleh: ${mt.Kasir || '-'}</span>
+                            ${warningBadge}
+                        </td>
                         
-                        <td class="py-3 px-4 text-xs font-bold whitespace-normal min-w-[150px]">${itemName}</td>
-                        <td class="py-3 px-4 text-center text-sm font-black text-brand-500 whitespace-nowrap">${mt.Qty} Pcs</td>
-                        <td class="py-3 px-4 text-xs italic whitespace-normal min-w-[150px]">${mt.Keterangan || '-'}</td>
+                        <td class="py-4 px-4 text-xs font-bold text-slate-700 whitespace-normal min-w-[150px] align-middle">${itemName}</td>
+                        <td class="py-4 px-4 text-center text-sm font-black text-indigo-600 whitespace-nowrap align-middle">${mt.Qty} Pcs</td>
+                        <td class="py-4 px-4 text-[10px] font-bold text-slate-500 italic whitespace-normal min-w-[150px] align-middle">${mt.Keterangan || '-'}</td>
                     </tr>`;
                 }
             });
-            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="text-center py-6 h-32">${this.getEmptyState('fa-box-open', 'Audit Bersih', 'Tidak ada penerimaan barang yang pending')}</td></tr>`;
+            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="py-10 text-center text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50/50">Tidak ada pengajuan Restok yang menunggu persetujuan</td></tr>`;
         }
+        
+        // Cek jika ada checkbox yang aktif
         this.checkBulkAudit();
     },
-    
+
     // =========================================================
     // 🚀 1. CEK SELEKSI CHECKBOX AUDIT
     // =========================================================
     checkBulkAudit: function() {
-        let opChecked = document.querySelectorAll('.cb-audit-opname:checked').length;
+        // Karena checkbox opname sudah musnah, kita paskan logikanya 
+        // hanya menghitung checkbox 'Terima Barang'
         let trChecked = document.querySelectorAll('.cb-audit-terima:checked').length;
         let bar = document.getElementById('bulk-action-bar');
         
         // Perbarui badge angka pada Floating Action Bar jika ada
         const countBadge = document.getElementById('bulk-action-count');
-        if (countBadge) countBadge.innerText = `${opChecked + trChecked} Dipilih`;
+        if (countBadge) countBadge.innerText = `${trChecked} Dipilih`;
 
         if (bar) { 
-            if (opChecked > 0 || trChecked > 0) bar.classList.remove('hidden'); 
+            if (trChecked > 0) bar.classList.remove('hidden'); 
             else bar.classList.add('hidden'); 
         }
     },
@@ -8296,9 +8309,8 @@ openDetailStokOpname: function(sku) {
     processBulkApproval: function(status) {
         if (this.isProcessing) return;
         
-        let opCbs = document.querySelectorAll('.cb-audit-opname:checked'); 
         let trCbs = document.querySelectorAll('.cb-audit-terima:checked');
-        let totalSelected = opCbs.length + trCbs.length;
+        let totalSelected = trCbs.length;
 
         if (totalSelected === 0) return this.showToast("Tidak ada data dipilih", "warning");
 
@@ -8316,7 +8328,7 @@ openDetailStokOpname: function(sku) {
         const btnExecute = document.getElementById('btn-confirm-bulk-execute');
 
         // Isi angka ringkasan
-        if (document.getElementById('bulk-confirm-opname-count')) document.getElementById('bulk-confirm-opname-count').innerText = `${opCbs.length} Item`;
+        if (document.getElementById('bulk-confirm-opname-count')) document.getElementById('bulk-confirm-opname-count').innerText = `0 Item`;
         if (document.getElementById('bulk-confirm-terima-count')) document.getElementById('bulk-confirm-terima-count').innerText = `${trCbs.length} Item`;
         if (document.getElementById('bulk-confirm-total-count')) document.getElementById('bulk-confirm-total-count').innerText = `${totalSelected} Laporan`;
 
@@ -8324,7 +8336,7 @@ openDetailStokOpname: function(sku) {
             // TEMA HIJAU (SETUJUI)
             if (iconBox) iconBox.className = "w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-emerald-100/60 shadow-inner";
             if (icon) icon.className = "fas fa-check-double animate-bounce";
-            if (titleEl) titleEl.innerText = "Setujui Laporan Terpilih?";
+            if (titleEl) titleEl.innerText = "Setujui Restok Terpilih?";
             if (subtitleEl) subtitleEl.innerText = "Stok sistem akan langsung diperbarui secara permanen.";
             if (actionBadge) {
                 actionBadge.innerText = "Disetujui (Approve)";
@@ -8333,7 +8345,7 @@ openDetailStokOpname: function(sku) {
             if (warningBox) {
                 warningBox.className = "bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-left flex items-start gap-2.5 mb-6";
                 if (warningIcon) warningIcon.className = "fas fa-circle-info text-amber-500 text-base mt-0.5 shrink-0";
-                if (warningText) warningText.innerHTML = "Dengan menyetujui, angka opname fisik akan <b>menimpa stok komputer</b>, dan barang masuk dari supplier akan <b>mencair ke stok toko</b>.";
+                if (warningText) warningText.innerHTML = "Dengan menyetujui, barang masuk dari supplier akan <b>mencair ke stok toko</b>.";
             }
             if (btnExecute) {
                 btnExecute.className = "w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs md:text-sm rounded-xl shadow-lg shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-2";
@@ -8343,7 +8355,7 @@ openDetailStokOpname: function(sku) {
             // TEMA MERAH (TOLAK)
             if (iconBox) iconBox.className = "w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border-[6px] border-rose-100/60 shadow-inner";
             if (icon) icon.className = "fas fa-xmark animate-bounce";
-            if (titleEl) titleEl.innerText = "Tolak Laporan Terpilih?";
+            if (titleEl) titleEl.innerText = "Tolak Restok Terpilih?";
             if (subtitleEl) subtitleEl.innerText = "Laporan akan diabaikan dan stok tidak akan berubah.";
             if (actionBadge) {
                 actionBadge.innerText = "Ditolak (Reject)";
@@ -8362,7 +8374,7 @@ openDetailStokOpname: function(sku) {
 
         // Hubungkan eksekusi ke tombol
         if (btnExecute) {
-            btnExecute.onclick = () => this.executeBulkApproval(status, opCbs, trCbs);
+            btnExecute.onclick = () => this.executeBulkApproval(status, trCbs);
         }
 
         this.openModal('modal-confirm-bulk');
@@ -8371,7 +8383,7 @@ openDetailStokOpname: function(sku) {
     // =========================================================
     // 🚀 3. PELAKSANA EKSEKUSI API SECARA MASAL
     // =========================================================
-    executeBulkApproval: async function(status, opCbs, trCbs) {
+    executeBulkApproval: async function(status, trCbs) {
         if (this.isProcessing) return;
         this.closeModal('modal-confirm-bulk');
 
@@ -8379,13 +8391,8 @@ openDetailStokOpname: function(sku) {
             this.setLoading(true, `Memproses Masal (${status})...`);
 
             try {
-                if (opCbs.length > 0) {
-                    let items = Array.from(opCbs).map(cb => { 
-                        let p = cb.value.split('|'); 
-                        return { waktu: p[0], sku: p[1], outlet: p[2], fisik: parseInt(p[3]) }; 
-                    });
-                    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_opname', items: items, status_app: status }) });
-                }
+                // Proses Opname sudah dicabut karena sekarang lewat tombol individual 'Setujui' per laporan
+                
                 if (trCbs.length > 0) {
                     let items = Array.from(trCbs).map(cb => cb.value);
                     await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_mutasi', items: items, status_app: status }) });
