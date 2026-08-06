@@ -4157,6 +4157,17 @@ selectOutlet: function(id) {
         modalDetail.firstElementChild.classList.add('scale-100');
     },
 
+    closeKpiDetailModal: function() {
+        const modalDetail = document.getElementById('modal-kpi-detail-exec');
+        if (modalDetail) {
+            modalDetail.firstElementChild.classList.remove('scale-100');
+            modalDetail.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                modalDetail.classList.add('hidden');
+            }, 250);
+        }
+    },
+
    
 
     // =========================================================
