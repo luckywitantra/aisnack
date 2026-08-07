@@ -1544,39 +1544,43 @@
             <!-- ================= TAB 1: DASHBOARD & TRX ================= -->
             <div id="report-content-trx" class="flex-1 flex flex-col min-h-0">
                 
-                <!-- 4 MEGA CARDS (Warm Colors) -->
+               <!-- 4 MEGA CARDS (Warm Colors) DENGAN FITUR KLIK (DRILL-DIVE) -->
                 <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5 shrink-0">
                     <!-- Omset (Emas) -->
-                    <div class="bg-gradient-to-br from-[#FFF5D1] to-[#FFD874]/50 p-4 rounded-2xl border border-[#FFB800]/30 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                    <div onclick="superApp.openReportDeepDive('omset')" class="bg-gradient-to-br from-[#FFF5D1] to-[#FFD874]/50 p-4 rounded-2xl border border-[#FFB800]/30 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform cursor-pointer active:scale-95">
+                        <i class="fas fa-external-link-alt absolute top-3 right-3 text-[#FFB800]/50 group-hover:text-[#FFB800] text-[10px] transition-colors z-20"></i>
                         <div class="absolute right-0 top-0 w-12 h-12 bg-white/50 rounded-bl-2xl flex items-center justify-center text-[#FFB800] text-lg group-hover:scale-110 transition-transform"><i class="fas fa-wallet"></i></div>
-                        <p class="text-[#D49800] text-[9px] font-black uppercase tracking-widest mb-0.5">Total Omset</p>
-                        <h4 class="text-lg md:text-2xl font-black text-[#4A3B32] tracking-tight truncate" id="rep-total-omset">Rp 0</h4>
-                        <div class="mt-1 text-[9px] font-bold text-[#A87B00]" id="rep-diff-omset">-</div>
+                        <p class="text-[#D49800] text-[9px] font-black uppercase tracking-widest mb-0.5 relative z-10">Total Omset</p>
+                        <h4 class="text-lg md:text-2xl font-black text-[#4A3B32] tracking-tight truncate relative z-10" id="rep-total-omset">Rp 0</h4>
+                        <div class="mt-1 text-[9px] font-bold text-[#A87B00] relative z-10" id="rep-diff-omset">-</div>
                     </div>
                     <!-- Tunai (Hijau Lembut) -->
-                    <div class="bg-gradient-to-br from-emerald-50 to-teal-50/80 p-4 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                    <div onclick="superApp.openReportDeepDive('tunai')" class="bg-gradient-to-br from-emerald-50 to-teal-50/80 p-4 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform cursor-pointer active:scale-95">
+                        <i class="fas fa-external-link-alt absolute top-3 right-3 text-emerald-500/50 group-hover:text-emerald-500 text-[10px] transition-colors z-20"></i>
                         <div class="absolute right-0 top-0 w-12 h-12 bg-white/50 rounded-bl-2xl flex items-center justify-center text-emerald-500 text-lg group-hover:scale-110 transition-transform"><i class="fas fa-money-bill-wave"></i></div>
-                        <p class="text-emerald-600 text-[9px] font-black uppercase tracking-widest mb-0.5">Kas Tunai</p>
-                        <h4 class="text-lg md:text-2xl font-black text-emerald-800 tracking-tight truncate" id="rep-total-tunai">Rp 0</h4>
-                        <div class="mt-1 text-[9px] font-bold text-emerald-600/70" id="rep-diff-tunai">-</div>
+                        <p class="text-emerald-600 text-[9px] font-black uppercase tracking-widest mb-0.5 relative z-10">Kas Tunai</p>
+                        <h4 class="text-lg md:text-2xl font-black text-emerald-800 tracking-tight truncate relative z-10" id="rep-total-tunai">Rp 0</h4>
+                        <div class="mt-1 text-[9px] font-bold text-emerald-600/70 relative z-10" id="rep-diff-tunai">-</div>
                     </div>
                     <!-- QRIS (Biru Lembut) -->
-                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50/80 p-4 rounded-2xl border border-blue-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                    <div onclick="superApp.openReportDeepDive('qris')" class="bg-gradient-to-br from-blue-50 to-indigo-50/80 p-4 rounded-2xl border border-blue-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform cursor-pointer active:scale-95">
+                        <i class="fas fa-external-link-alt absolute top-3 right-3 text-blue-500/50 group-hover:text-blue-500 text-[10px] transition-colors z-20"></i>
                         <div class="absolute right-0 top-0 w-12 h-12 bg-white/50 rounded-bl-2xl flex items-center justify-center text-blue-500 text-lg group-hover:scale-110 transition-transform"><i class="fas fa-qrcode"></i></div>
-                        <p class="text-blue-600 text-[9px] font-black uppercase tracking-widest mb-0.5">QRIS / Transfer</p>
-                        <h4 class="text-lg md:text-2xl font-black text-blue-800 tracking-tight truncate" id="rep-total-qris">Rp 0</h4>
-                        <div class="mt-1 text-[9px] font-bold text-blue-600/70" id="rep-diff-qris">-</div>
+                        <p class="text-blue-600 text-[9px] font-black uppercase tracking-widest mb-0.5 relative z-10">QRIS / Transfer</p>
+                        <h4 class="text-lg md:text-2xl font-black text-blue-800 tracking-tight truncate relative z-10" id="rep-total-qris">Rp 0</h4>
+                        <div class="mt-1 text-[9px] font-bold text-blue-600/70 relative z-10" id="rep-diff-qris">-</div>
                     </div>
                     <!-- Struk (Merah Lembut) -->
-                    <div class="bg-gradient-to-br from-rose-50 to-red-50/80 p-4 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                    <div onclick="superApp.openReportDeepDive('struk')" class="bg-gradient-to-br from-rose-50 to-red-50/80 p-4 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform cursor-pointer active:scale-95">
+                        <i class="fas fa-external-link-alt absolute top-3 right-3 text-[#E5202B]/50 group-hover:text-[#E5202B] text-[10px] transition-colors z-20"></i>
                         <div class="absolute right-0 top-0 w-12 h-12 bg-white/50 rounded-bl-2xl flex items-center justify-center text-[#E5202B] text-lg group-hover:scale-110 transition-transform"><i class="fas fa-receipt"></i></div>
-                        <p class="text-rose-600 text-[9px] font-black uppercase tracking-widest mb-0.5">Jumlah Struk</p>
-                        <h4 class="text-lg md:text-2xl font-black text-[#4A3B32] tracking-tight truncate" id="rep-total-trx">0</h4>
-                        <div class="mt-1 text-[9px] font-bold text-rose-500/70" id="rep-diff-trx">-</div>
+                        <p class="text-rose-600 text-[9px] font-black uppercase tracking-widest mb-0.5 relative z-10">Jumlah Struk</p>
+                        <h4 class="text-lg md:text-2xl font-black text-[#4A3B32] tracking-tight truncate relative z-10" id="rep-total-trx">0</h4>
+                        <div class="mt-1 text-[9px] font-bold text-rose-500/70 relative z-10" id="rep-diff-trx">-</div>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 shrink-0">
+                  
                     <!-- KARTU TREN PENJUALAN -->
                     <div class="lg:col-span-2 bg-white dark:bg-slate-900/80 backdrop-blur-xl p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-700/60 shadow-sm flex flex-col overflow-hidden relative group">
                         <div class="flex justify-between items-center gap-2 mb-4 relative z-10">
@@ -3297,7 +3301,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=690"></script>
+  <script src="app.js?v=682"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
