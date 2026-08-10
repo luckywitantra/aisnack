@@ -490,6 +490,12 @@ const superApp = {
                 let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
                 if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
+                let tPelanggan = (this.db.pengaturan || []).find(x => x.Pengaturan === 'aisnack_receipt_template');
+                if (tPelanggan && tPelanggan.Nilai) localStorage.setItem('aisnack_receipt_template', tPelanggan.Nilai);
+
+                let tDapur = (this.db.pengaturan || []).find(x => x.Pengaturan === 'aisnack_kitchen_receipt_template');
+                if (tDapur && tDapur.Nilai) localStorage.setItem('aisnack_kitchen_receipt_template', tDapur.Nilai);
+
                 let today = new Date(); let yyyy = today.getFullYear(); let mm = String(today.getMonth() + 1).padStart(2, '0'); let dd = String(today.getDate()).padStart(2, '0');
                 let todayStr = `${yyyy}-${mm}-${dd}`; 
                 const fs = document.getElementById('filter-start'); const fe = document.getElementById('filter-end');
@@ -720,7 +726,7 @@ const superApp = {
         this.isProcessing = false;
     },
     
-  pullFreshData: async function(silent = false) {
+pullFreshData: async function(silent = false) {
         if (this.isProcessing && !silent) return; 
         
         if (!silent) this.setLoading(true, "Menyinkronkan Database Terkini...");
@@ -796,11 +802,14 @@ const superApp = {
             }
             localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
+            // 🚀 PENARIK DATA PENGATURAN DARI CLOUD KE LOKAL
             let configs = [
                 { key: 'Logo_Aplikasi', storage: 'app_logo_url', callback: (val) => typeof this.updateAppLogos === 'function' && this.updateAppLogos(val) },
                 { key: 'Promo_Standby', storage: 'cfd_promo_standby' },
                 { key: 'Promo_Transaksi', storage: 'cfd_promo_transaksi' },
-                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' }
+                { key: 'aisnack_receipt_template', storage: 'aisnack_receipt_template' },
+                // 🛠️ PERBAIKAN: Masukkan template dapur ke radar penarik!
+                { key: 'aisnack_kitchen_receipt_template', storage: 'aisnack_kitchen_receipt_template' }
             ];
 
             configs.forEach(c => {
@@ -829,7 +838,7 @@ const superApp = {
     },
 
 
-    mergeDatabase: function(oldDb, newDb) {
+   mergeDatabase: function(oldDb, newDb) {
         if (!oldDb || !oldDb.masterProduk) return newDb;
         if (!newDb) return oldDb;
 
@@ -841,11 +850,12 @@ const superApp = {
         merged.outlets = newDb.outlets || oldDb.outlets;
         merged.hargaStokOutlet = newDb.hargaStokOutlet || oldDb.hargaStokOutlet;
         
-        // (Baris "merged.barangMasuk" yang keliru telah dihapus dari kelompok ini)
-
         merged.users = newDb.users || oldDb.users;
         merged.pengaturan = newDb.pengaturan || oldDb.pengaturan;
         merged.masterPengeluaran = newDb.masterPengeluaran || oldDb.masterPengeluaran;
+        
+        // 🚀 PERBAIKAN KRITIS: Selamatkan data Rekon agar tidak terhapus saat ditarik!
+        merged.rekon = newDb.rekon || oldDb.rekon;
 
         // --- B. HELPER PENGGABUNG ARRAY RIWAYAT ---
         const mergeHistoryArray = (oldArr = [], newArr = [], primaryKey, secondaryKey) => {
@@ -880,7 +890,7 @@ const superApp = {
         merged.opname = mergeHistoryArray(oldOpname, newOpname, 'ID_Opname', 'id_opname');
         merged.riwayatOpname = merged.opname; 
         
-        // 🚀 PROSES BARANG MASUK YANG BENAR (Digabung secara ketat di bawah ini)
+        // 🚀 PROSES BARANG MASUK
         let oldMutasi = oldDb.mutasi || oldDb.barangMasuk || [];
         let newMutasi = newDb.mutasi || newDb.barangMasuk || [];
         merged.mutasi = mergeHistoryArray(oldMutasi, newMutasi, 'ID_Mutasi', 'id_mutasi');
@@ -1794,38 +1804,63 @@ const superApp = {
     },
 
    // ==========================================
-    // DYNAMIC RECEIPT BUILDER ENGINE
+    // DYNAMIC RECEIPT BUILDER ENGINE (DUAL MODE)
     // ==========================================
-    receiptBlocks: [], // State memori desain
+    receiptBlocks: [], 
     activeBlockId: null,
+    currentBuilderMode: 'customer', // 'customer' atau 'kitchen'
 
-    // Template Dasar Jika Belum Pernah Dibuat
     defaultReceiptTemplate: [
-        { id: 1, type: 'logo', image: 'https://cdn-icons-png.flaticon.com/512/3081/3081308.png', align: 'center' },
+        { id: 1, type: 'logo', image: '', align: 'center' }, 
         { id: 2, type: 'text', content: '{{nama_toko}}', align: 'center', size: 'double', bold: true },
-        { id: 3, type: 'text', content: 'Pusat Jajanan Kekinian\nCab. {{cabang}}', align: 'center', size: 'normal', bold: false },
+        { id: 3, type: 'text', content: 'Cab. {{cabang}}', align: 'center', size: 'normal', bold: false },
         { id: 4, type: 'divider', style: 'dashed' },
         { id: 5, type: 'text', content: 'TRX: {{no_resi}}\nTgl: {{waktu}}\nKsr: {{kasir}}', align: 'left', size: 'normal', bold: false },
         { id: 6, type: 'divider', style: 'dashed' },
-        { id: 7, type: 'body_transaction' }, // Blok absolut daftar pesanan
+        { id: 7, type: 'body_transaction' }, 
         { id: 8, type: 'divider', style: 'dashed' },
-        { id: 9, type: 'text', content: 'Terima kasih atas kunjungannya!\nWiFi: {{wifi}}', align: 'center', size: 'normal', bold: true }
+        { id: 9, type: 'text', content: 'Terima kasih!\nWiFi: {{wifi}}', align: 'center', size: 'normal', bold: true }
     ],
 
-    openReceiptBuilder: function() {
-        let savedTemplate = localStorage.getItem('aisnack_receipt_template');
+    defaultKitchenTemplate: [
+        { id: 1, type: 'text', content: '*** TIKET DAPUR ***', align: 'center', size: 'normal', bold: true },
+        { id: 2, type: 'text', content: 'ANTRIAN: {{no_antrian}}', align: 'center', size: 'double', bold: true },
+        { id: 3, type: 'divider', style: 'dashed' },
+        { id: 4, type: 'body_transaction' }, 
+        { id: 5, type: 'divider', style: 'dashed' }
+    ],
+
+    openReceiptBuilder: function(mode = 'customer') {
+        this.currentBuilderMode = mode;
+        let storageKey = mode === 'kitchen' ? 'aisnack_kitchen_receipt_template' : 'aisnack_receipt_template';
+        let fallbackTemp = mode === 'kitchen' ? this.defaultKitchenTemplate : this.defaultReceiptTemplate;
+
+        let savedTemplate = localStorage.getItem(storageKey);
         if (savedTemplate) {
             try { this.receiptBlocks = JSON.parse(savedTemplate); } 
-            catch(e) { this.receiptBlocks = JSON.parse(JSON.stringify(this.defaultReceiptTemplate)); }
+            catch(e) { this.receiptBlocks = JSON.parse(JSON.stringify(fallbackTemp)); }
         } else {
-            this.receiptBlocks = JSON.parse(JSON.stringify(this.defaultReceiptTemplate));
+            this.receiptBlocks = JSON.parse(JSON.stringify(fallbackTemp));
         }
         
         this.activeBlockId = null;
+        
+        // 🚀 INJEKSI TOGGLE KE JUDUL MODAL BUILDER
+        const titleEl = document.getElementById('modal-receipt-builder').querySelector('h3');
+        if (titleEl) {
+            titleEl.innerHTML = `
+                Desain Kertas Struk 
+                <span class="ml-2 bg-slate-100 p-1 rounded-lg border inline-flex text-[10px]">
+                    <button onclick="superApp.openReceiptBuilder('customer')" class="px-2 py-1 rounded ${mode === 'customer' ? 'bg-brand-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}">Pelanggan</button>
+                    <button onclick="superApp.openReceiptBuilder('kitchen')" class="px-2 py-1 rounded ${mode === 'kitchen' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200'}">Dapur (Barista)</button>
+                </span>
+            `;
+        }
+
         this.renderReceiptCanvas();
         this.renderReceiptInspector();
-        this.closeModal('modal-system-settings'); // Tutup modal pengaturan
-        this.openModal('modal-receipt-builder'); // Buka modal canvas
+        this.closeModal('modal-system-settings'); 
+        this.openModal('modal-receipt-builder'); 
     },
 
     addReceiptBlock: function(type) {
@@ -1842,7 +1877,6 @@ const superApp = {
         this.renderReceiptCanvas();
         this.renderReceiptInspector();
         
-        // Auto scroll ke bawah
         let canvas = document.getElementById('receipt-canvas-container');
         if(canvas) setTimeout(()=> canvas.scrollTop = canvas.scrollHeight, 100);
     },
@@ -1872,7 +1906,7 @@ const superApp = {
 
     selectReceiptBlock: function(id) {
         this.activeBlockId = id;
-        this.renderReceiptCanvas(); // Re-render untuk efek Highlight
+        this.renderReceiptCanvas(); 
         this.renderReceiptInspector();
     },
 
@@ -1893,7 +1927,6 @@ const superApp = {
             let file = e.target.files[0]; 
             if (!file) return;
 
-            // Batasan ukuran awal agar browser tidak hang saat membaca file raksasa (maks 5MB)
             if (file.size > 5 * 1024 * 1024) { 
                 this.showToast("File terlalu besar. Maksimal 5MB sebelum dikompresi.", "error"); 
                 return; 
@@ -1905,16 +1938,13 @@ const superApp = {
             reader.onload = event => { 
                 let img = new Image();
                 img.onload = () => {
-                    // MESIN KOMPRESI CANVAS
                     let canvas = document.createElement('canvas');
                     let ctx = canvas.getContext('2d');
 
-                    // Tentukan ukuran maksimal (Printer thermal ukuran 58mm optimal di lebar 200px-250px)
                     let MAX_WIDTH = 250;
                     let width = img.width;
                     let height = img.height;
 
-                    // Hitung rasio aspek (menjaga gambar tidak gepeng)
                     if (width > MAX_WIDTH) {
                         height = Math.floor(height * (MAX_WIDTH / width));
                         width = MAX_WIDTH;
@@ -1923,19 +1953,12 @@ const superApp = {
                     canvas.width = width;
                     canvas.height = height;
 
-                    // Opsional: Isi background putih jika gambar transparan (PNG), 
-                    // karena printer thermal butuh kontras tegas antara hitam dan putih.
                     ctx.fillStyle = "#FFFFFF"; 
                     ctx.fillRect(0, 0, width, height);
-
-                    // Gambar ulang logo yang sudah dikecilkan ke dalam canvas
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Konversi kembali menjadi base64 dengan kualitas medium
-                    // Kualitas 0.8 sudah lebih dari cukup untuk printer hitam putih
                     let compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
 
-                    // Simpan gambar yang sudah dikompres ke blok yang aktif
                     this.updateBlockProp('image', compressedBase64);
                     this.showToast("Logo berhasil dipasang!", "success");
                 };
@@ -1956,7 +1979,6 @@ const superApp = {
             let isActive = b.id === this.activeBlockId;
             let activeClass = isActive ? 'border-brand-500 bg-brand-50/50 shadow-md transform scale-[1.02] z-10' : 'border-transparent hover:border-slate-300 hover:bg-slate-50';
             
-            // Tampilan Tools Overlay
             let toolsHtml = isActive ? `
                 <div class="absolute -right-4 -top-3 flex gap-1 z-20">
                     <button onclick="superApp.moveReceiptBlock(${b.id}, 'up'); event.stopPropagation();" class="w-7 h-7 bg-slate-800 text-white rounded-md shadow-md hover:bg-slate-700 text-xs"><i class="fas fa-arrow-up"></i></button>
@@ -1964,20 +1986,20 @@ const superApp = {
                     ${b.type !== 'body_transaction' ? `<button onclick="superApp.deleteReceiptBlock(${b.id}); event.stopPropagation();" class="w-7 h-7 bg-rose-500 text-white rounded-md shadow-md hover:bg-rose-600 text-xs"><i class="fas fa-trash"></i></button>` : ''}
                 </div>` : '';
 
-            // Rendering Elemen Spesifik
             let contentHtml = '';
             let alignClass = b.align === 'center' ? 'text-center' : (b.align === 'right' ? 'text-right' : 'text-left');
             
             if (b.type === 'text') {
                 let sizeClass = b.size === 'double' ? 'text-lg' : 'text-xs';
                 let weightClass = b.bold ? 'font-black' : 'font-medium';
-                // Parser Live Simulasi (Ubah Variabel ke Teks Dummy)
+                
                 let parsedText = (b.content || '')
                     .replace(/{{nama_toko}}/g, 'AI-SNACK')
                     .replace(/{{cabang}}/g, 'Cabang Penajam')
                     .replace(/{{kasir}}/g, 'Staf Beby')
                     .replace(/{{no_resi}}/g, 'TRX-123456789')
                     .replace(/{{waktu}}/g, '12/12/2026 14:00')
+                    .replace(/{{no_antrian}}/g, '99')
                     .replace(/{{wifi}}/g, 'AisnackJaya');
                 
                 contentHtml = `<div class="${alignClass} ${sizeClass} ${weightClass} whitespace-pre-wrap leading-tight font-mono text-black">${parsedText}</div>`;
@@ -1994,7 +2016,16 @@ const superApp = {
                 contentHtml = `<div class="${alignClass}"><div class="inline-flex flex-col items-center justify-center border-4 border-black p-2"><i class="fas fa-qrcode text-6xl text-black"></i><span class="text-[8px] font-black mt-1 uppercase text-black max-w-[80px] truncate">${b.content}</span></div></div>`;
             }
             else if (b.type === 'body_transaction') {
-                contentHtml = `
+                // Tampilan Body Transaksi Menyesuaikan Mode (Pelanggan vs Dapur)
+                if (this.currentBuilderMode === 'kitchen') {
+                    contentHtml = `
+                    <div class="font-mono text-black text-sm font-black text-left">
+                        <div>1 x Kopi Aren</div>
+                        <div>2 x Roti Bakar</div>
+                        <div class="text-[10px] ml-4 italic">* Tanpa Keju</div>
+                    </div>`;
+                } else {
+                    contentHtml = `
                     <div class="font-mono text-black text-xs">
                         <div class="flex justify-between font-black border-b border-dashed border-black pb-1 mb-1"><span>ITEM</span><span>TOTAL</span></div>
                         <div class="flex justify-between font-bold"><span>1x Kopi Aren</span><span>15.000</span></div>
@@ -2004,6 +2035,7 @@ const superApp = {
                         <div class="flex justify-between font-bold text-[10px]"><span>TUNAI</span><span>50.000</span></div>
                         <div class="flex justify-between font-bold text-[10px]"><span>KEMBALI</span><span>5.000</span></div>
                     </div>`;
+                }
             }
 
             html += `<div onclick="superApp.selectReceiptBlock(${b.id})" class="relative border-[2px] p-2 m-1 rounded cursor-pointer transition-all ${activeClass}">${toolsHtml}${contentHtml}</div>`;
@@ -2024,7 +2056,6 @@ const superApp = {
         let b = this.receiptBlocks.find(x => x.id === this.activeBlockId);
         let html = '';
 
-        // Teks Bantuan Umum Alignment
         let alignEditor = `
             <div class="mb-4">
                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Posisi (Alignment)</label>
@@ -2040,13 +2071,14 @@ const superApp = {
                 <div class="mb-4">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Isi Teks</label>
                     <textarea rows="4" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-brand-500 transition custom-scroll" oninput="superApp.updateBlockProp('content', this.value)">${b.content || ''}</textarea>
+                    <p class="text-[9px] text-slate-400 mt-1">Variabel: {{nama_toko}}, {{cabang}}, {{kasir}}, {{no_resi}}, {{waktu}}, {{no_antrian}}, {{wifi}}</p>
                 </div>
                 ${alignEditor}
                 <div class="mb-4">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Ukuran Huruf</label>
                     <select class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold text-slate-700 outline-none" onchange="superApp.updateBlockProp('size', this.value)">
                         <option value="normal" ${b.size==='normal'?'selected':''}>Normal (Kecil)</option>
-                        <option value="double" ${b.size==='double'?'selected':''}>Raksasa (Heading)</option>
+                        <option value="double" ${b.size==='double'?'selected':''}>Raksasa (Heading/Antrian)</option>
                     </select>
                 </div>
                 <div class="mb-4 flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-xl">
@@ -2078,34 +2110,35 @@ const superApp = {
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Link / Data QR Code</label>
                     <input type="text" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:border-brand-500 transition" oninput="superApp.updateBlockProp('content', this.value)" value="${b.content || ''}">
                 </div>
-                ${alignEditor}
-                <p class="text-[9px] text-brand-600 bg-brand-50 p-2 border border-brand-100 rounded mt-4 font-bold"><i class="fas fa-info-circle"></i> Berguna untuk Link Menu Digital, Alamat Maps, atau Akun Instagram toko Anda.</p>`;
+                ${alignEditor}`;
         }
         else if (b.type === 'body_transaction') {
             html += `
                 <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl text-center">
                     <i class="fas fa-lock text-3xl text-blue-300 mb-2"></i>
                     <h4 class="font-extrabold text-blue-800 text-sm">Blok Inti Transaksi</h4>
-                    <p class="text-[10px] text-blue-600 mt-1 font-medium leading-relaxed">Blok ini adalah area dinamis dimana sistem akan menyuntikkan pesanan, harga, dan kembalian pelanggan. Blok ini tidak bisa diedit isinya, namun bisa Anda pindahkan letaknya.</p>
+                    <p class="text-[10px] text-blue-600 mt-1 font-medium leading-relaxed">Blok ini adalah area dinamis dimana sistem akan menyuntikkan pesanan. Pada Struk Dapur, blok ini otomatis memperbesar ukuran huruf dan menghilangkan data harga.</p>
                 </div>`;
         }
 
         panel.innerHTML = html;
     },
 
-   saveReceiptTemplate: function() {
+    saveReceiptTemplate: function() {
         let templateData = JSON.stringify(this.receiptBlocks);
-        localStorage.setItem('aisnack_receipt_template', templateData);
+        let storageKey = this.currentBuilderMode === 'kitchen' ? 'aisnack_kitchen_receipt_template' : 'aisnack_receipt_template';
         
-        this.showToast("Mengunggah desain ke Database Pusat...", "info");
+        localStorage.setItem(storageKey, templateData);
+        
+        this.showToast(`Mengunggah desain struk ${this.currentBuilderMode} ke Cloud...`, "info");
 
         this.apiPost({
             action: 'update_pengaturan',
-            kunci: 'aisnack_receipt_template', 
+            kunci: storageKey, 
             nilai: templateData
         }).then(res => {
             if (res && res.status === 'sukses') {
-                this.showToast("Desain Struk Global Berhasil Disimpan!", "success");
+                this.showToast("Desain Berhasil Disimpan Global!", "success");
             } else {
                 this.showToast("Tersimpan di alat ini. Akan disinkronkan nanti.", "warning");
             }
@@ -2113,7 +2146,6 @@ const superApp = {
             this.showToast("Tersimpan di alat ini (Mode Offline).", "warning");
         });
 
-        // Panggil fungsi penutup yang aman
         this.closeReceiptBuilder();
     },
 
@@ -2126,28 +2158,24 @@ const superApp = {
         }, 300);
     },
 
-  executeReprint: async function() {
+  executeReprint: async function(receiptMode = 'customer') {
         if(!this.activeReprintTrx) return; 
         
         let t = this.activeReprintTrx; 
         let items = []; 
         try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
         
-        // Mengambil nominal dengan aman
         let tunaiVal = t.Tunai !== undefined ? t.Tunai : (t.Dibayar || 0);
         
-        // Membersihkan format tanggal dan waktu
         let cleanDate = this.cleanDateOnly(t.Tanggal);
         let cleanTime = this.cleanTimeOnly(t.Waktu);
         let explicitDate = cleanDate + ' ' + cleanTime;
 
-        // Mengambil metode bayar dari riwayat transaksi
         let metodeBayar = t.Metode_Bayar || 'TUNAI';
         
         this.setLoading(true, "Mencetak Ulang Struk...");
 
         try { 
-            // 🚀 PERBAIKAN: Parameter ke-10 (true) untuk Cetak Ulang, Parameter ke-11 untuk Metode Bayar
             await this.printReceipt(
                 t.ID_TRX, 
                 t.Outlet, 
@@ -2159,9 +2187,10 @@ const superApp = {
                 explicitDate, 
                 t.Antrian, 
                 true,          // isReprint = true
-                metodeBayar    // Mencegah NaN jika ini adalah transaksi QRIS
+                metodeBayar,   
+                receiptMode    // 🚀 TERUSKAN MODE CETAK KE MESIN PRINTER
             ); 
-            this.showToast("Perintah cetak ulang dikirim ke printer!", "success");
+            this.showToast(`Perintah cetak ulang (${receiptMode === 'kitchen' ? 'Dapur' : 'Pelanggan'}) dikirim ke printer!`, "success");
         } catch(e) {
             this.showToast("Gagal mencetak. Printer belum terhubung.", "error");
         } finally {
@@ -5948,7 +5977,7 @@ refreshData: function() {
 
 
     
-   switchMenu: function(menu) {
+ switchMenu: function(menu) {
     // 1. Bersihkan akses (Tidak perlu lagi memblokir hpp/profit karena sudah dilebur)
     // Cukup sembunyikan semua halaman
     document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
@@ -5964,11 +5993,12 @@ refreshData: function() {
         'outlet': 'text-teal-600',    
         'staf': 'text-amber-600',
         'laporan-harian': 'text-rose-600',
-        'user': 'text-purple-600' // 🚀 TAMBAHAN: Warna ungu elegan untuk Manajemen User
+        'user': 'text-purple-600',
+        'rekon': 'text-cyan-600' // 🚀 TAMBAHAN: Warna Cyan untuk Rekon & Kasbon
     };
     const allColors = Object.values(colors);
 
-    // [Navigasi Aktif] - Sesuai kode Anda sebelumnya
+    // [Navigasi Aktif]
     document.querySelectorAll('.nav-btn').forEach(b => { 
         b.classList.remove('nav-active', 'bg-slate-50', ...allColors); 
         b.classList.add('text-slate-500'); 
@@ -5994,7 +6024,8 @@ refreshData: function() {
         'pos': 'POS', 'opname': 'Opname Fisik Stok', 'terima': 'Penerimaan Barang', 
         'audit': 'Audit Laporan', 'report': 'Laporan Terpadu', 'ai': 'CFO Dashboard & Asisten AI', 
         'gudang': 'Gudang Pusat', 'master': 'Master Varian POS', 'outlet': 'Cabang & Harga Khusus', 'staf': 'Kinerja Karyawan', 'laporan-harian': 'Laporan Harian Ai-CHA',
-        'user': 'Manajemen Pengguna' // 🚀 TAMBAHAN: Judul halaman otomatis untuk User
+        'user': 'Manajemen Pengguna',
+        'rekon': 'Rekonsiliasi Bank & Kasbon' // 🚀 TAMBAHAN: Judul halaman otomatis untuk Rekon
     };
     const pageTitle = document.getElementById('page-title'); 
     if (pageTitle) pageTitle.innerText = titles[menu] || 'Aplikasi';
@@ -6013,7 +6044,7 @@ refreshData: function() {
         if (typeof this.showMenuGuide === 'function') setTimeout(() => this.showMenuGuide('opname'), 200);
     }
     if (menu === 'laporan-harian' && typeof this.initLaporanHarian === 'function') {
-    this.initLaporanHarian();
+        this.initLaporanHarian();
     }
     if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
     if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
@@ -6026,15 +6057,19 @@ refreshData: function() {
     }
     if (menu === 'staf' && typeof this.renderStaf === 'function') this.renderStaf();
     
-    // 🚀 TAMBAHAN: Trigger fungsi render saat menu Manajemen User dibuka
     if (menu === 'user' && typeof this.renderUserManagement === 'function') {
         this.renderUserManagement();
+    }
+
+    // 🚀 TAMBAHAN: Trigger fungsi render saat menu Rekon dibuka
+    if (menu === 'rekon' && typeof this.renderRekon === 'function') {
+        this.renderRekon();
     }
     
     if (menu === 'gudang' || menu === 'master' || menu === 'outlet') {
         if (typeof this.renderGudang === 'function') {
             this.renderGudang();
-            // 🚀 Buka tab stok otomatis agar layar tidak blank!
+            // Buka tab stok otomatis agar layar tidak blank!
             this.toggleGudangTab('stok');
         }
     }
@@ -6411,8 +6446,7 @@ refreshData: function() {
     },
     
     // PENAMBAHAN SISTEM NOMOR ANTRIAN (OPTIMISTIC UI - INSTANT CHECKOUT)
-    executeCheckout: async function() {
-        // 1. GEMBOK ANTI DOUBLE-CLICK & KERANJANG KOSONG
+   executeCheckout: async function() {
         if (this.isProcessing) return; 
         if (this.cart.length === 0) {
             this.showToast("Keranjang kosong! Transaksi dicegah.", "error");
@@ -6422,7 +6456,6 @@ refreshData: function() {
 
         this.isProcessing = true;
 
-        // Kunci tombol secara visual (Teks diganti jadi "Memproses..." karena tidak ada lagi ritual "Cek Server")
         let btnPay = document.getElementById('btn-execute-pay');
         let originalBtnHtml = '';
         if (btnPay) {
@@ -6432,12 +6465,6 @@ refreshData: function() {
             btnPay.classList.add('opacity-70', 'cursor-not-allowed');
         }
         
-        // ======================================================================
-        // 🚀 SINKRONISASI KILAT DIHAPUS DARI SINI AGAR TRANSAKSI INSTAN (0 DETIK)!
-        // Kita percaya sepenuhnya pada data stok yang ada di RAM lokal saat ini.
-        // ======================================================================
-
-        // 🚀 VALIDASI STOK TERAKHIR (Dilakukan secara instan di memori lokal)
         let stokAman = true;
         let barangHabis = '';
         
@@ -6456,7 +6483,6 @@ refreshData: function() {
             }
         }
 
-        // Jika stok lokal tidak cukup, tolak transaksi!
         if (!stokAman) {
             this.isProcessing = false;
             if (btnPay) {
@@ -6467,35 +6493,24 @@ refreshData: function() {
             this.showToast(`Gagal! Stok ${barangHabis} tidak mencukupi (Sisa lokal kurang).`, "error");
             return;
         }
-        // ======================================================================
 
         let d = new Date(); let pad = (n) => n < 10 ? '0' + n : n;
         let todayStrLocal = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         
-        // ======================================================================
-        // 🚀 1. LOCAL QUEUE TRACKER (CEGAH DOUBLE ANTREAN DI DEVICE YANG SAMA)
-        // ======================================================================
         let countToday = 0;
         (this.db.transactions || []).forEach(t => {
             let tglTrx = typeof this.cleanDateOnly === 'function' ? this.cleanDateOnly(t.Tanggal) : t.Tanggal;
             if (t.Outlet === this.outlet && tglTrx === todayStrLocal) { 
                 let num = Number(t.Antrian || 0);
-                if (num > countToday) countToday = num; // Cari nomor antrean tertinggi hari ini
+                if (num > countToday) countToday = num; 
             }
         });
 
-        // Ambil juga memori nomor antrean terakhir yang pernah dicetak HP ini hari ini
         let queueKey = `aisnack_last_queue_${this.outlet}_${todayStrLocal}`;
         let lastSavedQueue = Number(localStorage.getItem(queueKey) || 0);
-
-        // KUNCI AMAN: Antrean baru ADALAH angka tertinggi di antara (Array DB vs Memori HP) + 1
         let noAntrian = Math.max(countToday, lastSavedQueue) + 1;
-        
-        // Simpan langsung nomor baru ini ke memori HP agar tidak bisa mundur lagi hari ini
         localStorage.setItem(queueKey, noAntrian);
-        // ======================================================================
         
-        // ID Resi Dijamin Unik
         let kasirPrefix = this.currentUser ? this.currentUser.Username.substring(0,3).toUpperCase() : 'KSR';
         let trxID = `TRX-${kasirPrefix}-${d.getTime()}`;
 
@@ -6503,7 +6518,6 @@ refreshData: function() {
         
         const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintSuccess ? 'Sudah' : 'Belum' };
 
-        // 1. UPDATE MEMORI LOKAL SECARA INSTAN
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
             ID_TRX: trxID, Tanggal: todayStrLocal, Waktu: `${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`, 
@@ -6513,7 +6527,6 @@ refreshData: function() {
             Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'
         });
 
-        // 🚀 Kurangi visual stok langsung di layar kasir device ini
         this.cart.forEach(item => {
             let refBahan = item.sku_bahan || item.sku;
             let realStokData = (this.db.hargaStokOutlet || []).find(x => x.SKU === refBahan && x.ID_Outlet === this.outlet);
@@ -6524,22 +6537,38 @@ refreshData: function() {
         this.refreshData(); 
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
 
-        // 2. JALANKAN PRINTER DI BACKGROUND (Tanpa memblokir layar kasir)
+        // 🚀 CETAK DUAL STRUK (PELANGGAN & DAPUR)
         if (isPrintSuccess) {
-            this.printReceipt(trxID, this.outlet, this.payTotal, this.payCash, this.payChange, this.cart, 'Sukses', null, noAntrian, false).catch(e => console.log("Gagal print background"));
+            // 🛠️ PERBAIKAN 1: Kloning data keranjang sebelum dihapus oleh sistem di bawah
+            let printItems = JSON.parse(JSON.stringify(this.cart));
+            let printTotal = this.payTotal;
+            let printCash = this.payCash;
+            let printChange = this.payChange;
+            let printMethod = this.payMethod;
+
+            // Cetak Struk Pelanggan
+            this.printReceipt(trxID, this.outlet, printTotal, printCash, printChange, printItems, 'Sukses', null, noAntrian, false, printMethod, 'customer')
+            .then(() => {
+                // Jeda 1.5 detik (dipercepat), lalu cetak Struk Dapur menggunakan memori kloning
+                setTimeout(() => {
+                    this.printReceipt(trxID, this.outlet, printTotal, printCash, printChange, printItems, 'Sukses', null, noAntrian, false, printMethod, 'kitchen');
+                }, 1500); 
+            })
+            .catch(e => console.log("Gagal print background"));
         }
 
-        // 3. RESET KASIR & CFD SECARA INSTAN
         this._lastPaidTotal = this.payTotal;
         this._lastPaidChange = this.payChange;
+        
+        // Keranjang dikosongkan di sini (sekarang aman karena printer sudah punya kopiannya)
         this.cart = []; 
         this.payCash = 0; 
         this.payTotal = 0;
+        
         this.renderCart(); 
         this.syncStorage('paid', noAntrian); 
         this.closeModal('modal-payment'); 
         
-        // JEDA WAKTU UNTUK MENCEGAH DOUBLE CLICK SELAMA ANIMASI
         setTimeout(() => {
             this.isProcessing = false;
             if (btnPay) {
@@ -6549,17 +6578,11 @@ refreshData: function() {
             }
         }, 500);
 
-        // ======================================================================
-        // 4. 🚀 SINKRONISASI SERVER DI LATAR BELAKANG (NON-BLOCKING)
-        // ======================================================================
-        // Kasir sudah bisa melayani pelanggan berikutnya saat kode di bawah ini bekerja!
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
                 if (isPrintSuccess) {
                     this.laporStrukDicetak(trxID);
                 }
-                // 🚀 TARIK STOK TERBARU DI LATAR BELAKANG SETELAH TRANSAKSI BERHASIL
-                // Agar stok di device ini tetap akurat tanpa mengorbankan kecepatan checkout
                 if (typeof this.refreshStokOnly === 'function') {
                     this.refreshStokOnly(); 
                 }
@@ -8403,68 +8426,22 @@ openDetailStokOpname: function(sku) {
     },
 
     renderAudit: function() {
-        // =====================================================================
-        // 🚀 PERBAIKAN KRITIS: 
-        // Rendering tabel 'Pending Opname' DIHAPUS DARI SINI karena sudah 
-        // dikerjakan secara elegan (Grouped) oleh fungsi renderAuditOpname().
-        // Jika tidak dihapus, kodingan ini akan merusak/menimpa tabel tersebut.
-        // =====================================================================
-
-        // Fungsi ini sekarang HANYA FOKUS merender tabel 'Pending Terima Barang'
-        const tbodyTr = document.getElementById('audit-terima-tbody');
-        if (tbodyTr) {
-            let html = '';
-            
-            // Hitung dulu berapa kali tiap outlet sudah melakukan mutasi hari ini
-            let mutasiHistoryHariIni = {};
-            (this.db.mutasi || []).forEach(mt => {
-                if (mt.Status_Approval === 'Disetujui' && mt.Waktu) {
-                    let tgl = this.cleanDateOnly(mt.Waktu);
-                    if (tgl) {
-                        let key = `${mt.Outlet_Tujuan}_${tgl}`;
-                        mutasiHistoryHariIni[key] = (mutasiHistoryHariIni[key] || 0) + 1;
-                    }
-                }
-            });
-
-            (this.db.mutasi || []).forEach(mt => {
-                if (mt.Status_Approval === 'Pending') {
-                    let itemName = (this.db.masterProduk || []).find(m => m.SKU === mt.SKU)?.Nama_Produk || mt.SKU || 'Unknown';
-                    let tgl = this.cleanDateOnly(mt.Waktu);
-                    
-                    let key = `${mt.Outlet_Tujuan}_${tgl}`;
-                    let sudahAda = mutasiHistoryHariIni[key] || 0;
-                    
-                    let warningBadge = sudahAda > 0 ? 
-                        `<span class="text-[10px] font-black bg-rose-100/80 text-rose-600 px-2 py-0.5 rounded shadow-sm animate-pulse block mt-1">⚠️ Sudah ${sudahAda}x kirim hari ini!</span>` : '';
-
-                    let wStr = mt.Waktu ? (this.cleanDateOnly(mt.Waktu) + ' ' + this.cleanTimeOnly(mt.Waktu)) : '-';
-
-                    // 🎨 Tabel Terima Barang ini tetap dipertahankan sesuai aslinya
-                    html += `
-                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100/70">
-                        <td class="py-4 px-4 text-center w-12 align-middle">
-                            <input type="checkbox" class="cb-audit-terima w-5 h-5 rounded cursor-pointer accent-indigo-500" value="${mt.ID_Mutasi}" onchange="superApp.checkBulkAudit()">
-                        </td>
-                        <td class="py-4 px-4 text-[11px] font-bold text-slate-700 whitespace-nowrap align-middle">${wStr}</td>
-                        
-                        <td class="py-4 px-4 whitespace-nowrap align-middle">
-                            ${this.getOutletBadge(mt.Outlet_Tujuan)}<br>
-                            <span class="text-slate-400 font-bold text-[9px] uppercase mt-0.5 inline-block">Oleh: ${mt.Kasir || '-'}</span>
-                            ${warningBadge}
-                        </td>
-                        
-                        <td class="py-4 px-4 text-xs font-bold text-slate-700 whitespace-normal min-w-[150px] align-middle">${itemName}</td>
-                        <td class="py-4 px-4 text-center text-sm font-black text-indigo-600 whitespace-nowrap align-middle">${mt.Qty} Pcs</td>
-                        <td class="py-4 px-4 text-[10px] font-bold text-slate-500 italic whitespace-normal min-w-[150px] align-middle">${mt.Keterangan || '-'}</td>
-                    </tr>`;
-                }
-            });
-            tbodyTr.innerHTML = html || `<tr><td colspan="6" class="py-10 text-center text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50/50">Tidak ada pengajuan Restok yang menunggu persetujuan</td></tr>`;
+        // 1. Render Grup Opname
+        if (typeof this.renderAuditOpname === 'function') {
+            this.renderAuditOpname();
         }
-        
-        // Cek jika ada checkbox yang aktif
-        this.checkBulkAudit();
+
+        // 2. Render Grup Terima Barang (Restok)
+        if (typeof this.renderAuditTerima === 'function') {
+            this.renderAuditTerima();
+        }
+
+        // 3. Matikan / Sembunyikan Action Bar Masal (Bulk Action) lawas 
+        // karena sekarang approval dilakukan per-Surat Jalan di dalam Modal
+        let bulkBar = document.getElementById('bulk-action-bar');
+        if (bulkBar) {
+            bulkBar.classList.add('hidden');
+        }
     },
 
     // =========================================================
@@ -9438,89 +9415,105 @@ openDetailStokOpname: function(sku) {
         let existing = document.getElementById('dynamic-insight-modal');
         if(existing) existing.remove(); // Bersihkan modal lama jika ada
 
-        // Format angka dengan titik pemisah ribuan jika berupa angka/number
+        // Format angka dengan titik pemisah ribuan
         const formatVal = (val, prefix = '') => {
             if (val === undefined || val === null || val === 'N/A') return '-';
             return !isNaN(val) ? prefix + Number(val).toLocaleString('id-ID') : val;
         };
 
+        // 🚀 SMART LOGIC: Deteksi Tren Naik/Turun untuk Warna Ikon
+        let isNaik = String(tren).toLowerCase().includes('naik') || String(tren).includes('+');
+        let trendColor = isNaik ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100';
+        let trendIcon = isNaik ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
+
+        // 🚀 SMART LOGIC: Animasi Tutup Mulus (Bisa dipanggil dari tombol silang, tombol tutup, atau backdrop)
+        let closeLogic = "let m = document.getElementById('dynamic-insight-modal'); let c = document.getElementById('dim-card'); m.classList.add('opacity-0'); c.classList.replace('scale-100','scale-95'); setTimeout(()=>m.remove(), 300);";
+
         let modalHtml = `
-        <div id="dynamic-insight-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fade-in transition-opacity duration-300">
-            <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(229,32,43,0.2)] border border-white w-full max-w-sm overflow-hidden flex flex-col transform scale-95 transition-transform duration-400" id="dim-card">
+        <div id="dynamic-insight-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0" onclick="if(event.target === this) { ${closeLogic} }">
+            <div class="bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-[0_20px_60px_rgba(229,32,43,0.25)] border border-white w-full max-w-sm overflow-hidden flex flex-col transform scale-95 transition-transform duration-300" id="dim-card">
                 
                 <!-- HEADER AI-SNACK -->
-                <div class="bg-gradient-to-br from-[#E5202B] to-[#FFB800] p-6 relative overflow-hidden">
+                <div class="bg-gradient-to-br from-[#E5202B] to-[#FFB800] p-6 relative overflow-hidden shrink-0">
                     <div class="absolute -right-10 -top-10 w-32 h-32 bg-white/30 rounded-full blur-3xl"></div>
-                    <button onclick="document.getElementById('dynamic-insight-modal').remove()" class="absolute top-5 right-5 w-8 h-8 bg-black/10 hover:bg-black/20 rounded-full flex items-center justify-center text-white backdrop-blur-md z-10 transition-colors"><i class="fas fa-xmark text-sm"></i></button>
+                    
+                    <!-- 🚀 PERBAIKAN: Tombol Close digeser ke kanan (right-3), ukuran pas untuk jempol -->
+                    <button onclick="${closeLogic}" class="absolute top-4 right-3 w-8 h-8 bg-black/10 hover:bg-black/25 rounded-full flex items-center justify-center text-white backdrop-blur-md z-20 transition-all active:scale-95 cursor-pointer">
+                        <i class="fas fa-xmark text-sm drop-shadow-md"></i>
+                    </button>
                     
                     <div class="relative z-10 text-white pr-6">
-                        <span class="text-[9px] font-black text-[#FFF5D1] uppercase tracking-widest mb-1 bg-black/10 px-2.5 py-1 rounded-md shadow-sm inline-block"><i class="fas fa-brain mr-1"></i> AI ANALITIK</span>
-                        <h2 class="text-lg font-black leading-tight drop-shadow-md mt-1">${title}</h2>
-                        <p class="text-[10px] font-bold text-rose-100 mt-1 drop-shadow-sm">${subtitle}</p>
+                        <span class="text-[9px] font-black text-[#FFF5D1] uppercase tracking-widest mb-1.5 bg-black/20 px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1.5 backdrop-blur-md"><i class="fas fa-sparkles text-amber-300"></i> AI ANALITIK</span>
+                        <h2 class="text-xl font-black leading-tight drop-shadow-md mt-1">${title}</h2>
+                        <p class="text-[10px] font-bold text-rose-100 mt-1 drop-shadow-sm opacity-95">${subtitle}</p>
                     </div>
                 </div>
                 
-                <div class="p-5 md:p-6 bg-[#FFF5D1]/30 flex-1 overflow-y-auto custom-scroll max-h-[60vh]">
-                    <!-- JAM SIBUK -->
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4 flex items-center gap-4 group hover:-translate-y-0.5 transition-transform">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform"><i class="fas fa-clock"></i></div>
+                <div class="p-5 md:p-6 bg-[#FFF5D1]/20 flex-1 overflow-y-auto custom-scroll max-h-[65vh]">
+                    
+                    <!-- 🚀 FITUR BARU: Kotak Saran AI Assistant -->
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 p-3.5 rounded-2xl mb-4 flex gap-3 items-start shadow-inner">
+                        <div class="w-8 h-8 rounded-full bg-amber-200/50 flex justify-center items-center text-amber-600 shrink-0 mt-0.5"><i class="fas fa-robot text-sm"></i></div>
                         <div>
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Waktu Paling Sibuk</p>
-                            <p class="font-black text-[#4A3B32] text-sm">${peakHour}</p>
+                            <p class="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-0.5">Saran Asisten AI</p>
+                            <p class="text-[10px] font-bold text-slate-600 leading-relaxed">Persiapkan stok operasional ekstra pada <b class="text-amber-700">${peakHour}</b> untuk memaksimalkan omzet harian Anda!</p>
                         </div>
                     </div>
-                    
-                    <!-- 📊 GRID METRIK BARU (Cash, QRIS, Stok, Tren) -->
-                    <div class="grid grid-cols-2 gap-3 mb-5">
-                        <!-- Kartu Cash -->
-                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-emerald-100 flex flex-col gap-1 relative overflow-hidden group">
-                            <div class="absolute -right-2 -bottom-2 text-emerald-50 opacity-60 group-hover:scale-110 transition-transform duration-300"><i class="fas fa-money-bill-wave text-5xl"></i></div>
-                            <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest relative z-10">Cash</span>
+
+                    <!-- 📊 GRID METRIK MODERN -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col gap-1 relative overflow-hidden group hover:border-emerald-300 transition-colors cursor-default">
+                            <div class="absolute -right-2 -bottom-2 text-emerald-50 opacity-60 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300"><i class="fas fa-money-bill-wave text-5xl"></i></div>
+                            <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest relative z-10">Total Cash</span>
                             <span class="font-black text-slate-800 text-sm relative z-10 truncate">${formatVal(totalCash, 'Rp ')}</span>
                         </div>
                         
-                        <!-- Kartu QRIS -->
-                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-sky-100 flex flex-col gap-1 relative overflow-hidden group">
-                            <div class="absolute -right-2 -bottom-2 text-sky-50 opacity-60 group-hover:scale-110 transition-transform duration-300"><i class="fas fa-qrcode text-5xl"></i></div>
-                            <span class="text-[9px] font-black text-sky-600 uppercase tracking-widest relative z-10">QRIS</span>
+                        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-sky-100 flex flex-col gap-1 relative overflow-hidden group hover:border-sky-300 transition-colors cursor-default">
+                            <div class="absolute -right-2 -bottom-2 text-sky-50 opacity-60 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300"><i class="fas fa-qrcode text-5xl"></i></div>
+                            <span class="text-[9px] font-black text-sky-600 uppercase tracking-widest relative z-10">Total QRIS</span>
                             <span class="font-black text-slate-800 text-sm relative z-10 truncate">${formatVal(totalQris, 'Rp ')}</span>
                         </div>
 
-                        <!-- Kartu Stok -->
-                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-amber-100 flex flex-col gap-1 relative overflow-hidden group">
-                            <div class="absolute -right-2 -bottom-2 text-amber-50 opacity-60 group-hover:scale-110 transition-transform duration-300"><i class="fas fa-box-open text-5xl"></i></div>
+                        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-amber-100 flex flex-col gap-1 relative overflow-hidden group hover:border-amber-300 transition-colors cursor-default">
+                            <div class="absolute -right-2 -bottom-2 text-amber-50 opacity-60 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300"><i class="fas fa-box-open text-5xl"></i></div>
                             <span class="text-[9px] font-black text-amber-600 uppercase tracking-widest relative z-10">Sisa Stok</span>
                             <span class="font-black text-slate-800 text-sm relative z-10 truncate">${formatVal(stok)} Pcs</span>
                         </div>
 
-                        <!-- Kartu Tren -->
-                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-fuchsia-100 flex flex-col gap-1 relative overflow-hidden group">
-                            <div class="absolute -right-2 -bottom-2 text-fuchsia-50 opacity-60 group-hover:scale-110 transition-transform duration-300"><i class="fas fa-chart-line text-5xl"></i></div>
-                            <span class="text-[9px] font-black text-fuchsia-600 uppercase tracking-widest relative z-10">Tren (7 Hari)</span>
-                            <span class="font-black text-slate-800 text-sm relative z-10 truncate">${tren}</span>
+                        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-1 relative overflow-hidden group hover:shadow-md transition-shadow cursor-default">
+                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest relative z-10">Tren (7 Hari)</span>
+                            <div class="flex items-center gap-1.5 mt-0.5 relative z-10">
+                                <div class="w-6 h-6 rounded-full ${trendColor} flex items-center justify-center text-[10px] shadow-inner"><i class="fas ${trendIcon}"></i></div>
+                                <span class="font-black text-slate-700 text-[11px] truncate">${tren}</span>
+                            </div>
                         </div>
                     </div>
                     
                     <!-- KONTEN DINAMIS -->
-                    <div class="space-y-2.5">
-                        <p class="text-[9px] font-black text-[#A87B00] uppercase tracking-widest ml-1 mb-1 flex items-center gap-1.5"><i class="fas fa-list-ul"></i> Rincian Data</p>
-                        ${contentHtml}
+                    <div class="space-y-2 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative z-10">
+                        <p class="text-[9px] font-black text-[#A87B00] uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2 mb-2"><i class="fas fa-chart-pie text-[#E5202B]"></i> Rincian Data</p>
+                        <div class="text-xs font-medium text-slate-600 space-y-1">
+                            ${contentHtml}
+                        </div>
                     </div>
                 </div>
 
-                <!-- FOOTER TOMBOL -->
-                <div class="p-4 bg-white border-t border-slate-100 text-center shrink-0">
-                    <button onclick="document.getElementById('dynamic-insight-modal').remove()" class="w-full py-3 bg-slate-100 hover:bg-rose-50 hover:text-[#E5202B] text-[#4A3B32] font-black rounded-[1.25rem] text-xs transition-colors shadow-sm active:scale-95 border border-transparent hover:border-rose-100">Tutup Analitik</button>
+                <!-- 🚀 FOOTER TOMBOL GANDA -->
+                <div class="p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-10">
+                    <button onclick="${closeLogic}" class="flex-1 py-3.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-[#E5202B] font-black rounded-xl text-xs transition-colors shadow-sm active:scale-95 border border-transparent flex items-center justify-center gap-1.5"><i class="fas fa-times"></i> Tutup</button>
+                    <button onclick="if(typeof superApp !== 'undefined' && superApp.showToast) superApp.showToast('Membuka menu bagikan...', 'info'); else alert('Laporan Siap Dibagikan!');" class="flex-1 py-3.5 bg-gradient-to-r from-[#E5202B] to-[#FFB800] hover:from-[#d11c26] hover:to-[#e6a600] text-white font-black rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"><i class="fas fa-share-nodes"></i> Bagikan</button>
                 </div>
             </div>
         </div>`;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // Picu animasi scale up (Bouncy effect)
+        // 🚀 Picu animasi masuk (Fade & Bounce)
         setTimeout(() => {
+            const modal = document.getElementById('dynamic-insight-modal');
             const card = document.getElementById('dim-card');
-            if(card) {
+            if(modal && card) {
+                modal.classList.remove('opacity-0');
                 card.classList.remove('scale-95');
                 card.classList.add('scale-100');
             }
@@ -10493,14 +10486,13 @@ openDetailStokOpname: function(sku) {
     },
 
     // Membuka Modal Detail Struk di Tab Laporan
-    openDetailTrx: function(trxID) {
+   openDetailTrx: function(trxID) {
         let t = (this.db.transactions || []).find(x => x.ID_TRX === trxID);
         if(!t) return;
         
         let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
         let itemsHtml = items.map(i => `<div class="w-full text-left font-bold flex justify-between"><span>${i.qty}x ${i.nama}</span><span>${(Number(i.price) * Number(i.qty)).toLocaleString('id-ID')}</span></div>`).join('');
         
-        // 🚀 CEK METODE BAYAR AGAR TIDAK NaN
         let labelBayar = String(t.Metode_Bayar || 'Tunai').toUpperCase();
         let valBayar = labelBayar.includes('QRIS') ? Number(t.Total_Bayar || 0) : Number(t.Dibayar || 0);
         let valKembali = Number(t.Kembalian || 0);
@@ -10515,7 +10507,6 @@ openDetailStokOpname: function(sku) {
                 <div class="flex justify-between font-bold text-[10px]"><span>KEMBALI</span><span>${valKembali.toLocaleString('id-ID')}</span></div>
             </div>`;
 
-        // 🚀 TARIK TEMPLATE DINAMIS (Agar Popup 100% Mirip Kertas)
         let template = [];
         try { template = JSON.parse(localStorage.getItem('aisnack_receipt_template')); } catch(e) {}
         if (!template || template.length === 0) template = this.defaultReceiptTemplate;
@@ -10547,12 +10538,16 @@ openDetailStokOpname: function(sku) {
             }
         });
 
-        // Tampilkan Label Preview Reprint di Layar Popup
         parsedStrukHtml = `<div class="text-center w-full mb-3 pb-2 border-b border-slate-200"><span class="bg-slate-800 text-white px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest"><i class="fas fa-print mr-1"></i> Preview Cetak Ulang</span></div>` + parsedStrukHtml;
 
+        // 🚀 INJEKSI DUA TOMBOL CETAK
         document.getElementById('detail-struk-body').innerHTML = `
             <div class="flex flex-col items-center w-full max-w-[220px] mx-auto p-2 bg-white shadow-md relative">
                 ${parsedStrukHtml}
+            </div>
+            <div class="flex gap-2 w-full mt-4 justify-center">
+                <button onclick="superApp.executeReprint('customer')" class="bg-brand-50 hover:bg-brand-500 text-brand-600 hover:text-white border border-brand-200 px-3 py-2 rounded-xl text-[10px] font-black transition-all active:scale-95 shadow-sm"><i class="fas fa-print mr-1"></i> Struk Pelanggan</button>
+                <button onclick="superApp.executeReprint('kitchen')" class="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-200 px-3 py-2 rounded-xl text-[10px] font-black transition-all active:scale-95 shadow-sm"><i class="fas fa-print mr-1"></i> Tiket Dapur</button>
             </div>`;
             
         this.activeReprintTrx = t; 
@@ -12849,6 +12844,965 @@ openAIDeepDive: function(type, param) {
         }
     },
 
+
+// =========================================================
+    // 🚀 ENGINE: REKONSILIASI BANK, CASH & KASBON KARYAWAN
+    // =========================================================
+    rekonDataStore: { qris: {}, cash: {}, kasbon: {} },
+    _rekonState: { search: '', sort: 'date_desc', status: 'all' }, // State Filter Interaktif
+    _rekonDataList: { qris: [], cash: [], kasbon: [] }, // Cache Array
+
+   loadRekonDataFromCloud: function() {
+        this.rekonDataStore = { qris: {}, cash: {}, kasbon: {} };
+        
+        // 🚀 BACA DARI TABEL BARU: Log_Rekon
+        if (this.db && this.db.rekon) {
+            this.db.rekon.forEach(r => {
+                let t = String(r.Tipe).toLowerCase();
+                let key = r.ID_Rekon;
+                if (this.rekonDataStore[t]) {
+                    try {
+                        this.rekonDataStore[t][key] = JSON.parse(r.Data_JSON);
+                    } catch(e) {}
+                }
+            });
+        }
+    },
+
+    saveRekonDataToCloud: function(type, key, dataObj) {
+        // 🚀 KIRIM KE TABEL BARU: Hanya kirim 1 baris yang baru saja diedit
+        const payload = { 
+            action: 'save_rekon', 
+            tipe: type,
+            id_rekon: key, 
+            data_json: JSON.stringify(dataObj) 
+        };
+        
+        // Kirim diam-diam di latar belakang
+        this.apiPost(payload).then(res => {
+            if(res.status === 'sukses') {
+                this.showToast("Berhasil mencatat rekon ke database!", "success");
+            }
+        });
+    },
+
+    saveRekonMutasi: function(type, key) {
+        if(this.isProcessing) return;
+        
+        let st = document.getElementById('frm-mdl-rekon-status').value;
+        let nt = document.getElementById('frm-mdl-rekon-note').value;
+        
+        if (!this.rekonDataStore[type]) this.rekonDataStore[type] = {};
+        
+        let dataObj = {};
+
+        if (type === 'qris') {
+            let actInput = document.getElementById('frm-mdl-rekon-actual');
+            let act = actInput && actInput.value !== '' ? this.getNumericValue(actInput.value) : '';
+            dataObj = { status: st, note: nt, actual: act };
+        } else {
+            let actPosInput = document.getElementById('frm-mdl-rekon-act-pos');
+            let actAichaInput = document.getElementById('frm-mdl-rekon-act-aicha');
+            
+            let actPos = actPosInput && actPosInput.value !== '' ? this.getNumericValue(actPosInput.value) : '';
+            let actAicha = actAichaInput && actAichaInput.value !== '' ? this.getNumericValue(actAichaInput.value) : '';
+            
+            dataObj = { status: st, note: nt, actualPos: actPos, actualAicha: actAicha };
+        }
+        
+        // Simpan ke memori sementara
+        this.rekonDataStore[type][key] = dataObj;
+        
+        // 🚀 EKSEKUSI API BARU
+        this.saveRekonDataToCloud(type, key, dataObj);
+        
+        this.renderRekon();
+        this.closeModal('modal-form');
+    },
+
+    saveRekonKasbon: function(key, totalNominal) {
+        let saved = this.rekonDataStore.kasbon[key] || { history: [], lunas: false };
+        let inputBayar = document.getElementById('frm-mdl-kasbon-bayar');
+        let tambahBayar = inputBayar ? this.getNumericValue(inputBayar.value) : 0;
+        let isLunas = document.getElementById('mdl-kasbon-lunas').checked;
+
+        if (tambahBayar > 0) {
+            let now = new Date(); let pad = n => String(n).padStart(2, '0');
+            let wkt = `${pad(now.getDate())}/${pad(now.getMonth()+1)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            if(!saved.history) saved.history = [];
+            saved.history.push({ waktu: wkt, nominal: tambahBayar });
+        }
+
+        let totalTerbayar = (saved.history || []).reduce((sum, h) => sum + h.nominal, 0);
+        if (totalTerbayar >= totalNominal) isLunas = true;
+
+        let dataObj = { history: saved.history, lunas: isLunas };
+        
+        // Simpan ke memori sementara
+        this.rekonDataStore.kasbon[key] = dataObj;
+        
+        // 🚀 EKSEKUSI API BARU
+        this.saveRekonDataToCloud('kasbon', key, dataObj);
+        
+        this.renderRekon();
+        this.closeModal('modal-form');
+    },
+
+    switchRekonTab: function(tab) {
+        const cQris = document.getElementById('rekon-content-qris');
+        const cCash = document.getElementById('rekon-content-cash');
+        const cKasbon = document.getElementById('rekon-content-kasbon');
+        const bQris = document.getElementById('subtab-rekon-qris');
+        const bCash = document.getElementById('subtab-rekon-cash');
+        const bKasbon = document.getElementById('subtab-rekon-kasbon');
+
+        const activeClass = 'flex-1 py-2 px-1 bg-white rounded-lg text-[10px] font-black shadow-sm transition flex items-center justify-center gap-1.5 border border-slate-200/50';
+        const inactiveClass = 'flex-1 py-2 px-1 text-slate-500 hover:text-slate-700 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1.5 border border-transparent';
+
+        [cQris, cCash, cKasbon].forEach(c => c.classList.replace('flex', 'hidden'));
+        [bQris, bCash, bKasbon].forEach(b => { b.className = inactiveClass; b.classList.remove('text-blue-600', 'text-emerald-600', 'text-amber-600'); });
+
+        if (tab === 'qris') {
+            cQris.classList.replace('hidden', 'flex');
+            bQris.className = activeClass + ' text-blue-600';
+        } else if (tab === 'cash') {
+            cCash.classList.replace('hidden', 'flex');
+            bCash.className = activeClass + ' text-emerald-600';
+        } else if (tab === 'kasbon') {
+            cKasbon.classList.replace('hidden', 'flex');
+            bKasbon.className = activeClass + ' text-amber-600';
+        }
+    },
+
+ // =========================================================
+    // 🚀 ENGINE: KALKULATOR LIVE SELISIH REKON QRIS
+    // =========================================================
+    calcRekonDiffQris: function(expectedAmount) {
+        let actualInput = document.getElementById('frm-mdl-rekon-actual');
+        let diffEl = document.getElementById('mdl-rekon-diff-badge');
+        let statusSel = document.getElementById('frm-mdl-rekon-status');
+        if(!actualInput || !diffEl) return;
+
+        if (actualInput.value === '') {
+            diffEl.innerHTML = `<span class="text-slate-400 text-[10px] font-bold italic">Menunggu input...</span>`;
+            if (statusSel) statusSel.value = 'Pending';
+            return;
+        }
+
+        let actual = this.getNumericValue(actualInput.value);
+        let diff = actual - expectedAmount;
+
+        if (diff === 0) {
+            diffEl.innerHTML = `<span class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-black shadow-sm border border-emerald-200"><i class="fas fa-check-double mr-1"></i> PAS (Rp 0)</span>`;
+            if(statusSel) statusSel.value = 'Sesuai';
+        } else if (diff > 0) {
+            diffEl.innerHTML = `<span class="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-black shadow-sm border border-blue-200"><i class="fas fa-arrow-up mr-1"></i> LEBIH (+Rp ${diff.toLocaleString('id-ID')})</span>`;
+            if(statusSel) statusSel.value = 'Selisih';
+        } else {
+            diffEl.innerHTML = `<span class="bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg font-black shadow-sm border border-rose-200 animate-pulse"><i class="fas fa-arrow-down mr-1"></i> MINUS (-Rp ${Math.abs(diff).toLocaleString('id-ID')})</span>`;
+            if(statusSel) statusSel.value = 'Selisih';
+        }
+    },
+
+    // =========================================================
+    // 🚀 ENGINE: KALKULATOR LIVE DUAL INPUT REKON CASH
+    // =========================================================
+    calcRekonDiffCash: function(expPos, expAicha) {
+        let inpPos = document.getElementById('frm-mdl-rekon-act-pos');
+        let inpAicha = document.getElementById('frm-mdl-rekon-act-aicha');
+        let diffEl = document.getElementById('mdl-rekon-diff-badge');
+        let statusSel = document.getElementById('frm-mdl-rekon-status');
+
+        if(!inpPos || !inpAicha || !diffEl) return;
+
+        if (inpPos.value === '' && inpAicha.value === '') {
+            diffEl.innerHTML = `<span class="text-slate-400 text-[10px] font-bold italic">Menunggu input laci/fisik...</span>`;
+            if (statusSel) statusSel.value = 'Pending';
+            return;
+        }
+
+        let actPos = this.getNumericValue(inpPos.value);
+        let actAicha = this.getNumericValue(inpAicha.value);
+        
+        let diffPos = actPos - expPos;
+        let diffAicha = actAicha - expAicha;
+        let totalDiff = diffPos + diffAicha;
+
+        let html = '';
+        if (totalDiff === 0 && diffPos === 0 && diffAicha === 0) {
+            html = `<span class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-black shadow-sm border border-emerald-200"><i class="fas fa-check-double mr-1"></i> SEMUA PAS (Rp 0)</span>`;
+            if(statusSel) statusSel.value = 'Sesuai';
+        } else {
+            let color = totalDiff >= 0 ? 'text-blue-700 bg-blue-100 border-blue-200' : 'text-rose-700 bg-rose-100 border-rose-200 animate-pulse';
+            let icon = totalDiff >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            let sign = totalDiff > 0 ? '+' : '';
+            
+            html = `<div class="flex flex-col items-end"><span class="${color} px-2 py-1 rounded-md font-black shadow-sm border text-[10px]"><i class="fas ${icon} mr-1"></i> ${sign}Rp ${totalDiff.toLocaleString('id-ID')}</span>`;
+            
+            if (diffPos !== 0 || diffAicha !== 0) {
+                html += `<div class="flex gap-2 mt-1 text-[8px] font-bold text-slate-500">`;
+                if(diffPos !== 0) html += `<span>POS: <b class="${diffPos < 0 ? 'text-rose-500' : 'text-blue-500'}">${diffPos > 0 ? '+' : ''}${diffPos.toLocaleString('id-ID')}</b></span>`;
+                if(diffAicha !== 0) html += `<span>Lap: <b class="${diffAicha < 0 ? 'text-rose-500' : 'text-blue-500'}">${diffAicha > 0 ? '+' : ''}${diffAicha.toLocaleString('id-ID')}</b></span>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            
+            if(statusSel) statusSel.value = 'Selisih';
+        }
+        diffEl.innerHTML = html;
+    },
+
+   
+    // =========================================================
+    // 🚀 UPDATE ENGINE RENDER TABEL (KOLOM AKTUAL DIPISAH)
+    // =========================================================
+   renderRekon: function() {
+        this.loadRekonDataFromCloud(); 
+
+        const startInput = document.getElementById('rekon-filter-start');
+        const endInput = document.getElementById('rekon-filter-end');
+        let now = new Date(); let pad = n => String(n).padStart(2, '0');
+
+        if (startInput && !startInput.value) startInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+        if (endInput && !endInput.value) endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        let dateStart = new Date(startInput.value + "T00:00:00"); 
+        let dateEnd = new Date(endInput.value + "T23:59:59");
+
+        const filterOutEl = document.getElementById('rekon-filter-outlet');
+        if (filterOutEl && filterOutEl.options.length <= 1) {
+            let opts = '<option value="Semua">Semua Cabang</option>';
+            (this.db.outlets || []).forEach(o => { opts += `<option value="${o.ID_Outlet}">${o.Nama_Outlet}</option>`; });
+            filterOutEl.innerHTML = opts;
+        }
+        let selOut = filterOutEl ? filterOutEl.value : 'Semua';
+
+        let totalAichaNet = 0; let totalAichaQris = 0;
+        let totalPOSCash = 0; let totalPOSQris = 0;
+        
+        let mutasiMap = {}; 
+        let arrKasbonRaw = [];
+
+        const getStdDate = (str) => {
+            let s = String(str || '').split(',').pop().trim();
+            let m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (m) {
+                let p1 = parseInt(m[1], 10), p2 = parseInt(m[2], 10), p3 = parseInt(m[3], 10);
+                if (p1 > 1000) return { dObj: new Date(p1, p2 - 1, p3), stdStr: `${pad(p3)}/${pad(p2)}/${p1}` };
+                else return { dObj: new Date(p3, p2 - 1, p1), stdStr: `${pad(p1)}/${pad(p2)}/${p3}` };
+            }
+            return { dObj: new Date(s), stdStr: s.split(' ')[0] };
+        };
+
+        // 1. Ekstrak Laporan Ai-CHA
+        (this.db.laporanHarian || []).forEach(rep => {
+            if (rep.Status_Approval === 'Ditolak') return;
+            let rOut = String(rep.Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+            if (selOut !== 'Semua' && rOut !== selOut) return;
+
+            let dt = getStdDate(rep.Tanggal);
+            if (isNaN(dt.dObj.getTime()) || dt.dObj < dateStart || dt.dObj > dateEnd) return;
+
+            let csh = Number(rep.Cash || 0); let exp = Number(rep.Total_Pengeluaran || 0);
+            let qris = Number(rep.QRIS || 0);
+            let netLaci = csh - exp;
+            
+            totalAichaNet += netLaci;
+            totalAichaQris += qris;
+
+            let dKey = `${dt.stdStr}_${rOut}`;
+            if(!mutasiMap[dKey]) mutasiMap[dKey] = { tgl: dt.stdStr, outlet: rOut, aichaQris: 0, aichaCash: 0, posQris: 0, posCash: 0, sortTime: dt.dObj.getTime() };
+            mutasiMap[dKey].aichaQris += qris;
+            mutasiMap[dKey].aichaCash += netLaci;
+
+            try {
+                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                expArr.forEach((ex, idx) => {
+                    let nom = Number(ex.nominal);
+                    if (nom > 0) {
+                        let nLow = ex.nama.toLowerCase();
+                        let isKasbon = nLow.includes('kasbon') || nLow.includes('pinjam') || nLow.includes('bon ');
+                        arrKasbonRaw.push({
+                            id_laporan: rep.ID_Laporan, idx: idx, tgl: dt.stdStr, outlet: rOut,
+                            nama: ex.nama, nominal: nom, isKasbon: isKasbon, sortTime: dt.dObj.getTime()
+                        });
+                    }
+                });
+            } catch(e) {}
+        });
+
+        // 2. Ekstrak Transaksi POS Ai-Snack
+        (this.db.transactions || []).forEach(t => {
+            if (t.Status !== 'Sukses') return;
+            let tOut = String(t.Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
+            if (selOut !== 'Semua' && tOut !== selOut) return;
+
+            let dt = getStdDate(t.Tanggal);
+            if (isNaN(dt.dObj.getTime()) || dt.dObj < dateStart || dt.dObj > dateEnd) return;
+
+            let isQris = String(t.Metode_Bayar).trim().toLowerCase().includes('qris');
+            let byr = Number(t.Total_Bayar || 0);
+
+            let dKey = `${dt.stdStr}_${tOut}`;
+            if(!mutasiMap[dKey]) mutasiMap[dKey] = { tgl: dt.stdStr, outlet: tOut, aichaQris: 0, aichaCash: 0, posQris: 0, posCash: 0, sortTime: dt.dObj.getTime() };
+
+            if (isQris) {
+                totalPOSQris += byr;
+                mutasiMap[dKey].posQris += byr;
+            } else {
+                totalPOSCash += byr;
+                mutasiMap[dKey].posCash += byr;
+            }
+        });
+
+        // --- UPDATE 3 KARTU KPI ATAS ---
+        if(document.getElementById('rekon-aicha-net')) document.getElementById('rekon-aicha-net').innerText = `Rp ${totalAichaNet.toLocaleString('id-ID')}`;
+        if(document.getElementById('rekon-aicha-qris')) document.getElementById('rekon-aicha-qris').innerText = `Rp ${totalAichaQris.toLocaleString('id-ID')}`;
+        if(document.getElementById('rekon-aisnack-tunai')) document.getElementById('rekon-aisnack-tunai').innerText = `Rp ${totalPOSCash.toLocaleString('id-ID')}`;
+        if(document.getElementById('rekon-aisnack-qris')) document.getElementById('rekon-aisnack-qris').innerText = `Rp ${totalPOSQris.toLocaleString('id-ID')}`;
+        if(document.getElementById('rekon-total-qris-bank')) document.getElementById('rekon-total-qris-bank').innerText = `Rp ${(totalAichaQris + totalPOSQris).toLocaleString('id-ID')}`;
+
+        // 3. SUSUN ARRAY UNTUK LIST DINAMIS
+        this._rekonDataList.qris = [];
+        this._rekonDataList.cash = [];
+        
+        let mutasiKeys = Object.keys(mutasiMap);
+        mutasiKeys.forEach(k => {
+            let d = mutasiMap[k];
+            let totalQ = d.aichaQris + d.posQris;
+            let totalC = d.aichaCash + d.posCash;
+
+            // Masukkan ke array QRIS jika ada angka (atau ada memori pernah disimpan)
+            let savedQris = this.rekonDataStore.qris[k] || { status: 'Pending', note: '', actual: '' };
+            if (totalQ !== 0 || savedQris.actual !== '') {
+                this._rekonDataList.qris.push({ key: k, ...d, total: totalQ, saved: savedQris });
+            }
+
+            // Masukkan ke array Cash jika ada angka
+            let savedCash = this.rekonDataStore.cash[k] || { status: 'Pending', note: '', actualPos: '', actualAicha: '' };
+            if (totalC !== 0 || d.aichaCash !== 0 || d.posCash !== 0 || savedCash.actualPos !== '' || savedCash.actualAicha !== '') {
+                this._rekonDataList.cash.push({ key: k, ...d, total: totalC, saved: savedCash });
+            }
+        });
+
+        // Susun array Kasbon
+        this._rekonDataList.kasbon = arrKasbonRaw.map(d => {
+            let k = `${d.id_laporan}_${d.idx}`;
+            let savedKasbon = this.rekonDataStore.kasbon[k] || { history: [], lunas: false };
+            if (savedKasbon.terbayar !== undefined && !savedKasbon.history) {
+                savedKasbon.history = savedKasbon.terbayar > 0 ? [{ waktu: 'Data Lama', nominal: savedKasbon.terbayar }] : [];
+            }
+            return { key: k, ...d, saved: savedKasbon };
+        });
+
+        // 🚀 HITUNG AKUMULASI (SUMMARY)
+        let countSesuai = 0, countSelisih = 0, countPending = 0;
+        
+        this._rekonDataList.qris.forEach(d => {
+            if(d.saved.status === 'Sesuai') countSesuai++;
+            else if(d.saved.status === 'Selisih') countSelisih++;
+            else countPending++;
+        });
+        this._rekonDataList.cash.forEach(d => {
+            if(d.saved.status === 'Sesuai') countSesuai++;
+            else if(d.saved.status === 'Selisih') countSelisih++;
+            else countPending++;
+        });
+        this._rekonDataList.kasbon.forEach(d => {
+            if(d.saved.lunas) countSesuai++; 
+            else countSelisih++; // Jika belum lunas masuk ke hutang/selisih
+        });
+
+        if(document.getElementById('rekon-sum-sesuai')) document.getElementById('rekon-sum-sesuai').innerText = countSesuai;
+        if(document.getElementById('rekon-sum-selisih')) document.getElementById('rekon-sum-selisih').innerText = countSelisih;
+        if(document.getElementById('rekon-sum-pending')) document.getElementById('rekon-sum-pending').innerText = countPending;
+
+        // 4. Render Interface List
+        this.updateRekonListUI();
+    },
+       
+     
+    // =========================================================
+    // 🚀 MESIN RENDER LIST INTERAKTIF (SEARCH, SORT, FILTER)
+    // =========================================================
+    updateRekonListUI: function() {
+        let state = this._rekonState;
+        let sQuery = state.search.toLowerCase().trim();
+
+        // FUNGSI SORTING UNIVERSAL
+        const sortData = (arr, isKasbon = false) => {
+            return arr.sort((a, b) => {
+                if (state.sort === 'date_desc') return b.sortTime - a.sortTime;
+                if (state.sort === 'date_asc') return a.sortTime - b.sortTime;
+                if (state.sort === 'out_az') return a.outlet.localeCompare(b.outlet);
+                
+                let valA = isKasbon ? a.nominal : a.total;
+                let valB = isKasbon ? b.nominal : b.total;
+                if (state.sort === 'nom_desc') return valB - valA;
+                if (state.sort === 'nom_asc') return valA - valB;
+                return 0;
+            });
+        };
+
+        // FUNGSI FILTER UNIVERSAL
+        const filterData = (arr, isKasbon = false) => {
+            return arr.filter(d => {
+                // Filter Pencarian Text
+                let txtToSearch = (d.outlet + " " + (d.saved.note || '')).toLowerCase();
+                if (isKasbon) txtToSearch += " " + d.nama.toLowerCase();
+                
+                let numToSearch = String(isKasbon ? d.nominal : d.total);
+                
+                let passSearch = sQuery === '' || txtToSearch.includes(sQuery) || numToSearch.includes(sQuery);
+                if (!passSearch) return false;
+
+                // Filter Status Combobox
+                if (state.status !== 'all') {
+                    if (isKasbon) {
+                        let isLunas = d.saved.lunas;
+                        if (state.status === 'Sesuai' && !isLunas) return false;
+                        if (state.status === 'Selisih' && isLunas) return false;
+                        if (state.status === 'Pending') return false; // Kasbon tidak ada pending
+                    } else {
+                        if (d.saved.status !== state.status) return false;
+                    }
+                }
+                return true;
+            });
+        };
+
+        // ----------------------------------------------------
+        // 1. RENDER QRIS
+        // ----------------------------------------------------
+        let qrisHtml = ''; let qArr = sortData(filterData(this._rekonDataList.qris));
+        const getDiffBadgeCard = (diff) => {
+            if (diff === 0) return `<span class="text-emerald-500 font-black"><i class="fas fa-check"></i> Pas</span>`;
+            if (diff > 0) return `<span class="text-blue-500 font-black"><i class="fas fa-arrow-up"></i> +${diff.toLocaleString('id-ID')}</span>`;
+            return `<span class="text-rose-500 font-black"><i class="fas fa-arrow-down"></i> -${Math.abs(diff).toLocaleString('id-ID')}</span>`;
+        };
+
+        qArr.forEach(d => {
+            let isActEmpty = d.saved.actual === ''; let actVal = Number(d.saved.actual || 0);
+            let badge = d.saved.status === 'Sesuai' ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-black"><i class="fas fa-check-circle"></i> Sesuai</span>` :
+                        d.saved.status === 'Selisih' ? `<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[9px] font-black"><i class="fas fa-exclamation-circle"></i> Selisih</span>` :
+                        `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[9px] font-black">Pending</span>`;
+
+            qrisHtml += `
+            <div class="bg-white border border-slate-200/80 p-3 rounded-[1rem] shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer active:scale-95 group" onclick="superApp.openRekonMutasiModal('qris', '${d.key}', '${d.tgl}', '${d.outlet}', ${d.posQris}, ${d.aichaQris})">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                    <div>
+                        <span class="font-extrabold text-slate-800 text-xs">${d.tgl}</span>
+                        <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1 bg-blue-50 px-1.5 py-0.5 rounded"><i class="fas fa-store mr-0.5"></i> ${d.outlet}</span>
+                    </div>
+                    ${badge}
+                </div>
+                <div class="flex justify-between items-end">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[9px] font-bold text-slate-400">Target Sistem:</span>
+                        <span class="font-black text-slate-700 text-sm">Rp ${d.total.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div class="flex flex-col gap-1 items-end text-right">
+                        <span class="text-[9px] font-bold text-slate-400 flex items-center gap-1">Aktual Bank ${isActEmpty ? '' : getDiffBadgeCard(actVal - d.total)}</span>
+                        <span class="font-black text-sm ${isActEmpty ? 'text-slate-300' : 'text-blue-600'}">${isActEmpty ? 'Menunggu Input' : 'Rp ' + actVal.toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('rekon-content-qris').innerHTML = qArr.length > 0 ? qrisHtml : `<div class="p-8 text-center text-slate-400 font-bold text-xs italic"><i class="fas fa-search-minus text-3xl mb-2 opacity-50 block"></i> Tidak ada mutasi QRIS sesuai filter</div>`;
+
+        // ----------------------------------------------------
+        // 2. RENDER CASH
+        // ----------------------------------------------------
+        let cashHtml = ''; let cArr = sortData(filterData(this._rekonDataList.cash));
+        cArr.forEach(d => {
+            let isCashEmpty = (d.saved.actualPos === '' && d.saved.actualAicha === '') || d.saved.actualPos === undefined;
+            let actPosVal = Number(d.saved.actualPos || 0); let actAichaVal = Number(d.saved.actualAicha || 0);
+            let actTotal = actPosVal + actAichaVal;
+            let diffPos = actPosVal - d.posCash; let diffAicha = actAichaVal - d.aichaCash;
+            let totalDiff = actTotal - d.total;
+
+            let badge = d.saved.status === 'Sesuai' ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-black uppercase"><i class="fas fa-check"></i> Sesuai</span>` :
+                        d.saved.status === 'Selisih' ? `<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[9px] font-black uppercase"><i class="fas fa-times"></i> Selisih</span>` :
+                        `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[9px] font-black uppercase">Pending</span>`;
+
+            cashHtml += `
+            <div class="bg-white border border-slate-200/80 p-3 rounded-[1rem] shadow-sm hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer active:scale-95 group" onclick="superApp.openRekonMutasiModal('cash', '${d.key}', '${d.tgl}', '${d.outlet}', ${d.posCash}, ${d.aichaCash})">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                    <div>
+                        <span class="font-extrabold text-slate-800 text-xs">${d.tgl}</span>
+                        <span class="text-[9px] font-black text-emerald-500 uppercase tracking-widest ml-1 bg-emerald-50 px-1.5 py-0.5 rounded"><i class="fas fa-store mr-0.5"></i> ${d.outlet}</span>
+                    </div>
+                    ${badge}
+                </div>
+                
+                <div class="flex justify-between items-center mb-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <span class="text-[9px] font-bold text-slate-500">Target Sistem:</span>
+                    <div class="flex gap-2">
+                        <span class="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">POS: ${d.posCash.toLocaleString('id-ID')}</span>
+                        <span class="text-[9px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">Lap: ${d.aichaCash.toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-end">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-slate-400">Aktual Fisik: ${isCashEmpty ? '' : getDiffBadgeCard(totalDiff)}</span>
+                        ${!isCashEmpty && (diffPos !== 0 || diffAicha !== 0) ? `
+                        <div class="flex gap-1 text-[8px] font-bold mt-0.5">
+                            ${diffPos !== 0 ? `<span class="${diffPos < 0 ? 'text-rose-500' : 'text-blue-500'}">POS: ${diffPos > 0 ? '+' : ''}${diffPos.toLocaleString('id-ID')}</span>` : `<span class="text-emerald-500">POS ✔</span>`}
+                            <span class="text-slate-300">|</span>
+                            ${diffAicha !== 0 ? `<span class="${diffAicha < 0 ? 'text-rose-500' : 'text-blue-500'}">Lap: ${diffAicha > 0 ? '+' : ''}${diffAicha.toLocaleString('id-ID')}</span>` : `<span class="text-emerald-500">Lap ✔</span>`}
+                        </div>` : ''}
+                    </div>
+                    <div class="text-right">
+                        <span class="font-black text-sm md:text-base ${isCashEmpty ? 'text-slate-300' : 'text-emerald-600'}">${isCashEmpty ? 'Menunggu Input' : 'Rp ' + actTotal.toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('rekon-content-cash').innerHTML = cArr.length > 0 ? cashHtml : `<div class="p-8 text-center text-slate-400 font-bold text-xs italic"><i class="fas fa-search-minus text-3xl mb-2 opacity-50 block"></i> Tidak ada mutasi Cash sesuai filter</div>`;
+
+        // ----------------------------------------------------
+        // 3. RENDER KASBON & OPEX
+        // ----------------------------------------------------
+        let kbHtml = ''; let kbArr = sortData(filterData(this._rekonDataList.kasbon, true), true);
+        kbArr.forEach(d => {
+            let totalTerbayar = (d.saved.history || []).reduce((sum, h) => sum + h.nominal, 0);
+            let sisa = d.nominal - totalTerbayar;
+            
+            let sisaTeks = d.saved.lunas ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-black"><i class="fas fa-check"></i> Lunas</span>` : 
+                           d.isKasbon ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[9px] font-black border border-orange-200 shadow-sm">Sisa: Rp ${sisa.toLocaleString('id-ID')}</span>` :
+                           `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[9px] font-black">OPEX Biasa</span>`;
+
+            kbHtml += `
+            <div class="bg-white border border-slate-200/80 p-3 rounded-[1rem] shadow-sm hover:border-amber-300 hover:shadow-md transition-all cursor-pointer active:scale-95 group" onclick="superApp.openRekonKasbonModal('${d.key}', '${d.tgl}', '${d.outlet}', '${d.nama}', ${d.nominal})">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex-1 pr-2">
+                        <span class="font-black text-slate-800 text-xs line-clamp-2 leading-snug mb-1 ${d.isKasbon ? 'text-amber-700' : ''}">${d.nama}</span>
+                        <div class="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                            <span><i class="far fa-calendar-alt"></i> ${d.tgl}</span>
+                            <span class="bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest text-slate-500"><i class="fas fa-store text-amber-500"></i> ${d.outlet}</span>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="font-black text-sm text-rose-600 mb-1">Rp ${d.nominal.toLocaleString('id-ID')}</div>
+                        ${sisaTeks}
+                    </div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('rekon-content-kasbon').innerHTML = kbArr.length > 0 ? kbHtml : `<div class="p-8 text-center text-slate-400 font-bold text-xs italic"><i class="fas fa-search-minus text-3xl mb-2 opacity-50 block"></i> Tidak ada catatan biaya/kasbon sesuai filter</div>`;
+    },
+
+  // =========================================================
+    // 🚀 ENGINE: MODAL REKON MUTASI (DUAL INPUT UNTUK CASH)
+    // =========================================================
+    openRekonMutasiModal: function(type, key, tgl, outlet, posVal, aichaVal) {
+        let isQris = type === 'qris';
+        let saved = this.rekonDataStore[type][key] || { status: 'Pending', note: '', actual: '', actualPos: '', actualAicha: '' };
+        let total = posVal + aichaVal;
+
+        let themeColor = isQris ? 'blue' : 'emerald';
+        let titleColor = isQris ? 'text-blue-600' : 'text-emerald-600';
+        let bgHeader = isQris ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100';
+        let titleName = isQris ? 'Total QRIS Masuk' : 'Total Cash Tunai';
+        let iconName = isQris ? 'fa-qrcode' : 'fa-money-bill-wave';
+
+        // 🚀 DESAIN SPLIT (RINCIAN SUMBER TARGET)
+        let inputs = `
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                 <div class="bg-amber-50/60 p-3 rounded-xl border border-amber-100 text-center shadow-inner relative">
+                     <p class="text-[9px] text-amber-600 font-black uppercase tracking-widest mb-1"><i class="fas fa-hamburger mr-1"></i>POS Ai-Snack</p>
+                     <p class="font-black text-slate-700 text-xs md:text-sm">Rp ${posVal.toLocaleString('id-ID')}</p>
+                 </div>
+                 <div class="bg-rose-50/60 p-3 rounded-xl border border-rose-100 text-center shadow-inner relative">
+                     <p class="text-[9px] text-rose-500 font-black uppercase tracking-widest mb-1"><i class="fas fa-clipboard-list mr-1"></i>Lap. Ai-CHA</p>
+                     <p class="font-black text-slate-700 text-xs md:text-sm">${aichaVal < 0 ? '-' : ''}Rp ${Math.abs(aichaVal).toLocaleString('id-ID')}</p>
+                 </div>
+            </div>
+
+            <!-- Target Sistem Total -->
+            <div class="mb-4 text-center ${bgHeader} border rounded-xl p-3 shadow-sm">
+                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1"><i class="fas ${iconName} mr-1"></i> Target ${titleName} (Sistem)</p>
+                <h2 class="text-3xl font-black ${titleColor}">${total < 0 ? '-' : ''}Rp ${Math.abs(total).toLocaleString('id-ID')}</h2>
+            </div>
+        `;
+
+        // 🚀 RENDER INPUT DYNAMIC (1 Input untuk QRIS, 2 Input untuk Cash)
+        if (isQris) {
+            inputs += `
+            <div class="mb-4">
+                <label class="text-xs font-black text-slate-600 block mb-2 uppercase tracking-widest">Input Mutasi M-Banking</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Rp</span>
+                    <!-- 🛠️ PERBAIKAN 1: calcRekonDiff diubah jadi calcRekonDiffQris -->
+                    <input type="text" inputmode="numeric" id="frm-mdl-rekon-actual" value="${saved.actual ? Number(saved.actual).toLocaleString('id-ID') : ''}" 
+                        oninput="superApp.formatRupiahInput(this); superApp.calcRekonDiffQris(${total});" 
+                        placeholder="Ketik mutasi bank yang masuk..." 
+                        class="w-full border-2 border-slate-200 rounded-xl pl-9 pr-4 py-3 font-black text-lg bg-white outline-none focus:border-blue-500 transition shadow-inner">
+                </div>
+            </div>`;
+        } else {
+            inputs += `
+            <label class="text-xs font-black text-slate-600 block mb-2 uppercase tracking-widest mt-2">Input Hitungan Fisik Laci (Asli)</label>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-amber-50/30 p-2.5 border border-amber-100 rounded-xl shadow-inner">
+                    <label class="text-[9px] font-black text-amber-600 uppercase tracking-widest block mb-1.5"><i class="fas fa-hand-holding-usd"></i> Fisik POS</label>
+                    <div class="relative">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">Rp</span>
+                        <input type="text" inputmode="numeric" id="frm-mdl-rekon-act-pos" value="${saved.actualPos ? Number(saved.actualPos).toLocaleString('id-ID') : ''}" 
+                            oninput="superApp.formatRupiahInput(this); superApp.calcRekonDiffCash(${posVal}, ${aichaVal});" 
+                            placeholder="0" class="w-full border-2 border-slate-200 rounded-lg pl-8 pr-2 py-2 font-black text-sm bg-white outline-none focus:border-amber-500 transition shadow-sm">
+                    </div>
+                </div>
+                <div class="bg-rose-50/30 p-2.5 border border-rose-100 rounded-xl shadow-inner">
+                    <label class="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1.5"><i class="fas fa-hand-holding-usd"></i> Fisik Ai-CHA</label>
+                    <div class="relative">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">Rp</span>
+                        <input type="text" inputmode="numeric" id="frm-mdl-rekon-act-aicha" value="${saved.actualAicha ? Number(saved.actualAicha).toLocaleString('id-ID') : ''}" 
+                            oninput="superApp.formatRupiahInput(this); superApp.calcRekonDiffCash(${posVal}, ${aichaVal});" 
+                            placeholder="0" class="w-full border-2 border-slate-200 rounded-lg pl-8 pr-2 py-2 font-black text-sm bg-white outline-none focus:border-rose-500 transition shadow-sm">
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // 🚀 LIVE KALKULASI & STATUS
+        inputs += `
+            <div class="mb-4 flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-xl min-h-[60px]">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kalkulasi Selisih:</span>
+                <div id="mdl-rekon-diff-badge"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 block mb-1">Status Pencocokan</label>
+                    <select id="frm-mdl-rekon-status" class="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 font-bold text-xs bg-white outline-none focus:border-${themeColor}-500">
+                        <option value="Pending" ${saved.status === 'Pending' ? 'selected' : ''}>⏳ Menunggu Pengecekan</option>
+                        <option value="Sesuai" ${saved.status === 'Sesuai' ? 'selected' : ''}>✅ Sesuai Aktual</option>
+                        <option value="Selisih" ${saved.status === 'Selisih' ? 'selected' : ''}>❌ Ada Selisih</option>
+                    </select>
+                </div>
+                ${this.makeInput('Catatan', 'mdl-rekon-note', saved.note, 'text', 'Boleh dikosongkan')}
+            </div>
+        `;
+
+        this.buildForm(`Cek Mutasi: ${outlet} (${tgl})`, inputs, `superApp.saveRekonMutasi('${type}', '${key}')`);
+        
+        // 🛠️ PERBAIKAN 2: calcRekonDiff diubah jadi calcRekonDiffQris
+        setTimeout(() => {
+            if (isQris) this.calcRekonDiffQris(total);
+            else this.calcRekonDiffCash(posVal, aichaVal);
+        }, 100);
+    },
+
+   
+
+    // --- MODAL TRACKING KASBON & OPEX (DENGAN RIWAYAT CICILAN) ---
+    openRekonKasbonModal: function(key, tgl, outlet, nama, nominal) {
+        let saved = this.rekonDataStore.kasbon[key] || { history: [], lunas: false };
+        if (saved.terbayar !== undefined && !saved.history) {
+            saved.history = saved.terbayar > 0 ? [{ waktu: 'Awal (Data Lama)', nominal: saved.terbayar }] : [];
+        }
+
+        let historyHtml = '';
+        let totalTerbayar = 0;
+        
+        if (saved.history && saved.history.length > 0) {
+            historyHtml = saved.history.map((h, i) => {
+                totalTerbayar += h.nominal;
+                return `
+                <div class="flex justify-between items-center bg-white p-2 border-b border-slate-100 text-xs">
+                    <span class="font-bold text-slate-500">${h.waktu}</span>
+                    <span class="font-black text-emerald-600">Rp ${h.nominal.toLocaleString('id-ID')}</span>
+                </div>`;
+            }).join('');
+        } else {
+            historyHtml = `<div class="text-center text-slate-400 text-[10px] italic py-3">Belum ada riwayat cicilan/pembayaran</div>`;
+        }
+
+        let sisa = nominal - totalTerbayar;
+        let safeNama = nama.replace(/'/g, "\\'");
+
+        let inputs = `
+            <div class="mb-3 text-center bg-slate-50 rounded-xl p-3 border border-slate-200 shadow-inner">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${nama}</p>
+                <h2 class="text-2xl font-black text-rose-600">Rp ${nominal.toLocaleString('id-ID')}</h2>
+                <div class="flex justify-between mt-2 text-[10px] font-bold px-2">
+                    <span class="text-emerald-600">Terbayar: Rp ${totalTerbayar.toLocaleString('id-ID')}</span>
+                    <span class="text-amber-600">Sisa: Rp ${sisa.toLocaleString('id-ID')}</span>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Riwayat Pembayaran</p>
+                <div class="bg-slate-50 border border-slate-200 rounded-xl max-h-32 overflow-y-auto custom-scroll shadow-inner">
+                    ${historyHtml}
+                </div>
+            </div>
+
+            ${this.makeInput('Catat Pembayaran Baru (Rp)', 'mdl-kasbon-bayar', '', 'number', 'Ketik angka cicilan terbaru', false, 'superApp.formatRupiahInput(this)')}
+            
+            <div class="mt-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-sm">
+                <input type="checkbox" id="mdl-kasbon-lunas" class="w-5 h-5 accent-emerald-500 cursor-pointer" ${saved.lunas ? 'checked' : ''}>
+                <label for="mdl-kasbon-lunas" class="text-xs font-black text-emerald-700 cursor-pointer w-full">Tandai Lunas Sepenuhnya</label>
+            </div>
+            
+            <!-- Tombol Ekspor -->
+            <div class="flex gap-2 mt-4 pt-3 border-t border-slate-200">
+                <button type="button" onclick="superApp.exportKasbonWA('${key}', '${tgl}', '${outlet}', '${safeNama}', ${nominal})" class="flex-1 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#128C7E] hover:to-[#075E54] text-white rounded-xl py-2.5 text-[10px] font-black shadow-md transition active:scale-95 flex justify-center items-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i> Kirim WA</button>
+                <button type="button" onclick="superApp.exportKasbonPDF('${key}', '${tgl}', '${outlet}', '${safeNama}', ${nominal})" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white rounded-xl py-2.5 text-[10px] font-black shadow-md transition active:scale-95 flex justify-center items-center gap-1.5"><i class="fas fa-file-pdf text-sm"></i> Ekspor PDF</button>
+            </div>
+        `;
+
+        this.buildForm(`Tracking: ${outlet}`, inputs, `superApp.saveRekonKasbon('${key}', ${nominal})`);
+    },
+
+    
+
+    // --- EKSPOR KASBON (WA & PDF) ---
+    exportKasbonWA: function(key, tgl, outlet, nama, nominal) {
+        let saved = this.rekonDataStore.kasbon[key] || { history: [], lunas: false };
+        let totalTerbayar = (saved.history || []).reduce((sum, h) => sum + h.nominal, 0);
+        let sisa = nominal - totalTerbayar;
+
+        let txt = `*🧾 DETAIL KASBON / BIAYA OPERASIONAL*\n\n`;
+        txt += `Cabang: *Ai-CHA ${outlet}*\n`;
+        txt += `Tgl Input: ${tgl}\n`;
+        txt += `Keterangan: *${nama}*\n\n`;
+        txt += `💰 Total Kasbon : *Rp ${nominal.toLocaleString('id-ID')}*\n`;
+        txt += `✅ Terbayar    : Rp ${totalTerbayar.toLocaleString('id-ID')}\n`;
+        txt += `⚠️ Sisa Hutang  : *Rp ${sisa.toLocaleString('id-ID')}*\n`;
+        txt += `Status: ${saved.lunas ? 'LUNAS 🎉' : 'BELUM LUNAS'}\n\n`;
+        
+        if (saved.history && saved.history.length > 0) {
+            txt += `*Riwayat Pembayaran/Cicilan:*\n`;
+            saved.history.forEach((h, i) => {
+                txt += `${i+1}. [${h.waktu}] - Rp ${h.nominal.toLocaleString('id-ID')}\n`;
+            });
+        } else {
+            txt += `_Belum ada riwayat pembayaran._\n`;
+        }
+
+        let waUrl = `https://wa.me/?text=${encodeURIComponent(txt)}`;
+        window.open(waUrl, '_blank');
+    },
+
+    exportKasbonPDF: function(key, tgl, outlet, nama, nominal) {
+        let saved = this.rekonDataStore.kasbon[key] || { history: [], lunas: false };
+        let totalTerbayar = (saved.history || []).reduce((sum, h) => sum + h.nominal, 0);
+        let sisa = nominal - totalTerbayar;
+
+        let histHtml = '';
+        if (saved.history && saved.history.length > 0) {
+            saved.history.forEach((h, i) => {
+                histHtml += `<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${i+1}</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${h.waktu}</td><td style="padding: 8px; text-align: right; font-weight: bold; color: #059669; border-bottom: 1px solid #e2e8f0;">Rp ${h.nominal.toLocaleString('id-ID')}</td></tr>`;
+            });
+        } else {
+            histHtml = `<tr><td colspan="3" style="padding: 8px; text-align: center; color: #94a3b8; font-style: italic;">Belum ada riwayat cicilan</td></tr>`;
+        }
+
+        let pdfHtml = `
+            <div style="padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b;">
+                <h2 style="color: #ea580c; border-bottom: 2px solid #fed7aa; padding-bottom: 10px; margin-bottom: 20px;">Laporan Kasbon & Biaya Khusus</h2>
+                <table style="width: 100%; margin-bottom: 20px; font-size: 14px;">
+                    <tr><td style="padding: 5px; color: #64748b;">Cabang</td><td style="padding: 5px; font-weight: bold;">: Ai-CHA ${outlet}</td></tr>
+                    <tr><td style="padding: 5px; color: #64748b;">Tgl Input</td><td style="padding: 5px; font-weight: bold;">: ${tgl}</td></tr>
+                    <tr><td style="padding: 5px; color: #64748b;">Keterangan</td><td style="padding: 5px; font-weight: bold;">: ${nama}</td></tr>
+                    <tr><td style="padding: 5px; color: #64748b;">Status</td><td style="padding: 5px; font-weight: bold;">: ${saved.lunas ? '<span style="color:#059669;">LUNAS</span>' : '<span style="color:#e11d48;">BELUM LUNAS</span>'}</td></tr>
+                </table>
+
+                <div style="display: flex; justify-content: space-between; background: #fff7ed; border: 1px solid #fed7aa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 10px; color: #ea580c; text-transform: uppercase;">Total Kasbon</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #9a3412;">Rp ${nominal.toLocaleString('id-ID')}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 10px; color: #059669; text-transform: uppercase;">Terbayar</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #065f46;">Rp ${totalTerbayar.toLocaleString('id-ID')}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 10px; color: #e11d48; text-transform: uppercase;">Sisa Hutang</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #9f1239;">Rp ${sisa.toLocaleString('id-ID')}</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 14px; margin-bottom: 10px; color: #475569;">Riwayat Pembayaran:</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead style="background: #f1f5f9; color: #475569;">
+                        <tr><th style="padding: 8px;">No</th><th style="padding: 8px;">Waktu Bayar</th><th style="padding: 8px; text-align: right;">Nominal</th></tr>
+                    </thead>
+                    <tbody>${histHtml}</tbody>
+                </table>
+                <div style="margin-top: 30px; font-size: 10px; text-align: center; color: #94a3b8;">Dicetak dari Sistem ERP Ai-Snack pada ${new Date().toLocaleString('id-ID')}</div>
+            </div>
+        `;
+
+        this.showToast("Menyiapkan PDF...");
+        let tempDiv = document.createElement('div');
+        tempDiv.innerHTML = pdfHtml;
+        tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px'; tempDiv.style.top = '-9999px';
+        document.body.appendChild(tempDiv);
+
+        const opt = { 
+            margin: 0.5, filename: `Detail_Kasbon_${nama.replace(/\s+/g, '_')}.pdf`, 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a5', orientation: 'portrait' } 
+        };
+
+        html2pdf().set(opt).from(tempDiv).save().then(() => tempDiv.remove());
+    },
+
+    // =========================================================
+    // 🚀 ENGINE EKSPOR: WHATSAPP FORWARD & PDF CORPORATE
+    // =========================================================
+    exportRekonWA: function() {
+        let start = document.getElementById('rekon-filter-start').value;
+        let end = document.getElementById('rekon-filter-end').value;
+        let outlet = document.getElementById('rekon-filter-outlet').value;
+        
+        let cSesuai = document.getElementById('rekon-sum-sesuai').innerText;
+        let cSelisih = document.getElementById('rekon-sum-selisih').innerText;
+        let cPending = document.getElementById('rekon-sum-pending').innerText;
+
+        let txt = `*📊 LAPORAN AUDIT & REKONSILIASI KEUANGAN*\n\n`;
+        txt += `🏢 Cabang: *${outlet}*\n`;
+        txt += `📅 Periode: *${start} s/d ${end}*\n\n`;
+
+        txt += `*📈 RINGKASAN STATUS PENGECEKAN:*\n`;
+        txt += `✅ Sesuai / Lunas : *${cSesuai}* Data\n`;
+        txt += `❌ Selisih / Hutang : *${cSelisih}* Data\n`;
+        txt += `⏳ Belum Diperiksa : *${cPending}* Data\n\n`;
+
+        let selisihList = [];
+        this._rekonDataList.qris.forEach(d => { if(d.saved.status !== 'Sesuai') selisihList.push(`[QRIS] ${d.tgl} ${d.outlet} - ${d.saved.status.toUpperCase()}`); });
+        this._rekonDataList.cash.forEach(d => { if(d.saved.status !== 'Sesuai') selisihList.push(`[CASH] ${d.tgl} ${d.outlet} - ${d.saved.status.toUpperCase()}`); });
+        this._rekonDataList.kasbon.forEach(d => { if(!d.saved.lunas) selisihList.push(`[OPEX] ${d.tgl} ${d.nama} - BLM LUNAS`); });
+
+        if(selisihList.length > 0) {
+            txt += `*⚠️ DAFTAR ATENSI (BELUM BERES):*\n`;
+            selisihList.slice(0, 15).forEach((x, i) => txt += `${i+1}. ${x}\n`);
+            if(selisihList.length > 15) txt += `\n_...dan ${selisihList.length - 15} data bermasalah lainnya._\n`;
+            txt += `\n*Mohon segera diperiksa di Aplikasi ERP!*\n`;
+        } else {
+            txt += `_Semua mutasi bank & fisik kasir sudah *100% BALANCE & SESUAI!* 🎉_\n`;
+        }
+
+        let waUrl = `https://wa.me/?text=${encodeURIComponent(txt)}`;
+        window.open(waUrl, '_blank');
+    },
+
+    exportRekonPDF: function() {
+        this.showToast("Menyiapkan Laporan PDF...", "info");
+        
+        let start = document.getElementById('rekon-filter-start').value;
+        let end = document.getElementById('rekon-filter-end').value;
+        let outlet = document.getElementById('rekon-filter-outlet').value;
+
+        let totalQrisBank = document.getElementById('rekon-total-qris-bank').innerText;
+        let cSesuai = document.getElementById('rekon-sum-sesuai').innerText;
+        let cSelisih = document.getElementById('rekon-sum-selisih').innerText;
+        let cPending = document.getElementById('rekon-sum-pending').innerText;
+
+        // Fungsi Render Tabel Rincian PDF
+        const renderTableRows = (arr, type) => {
+            if(arr.length === 0) return `<tr><td colspan="4" style="text-align:center; padding:10px; color:#94a3b8; font-style:italic;">Tidak ada atensi/selisih</td></tr>`;
+            let rows = '';
+            arr.forEach(d => {
+                let badge = type === 'kasbon' ? (!d.saved.lunas ? '<span style="color:#e11d48; font-weight:bold;">HUTANG</span>' : '<span style="color:#059669;">LUNAS</span>') : 
+                            (d.saved.status === 'Selisih' ? '<span style="color:#e11d48; font-weight:bold;">SELISIH</span>' : (d.saved.status === 'Pending' ? '<span style="color:#d97706;">PENDING</span>' : '<span style="color:#059669;">SESUAI</span>'));
+                
+                let ket = type === 'kasbon' ? d.nama : (d.saved.note || '-');
+                let target = type === 'kasbon' ? d.nominal : d.total;
+                
+                rows += `<tr>
+                    <td style="padding:8px; border-bottom:1px solid #e2e8f0; font-size:11px;">${d.tgl} <br> <span style="font-size:9px; color:#64748b;">${d.outlet}</span></td>
+                    <td style="padding:8px; border-bottom:1px solid #e2e8f0; font-size:11px; text-align:right;">Rp ${target.toLocaleString('id-ID')}</td>
+                    <td style="padding:8px; border-bottom:1px solid #e2e8f0; font-size:11px; text-align:center;">${badge}</td>
+                    <td style="padding:8px; border-bottom:1px solid #e2e8f0; font-size:10px; color:#475569;">${ket}</td>
+                </tr>`;
+            });
+            return rows;
+        };
+
+        // Filter Hanya Menampilkan yang Bermasalah/Pending
+        let badQris = this._rekonDataList.qris.filter(d => d.saved.status !== 'Sesuai');
+        let badCash = this._rekonDataList.cash.filter(d => d.saved.status !== 'Sesuai');
+        let badKasbon = this._rekonDataList.kasbon.filter(d => !d.saved.lunas);
+
+        let pdfHtml = `
+            <div style="padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b;">
+                <div style="border-bottom: 2px solid #06b6d4; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h1 style="color: #0891b2; margin: 0; font-size: 24px;">Laporan Audit & Rekonsiliasi</h1>
+                        <p style="margin: 5px 0 0 0; color: #64748b; font-size: 12px;">Sistem ERP Terpadu - Ai-Snack & Ai-CHA</p>
+                    </div>
+                    <div style="text-align: right; font-size: 12px; color: #475569;">
+                        <strong>Tgl Cetak:</strong> ${new Date().toLocaleString('id-ID')}<br>
+                        <strong>Periode:</strong> ${start} s/d ${end}<br>
+                        <strong>Cabang:</strong> ${outlet}
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+                    <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center;">
+                        <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold;">✅ Sesuai / Lunas</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #059669;">${cSesuai}</div>
+                    </div>
+                    <div style="flex: 1; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 15px; text-align: center;">
+                        <div style="font-size: 10px; color: #e11d48; text-transform: uppercase; font-weight: bold;">❌ Selisih / Hutang</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #be123c;">${cSelisih}</div>
+                    </div>
+                    <div style="flex: 1; background: #fdf6e3; border: 1px solid #fef08a; border-radius: 8px; padding: 15px; text-align: center;">
+                        <div style="font-size: 10px; color: #d97706; text-transform: uppercase; font-weight: bold;">⏳ Pending</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #b45309;">${cPending}</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 14px; margin-bottom: 10px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">⚠️ Rincian Daftar Atensi (Selisih / Pending / Belum Lunas)</h3>
+                
+                <h4 style="font-size: 12px; margin-bottom: 5px; color: #0284c7;">1. Mutasi QRIS & Transfer</h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead style="background: #e0f2fe; color: #0369a1; font-size: 10px;"><tr><th style="padding:6px; text-align:left;">Tgl & Cabang</th><th style="padding:6px; text-align:right;">Target Sistem</th><th style="padding:6px; text-align:center;">Status</th><th style="padding:6px; text-align:left;">Catatan</th></tr></thead>
+                    <tbody>${renderTableRows(badQris, 'qris')}</tbody>
+                </table>
+
+                <h4 style="font-size: 12px; margin-bottom: 5px; color: #059669;">2. Mutasi Cash / Brankas</h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead style="background: #d1fae5; color: #047857; font-size: 10px;"><tr><th style="padding:6px; text-align:left;">Tgl & Cabang</th><th style="padding:6px; text-align:right;">Target Sistem</th><th style="padding:6px; text-align:center;">Status</th><th style="padding:6px; text-align:left;">Catatan</th></tr></thead>
+                    <tbody>${renderTableRows(badCash, 'cash')}</tbody>
+                </table>
+
+                <h4 style="font-size: 12px; margin-bottom: 5px; color: #b45309;">3. Piutang Kasbon & OPEX</h4>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead style="background: #fef3c7; color: #b45309; font-size: 10px;"><tr><th style="padding:6px; text-align:left;">Tgl & Cabang</th><th style="padding:6px; text-align:right;">Nominal Total</th><th style="padding:6px; text-align:center;">Status</th><th style="padding:6px; text-align:left;">Keterangan / Nama</th></tr></thead>
+                    <tbody>${renderTableRows(badKasbon, 'kasbon')}</tbody>
+                </table>
+            </div>
+        `;
+
+        let tempDiv = document.createElement('div');
+        tempDiv.innerHTML = pdfHtml;
+        tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px'; tempDiv.style.top = '-9999px';
+        document.body.appendChild(tempDiv);
+
+        const opt = { 
+            margin: 0.5, 
+            filename: `Audit_Rekon_${outlet}_${start}.pdf`, 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2, useCORS: true }, 
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+        };
+
+        html2pdf().set(opt).from(tempDiv).save().then(() => {
+            tempDiv.remove();
+            this.showToast("Laporan PDF berhasil diunduh!", "success");
+        });
+    },
+
+
+
+    
+
     // 🚀 AUTO-SYNC BACKGROUND PROCESS (Setiap 3 Menit)
     initAutoSync: function() {
         // Cek antrean setiap 3 menit (180.000 milidetik)
@@ -13022,79 +13976,93 @@ openAIDeepDive: function(type, param) {
     },
 
 // 🚀 MESIN PENERJEMAH GAMBAR KE KODE BINER PRINTER THERMAL (ESC/POS)
-   generateRasterImage: function(base64Image) {
+    generateRasterImage: function(base64Image) {
         return new Promise((resolve) => {
+            if (!base64Image || base64Image === '') {
+                resolve(null);
+                return;
+            }
+
             let img = new Image();
+            
+            // 🚀 PERBAIKAN KRITIS: Izin Lintas Domain (Mencegah Tainted Canvas Error)
+            img.crossOrigin = "Anonymous"; 
+
             img.onload = () => {
-                let canvas = document.createElement('canvas');
-                let ctx = canvas.getContext('2d');
+                try {
+                    let canvas = document.createElement('canvas');
+                    let ctx = canvas.getContext('2d');
 
-                // 🚀 PERBAIKAN: Lebar diturunkan menjadi 160px agar ukuran data biner menyusut drastis
-                let width = img.width;
-                let height = img.height;
-                let maxWidth = 160; 
+                    let width = img.width;
+                    let height = img.height;
+                    let maxWidth = 160; 
 
-                if (width > maxWidth) {
-                    height = Math.floor(height * (maxWidth / width));
-                    width = maxWidth;
-                }
-
-                // ATURAN MUTLAK ESC/POS: Lebar harus kelipatan 8
-                width = Math.floor(width / 8) * 8;
-
-                canvas.width = width;
-                canvas.height = height;
-
-                // Beri warna dasar putih agar PNG transparan tidak tercetak jadi kotak hitam
-                ctx.fillStyle = "#FFFFFF";
-                ctx.fillRect(0, 0, width, height);
-                ctx.drawImage(img, 0, 0, width, height);
-
-                let imgData = ctx.getImageData(0, 0, width, height);
-                let pixels = imgData.data;
-
-                // Header Perintah ESC/POS untuk Cetak Gambar (GS v 0 0)
-                let xL = (width / 8) % 256;
-                let xH = Math.floor((width / 8) / 256);
-                let yL = height % 256;
-                let yH = Math.floor(height / 256);
-
-                let header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
-                let data = new Uint8Array((width / 8) * height);
-
-                // Terjemahkan Piksel menjadi Titik Hitam Putih (Bit Matrix)
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width / 8; x++) {
-                        let byte = 0;
-                        for (let bit = 0; bit < 8; bit++) {
-                            let idx = (y * width + (x * 8 + bit)) * 4;
-                            let r = pixels[idx];
-                            let g = pixels[idx + 1];
-                            let b = pixels[idx + 2];
-                            let alpha = pixels[idx + 3];
-
-                            // Titik dinyatakan HITAM jika warnanya gelap
-                            if (alpha > 128 && (r + g + b) / 3 < 128) {
-                                byte |= (1 << (7 - bit));
-                            }
-                        }
-                        data[y * (width / 8) + x] = byte;
+                    if (width > maxWidth) {
+                        height = Math.floor(height * (maxWidth / width));
+                        width = maxWidth;
                     }
-                }
 
-                // Gabungkan Header dengan Data Gambar
-                let result = new Uint8Array(header.length + data.length);
-                result.set(header);
-                result.set(data, header.length);
-                resolve(result);
+                    // ATURAN MUTLAK ESC/POS: Lebar harus kelipatan 8
+                    width = Math.floor(width / 8) * 8;
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Di sinilah error tainted canvas sebelumnya terjadi
+                    let imgData = ctx.getImageData(0, 0, width, height);
+                    let pixels = imgData.data;
+
+                    let xL = (width / 8) % 256;
+                    let xH = Math.floor((width / 8) / 256);
+                    let yL = height % 256;
+                    let yH = Math.floor(height / 256);
+
+                    let header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
+                    let data = new Uint8Array((width / 8) * height);
+
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width / 8; x++) {
+                            let byte = 0;
+                            for (let bit = 0; bit < 8; bit++) {
+                                let idx = (y * width + (x * 8 + bit)) * 4;
+                                let r = pixels[idx];
+                                let g = pixels[idx + 1];
+                                let b = pixels[idx + 2];
+                                let alpha = pixels[idx + 3];
+
+                                if (alpha > 128 && (r + g + b) / 3 < 128) {
+                                    byte |= (1 << (7 - bit));
+                                }
+                            }
+                            data[y * (width / 8) + x] = byte;
+                        }
+                    }
+
+                    let result = new Uint8Array(header.length + data.length);
+                    result.set(header);
+                    result.set(data, header.length);
+                    resolve(result);
+                } catch (e) {
+                    console.warn("Gagal merender gambar printer (CORS/Tainted Canvas):", e);
+                    resolve(null); // Jika tetap error, abaikan gambar dan lanjut cetak teksnya!
+                }
             };
-            img.onerror = () => resolve(null);
+
+            img.onerror = () => {
+                console.warn("Gambar gagal dimuat oleh mesin printer.");
+                resolve(null); // Abaikan gambar jika gagal dimuat
+            };
+
             img.src = base64Image;
         });
     },
     
 // 🚀 FUNGSI PRINT FINAL DENGAN ANTISIPASI NaN & LOGIKA REPRINT
-   printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian, isReprint = false, metodeBayar = 'TUNAI') {
+  printReceipt: async function(id, outlet, total, tunai, kembali, items, status, explicitDate, antrian, isReprint = false, metodeBayar = 'TUNAI', receiptMode = 'customer') {
         if (!this.printerCharacteristic) {
             this.showToast("Printer belum terhubung!", "error");
             throw new Error("Printer tidak siap");
@@ -13102,34 +14070,38 @@ openAIDeepDive: function(type, param) {
         
         try {
             let statStr = status === 'Sukses' ? '' : '\n*** DIBATALKAN ***\n';
-            
-            // Format fallback date if explicitDate is not provided
             let printTime = explicitDate ? explicitDate : new Date().toLocaleString('id-ID', {
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
             }).replace(',', '');
             
             let antrianStr = antrian ? `\nANTRIAN : ${antrian}\n` : '';
-            
-            // 1. INJEKSI KETERANGAN REPRINT KE PRINTER
-            if (isReprint) {
-                statStr += '\n*** REPRINT / CETAK ULANG ***\n';
-            }
+            if (isReprint) statStr += '\n*** REPRINT / CETAK ULANG ***\n';
 
-            // 2. CEK QRIS AGAR TIDAK NaN
             let labelBayar = String(metodeBayar).toUpperCase();
             let valBayar = labelBayar.includes('QRIS') ? Number(total || 0) : Number(tunai || 0);
             let valKembali = Number(kembali || 0);
 
             let template = [];
-            try { template = JSON.parse(localStorage.getItem('aisnack_receipt_template')); } catch(e) {}
-            if (!template || template.length === 0) template = this.defaultReceiptTemplate;
+            let storageKey = receiptMode === 'kitchen' ? 'aisnack_kitchen_receipt_template' : 'aisnack_receipt_template';
+            try { template = JSON.parse(localStorage.getItem(storageKey)); } catch(e) {}
+            
+            if ((!template || template.length === 0) && receiptMode === 'kitchen') {
+                template = [
+                    { type: 'text', content: '*** TIKET DAPUR ***', align: 'center', size: 'normal', bold: true },
+                    { type: 'text', content: 'ANTRIAN: {{no_antrian}}', align: 'center', size: 'double', bold: true },
+                    { type: 'divider', style: 'dashed' },
+                    { type: 'body_transaction' }, 
+                    { type: 'divider', style: 'dashed' }
+                ];
+            } else if (!template || template.length === 0) {
+                template = this.defaultReceiptTemplate;
+            }
 
             let printQueue = [];
             let str = "\x1B\x40"; 
 
             for (let b of template) {
-                
                 if (b.type === 'logo' && b.image) {
                     if (str !== '') { printQueue.push(new TextEncoder().encode(str)); str = ''; }
                     let alignStr = "\x1B\x61" + (b.align === 'center' ? "\x01" : (b.align === 'right' ? "\x02" : "\x00"));
@@ -13153,6 +14125,7 @@ openAIDeepDive: function(type, param) {
                         .replace(/{{kasir}}/g, this.currentUser ? this.currentUser.Username : 'Kasir')
                         .replace(/{{no_resi}}/g, id || '-')
                         .replace(/{{waktu}}/g, printTime)
+                        .replace(/{{no_antrian}}/g, antrian || '-')
                         .replace(/{{wifi}}/g, 'Tanya Kasir');
 
                     str += txt + "\n";
@@ -13165,26 +14138,36 @@ openAIDeepDive: function(type, param) {
                     str += "\x1D\x21\x00\x1B\x61\x00\x1B\x45\x00"; 
                     
                     if (statStr) str += `\x1B\x61\x01\x1B\x45\x01${statStr}\x1B\x45\x00\x1B\x61\x00`;
-                    if (antrianStr) str += `\x1B\x61\x01\x1B\x45\x01${antrianStr}\x1B\x45\x00\x1B\x61\x00`;
-
-                    items.forEach(i => {
-                        str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
-                    });
-
-                    // 3. CETAK LABEL METODE BAYAR DINAMIS (Aligned)
-                    str += "--------------------------------\n";
-                    str += "\x1B\x61\x02"; // Right Align
-                    str += `\x1B\x45\x01TOTAL   : Rp ${Number(total).toLocaleString('id-ID')}\n\x1B\x45\x00`;
                     
-                    // PadEnd ensures the label takes up consistent space before the colon
-                    str += `${labelBayar.padEnd(8)}: Rp ${valBayar.toLocaleString('id-ID')}\n`;
-                    str += `KEMBALI : Rp ${valKembali.toLocaleString('id-ID')}\n`;
-                    
-                    str += "\x1B\x61\x00"; // Reset to Left Align
+                    if (antrianStr && receiptMode === 'customer') str += `\x1B\x61\x01\x1B\x45\x01${antrianStr}\x1B\x45\x00\x1B\x61\x00`;
+
+                    if (receiptMode === 'kitchen') {
+                        // 🚀 PERBAIKAN: Huruf Normal & Cetak Tebal untuk Dapur
+                        str += "\x1D\x21\x00\x1B\x45\x01"; 
+                        items.forEach(i => {
+                            str += `${i.qty} x ${i.nama}\n`;
+                            if (i.catatan) {
+                                str += `   *${i.catatan}*\n`; 
+                            }
+                        });
+                        str += "\x1B\x45\x00"; // Matikan bold
+                    } else {
+                        items.forEach(i => {
+                            str += `${i.nama}\n${i.qty} x Rp ${Number(i.price).toLocaleString('id-ID')} = Rp ${(i.price * i.qty).toLocaleString('id-ID')}\n`;
+                        });
+
+                        str += "--------------------------------\n";
+                        str += "\x1B\x61\x02"; 
+                        str += `\x1B\x45\x01TOTAL   : Rp ${Number(total).toLocaleString('id-ID')}\n\x1B\x45\x00`;
+                        str += `${labelBayar.padEnd(8)}: Rp ${valBayar.toLocaleString('id-ID')}\n`;
+                        str += `KEMBALI : Rp ${valKembali.toLocaleString('id-ID')}\n`;
+                        str += "\x1B\x61\x00"; 
+                    }
                 }
             }
 
-            str += "\x1B\x40\n\n\n\n";
+            str += "\x1D\x56\x41\x03"; 
+            
             printQueue.push(new TextEncoder().encode(str));
             
             for (let chunk of printQueue) {
@@ -13195,7 +14178,7 @@ openAIDeepDive: function(type, param) {
                 }
             }
 
-            if (isReprint && id && status === 'Sukses') {
+            if (isReprint && id && status === 'Sukses' && receiptMode === 'customer') {
                 this.laporStrukDicetak(id);
             }
 
