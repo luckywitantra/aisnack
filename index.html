@@ -356,35 +356,41 @@
             <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Laporan Ai-CHA</span>
         </button>
         
-        <!-- 🔐 Area Khusus Manajer/Owner -->
-        <div id="admin-menus" class="hidden flex-col gap-1.5 shrink-0">
-            <div class="flex items-center gap-3 px-3 mt-4 mb-2 shrink-0">
-                <div class="w-5 h-5 rounded-md bg-[#FFF5D1] dark:bg-[#FFF5D1]/10 text-[#FFB800] flex items-center justify-center"><i class="fas fa-shield-halved text-[10px]"></i></div>
-                <p class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Akses Pimpinan</p>
-                <div class="h-[2px] bg-slate-100 dark:bg-slate-800 flex-1 rounded-full"></div>
-            </div>
-            
-            <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
-                <div class="w-8 flex justify-center"><i class="fas fa-user-check group-hover:scale-110 transition-transform duration-300 text-lg text-rose-500"></i></div>
-                <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Audit & Persetujuan</span>
-                <span id="badge-audit" class="hidden ml-auto bg-[#E5202B] text-white px-2 py-0.5 rounded-md text-[10px] font-black shadow-[0_0_10px_rgba(229,32,43,0.5)] animate-pulse border border-[#E5202B]/80">0</span>
-            </button>
-            
-            <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all duration-300 group border border-transparent">
-                <div class="w-8 flex justify-center"><i class="fas fa-robot group-hover:scale-110 transition-transform duration-300 text-lg text-indigo-500 dark:text-indigo-400"></i></div>
-                <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300 text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-500 dark:from-slate-400 dark:to-slate-400 group-hover:from-indigo-500 group-hover:to-purple-500 dark:group-hover:from-indigo-400 dark:group-hover:to-purple-400">CFO Dashboard</span>
-            </button>
-            
-            <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
-                <div class="w-8 flex justify-center"><i class="fas fa-warehouse group-hover:scale-110 transition-transform duration-300 text-lg text-orange-500 dark:text-orange-400"></i></div>
-                <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Gudang & Master</span>
-            </button>
+       <!-- 🔐 Area Khusus Manajer/Owner -->
+<div id="admin-menus" class="hidden flex-col gap-1.5 shrink-0">
+    <div class="flex items-center gap-3 px-3 mt-4 mb-2 shrink-0">
+        <div class="w-5 h-5 rounded-md bg-[#FFF5D1] dark:bg-[#FFF5D1]/10 text-[#FFB800] flex items-center justify-center"><i class="fas fa-shield-halved text-[10px]"></i></div>
+        <p class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Akses Pimpinan</p>
+        <div class="h-[2px] bg-slate-100 dark:bg-slate-800 flex-1 rounded-full"></div>
+    </div>
+    
+    <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-user-check group-hover:scale-110 transition-transform duration-300 text-lg text-rose-500"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Audit & Persetujuan</span>
+        <span id="badge-audit" class="hidden ml-auto bg-[#E5202B] text-white px-2 py-0.5 rounded-md text-[10px] font-black shadow-[0_0_10px_rgba(229,32,43,0.5)] animate-pulse border border-[#E5202B]/80">0</span>
+    </button>
+    
+    <!-- 🚀 Tombol Menu Rekon & Kasbon (Gaya Seragam) -->
+    <button onclick="superApp.switchMenu('rekon')" id="nav-rekon" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-handshake group-hover:scale-110 transition-transform duration-300 text-lg text-cyan-500 dark:text-cyan-400"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Rekon & Kasbon</span>
+    </button>
+    
+    <button onclick="superApp.switchMenu('ai')" id="nav-ai" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-robot group-hover:scale-110 transition-transform duration-300 text-lg text-indigo-500 dark:text-indigo-400"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300 text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-500 dark:from-slate-400 dark:to-slate-400 group-hover:from-indigo-500 group-hover:to-purple-500 dark:group-hover:from-indigo-400 dark:group-hover:to-purple-400">CFO Dashboard</span>
+    </button>
+    
+    <button onclick="superApp.switchMenu('gudang')" id="nav-gudang" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-warehouse group-hover:scale-110 transition-transform duration-300 text-lg text-orange-500 dark:text-orange-400"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Gudang & Master</span>
+    </button>
 
-            <button onclick="superApp.switchMenu('user')" id="nav-user" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
-                <div class="w-8 flex justify-center"><i class="fas fa-users-gear group-hover:scale-110 transition-transform duration-300 text-lg text-teal-500 dark:text-teal-400"></i></div>
-                <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Manajemen Staf</span>
-            </button>
-        </div>
+    <button onclick="superApp.switchMenu('user')" id="nav-user" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-users-gear group-hover:scale-110 transition-transform duration-300 text-lg text-teal-500 dark:text-teal-400"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Manajemen Staf</span>
+    </button>
+</div>
     </nav>
 
     <!-- 🚪 Tombol Bawah: Tutup Shift -->
@@ -828,6 +834,176 @@
         
     </div>
 </div>
+
+
+<!-- ================= VIEW REKONSILIASI & KASBON ================= -->
+<div id="view-rekon" class="app-view hidden flex-col h-full gap-3 pb-24 md:pb-6 transition-all duration-300 relative min-h-0 bg-slate-50/50">
+    
+    <div class="bg-white/95 backdrop-blur-md p-3 md:p-5 rounded-b-[1.5rem] md:rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border-b border-x border-slate-100 flex flex-col relative group flex-1 min-h-0">
+        
+        <!-- Header & Filter Compact -->
+        <div class="flex flex-col gap-3 mb-3 shrink-0 relative z-10">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white text-lg shadow-[0_4px_10px_rgba(6,182,212,0.3)] shrink-0">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-sm md:text-lg text-[#4A3B32] tracking-tight leading-tight">Rekon Bank & Kasbon</h3>
+                        <p class="text-[9px] font-bold text-slate-400">Pencocokan mutasi & piutang</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200/60 shadow-inner w-full">
+                <select id="rekon-filter-outlet" onchange="superApp.renderRekon()" class="flex-1 min-w-[100px] bg-white border border-slate-200 text-cyan-700 text-[10px] font-black rounded-lg px-2 py-2 outline-none focus:border-cyan-400 shadow-sm cursor-pointer truncate">
+                    <option value="Semua">Semua Cabang</option>
+                </select>
+                <div class="flex flex-1 min-w-[140px] items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm focus-within:border-cyan-400">
+                    <input type="date" id="rekon-filter-start" onchange="superApp.renderRekon()" class="w-full bg-transparent text-slate-600 text-[9px] font-bold px-1.5 py-2 outline-none cursor-pointer">
+                    <span class="text-slate-300 font-black text-[9px]">-</span>
+                    <input type="date" id="rekon-filter-end" onchange="superApp.renderRekon()" class="w-full bg-transparent text-slate-600 text-[9px] font-bold px-1.5 py-2 outline-none cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <!-- 🚀 3 Kartu Komparasi Super Compact (Layout Baru) -->
+        <div class="flex flex-col gap-2 mb-3 shrink-0 relative z-10">
+            
+            <!-- Kartu Target Saldo (Banner Atas) -->
+            <div class="bg-gradient-to-r from-cyan-500 to-blue-600 p-3 rounded-2xl border border-blue-400 shadow-md shadow-blue-500/20 text-white flex justify-between items-center relative overflow-hidden">
+                <i class="fas fa-university absolute -right-2 -bottom-4 text-6xl text-white/10"></i>
+                <div class="relative z-10">
+                    <h4 class="text-[9px] font-black text-cyan-100 uppercase tracking-widest mb-0.5 flex items-center gap-1"><i class="fas fa-bullseye"></i> Target Mutasi Rekening</h4>
+                    <p class="text-xl font-black drop-shadow-sm tracking-tight" id="rekon-total-qris-bank">Rp 0</p>
+                </div>
+                <div class="relative z-10 text-right">
+                    <span class="text-[8px] font-bold bg-black/20 px-2 py-1 rounded-lg backdrop-blur-sm border border-white/20">Ai-CHA + POS</span>
+                </div>
+            </div>
+
+            <!-- Kartu Ai-CHA & POS (Split Kiri-Kanan) -->
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Ai-CHA -->
+                <div class="bg-rose-50 p-2.5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden group">
+                    <i class="fas fa-store absolute -right-2 -bottom-2 text-4xl text-rose-500/5 group-hover:scale-110 transition-transform"></i>
+                    <h4 class="text-[9px] font-black text-rose-600 uppercase tracking-widest border-b border-rose-200/50 pb-1 mb-1.5 flex items-center justify-between">
+                        Ai-CHA <span class="bg-rose-100 text-rose-500 px-1 rounded">Lap</span>
+                    </h4>
+                    <div class="flex flex-col gap-1 relative z-10">
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="font-bold text-slate-500"><i class="fas fa-wallet w-3 text-center opacity-70"></i> Net Laci</span>
+                            <span class="font-black text-rose-700" id="rekon-aicha-net">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="font-bold text-slate-500"><i class="fas fa-qrcode w-3 text-center opacity-70 text-blue-500"></i> QRIS</span>
+                            <span class="font-black text-blue-600" id="rekon-aicha-qris">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ai-Snack -->
+                <div class="bg-amber-50 p-2.5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden group">
+                    <i class="fas fa-hamburger absolute -right-2 -bottom-2 text-4xl text-amber-500/5 group-hover:scale-110 transition-transform"></i>
+                    <h4 class="text-[9px] font-black text-amber-600 uppercase tracking-widest border-b border-amber-200/50 pb-1 mb-1.5 flex items-center justify-between">
+                        Ai-Snack <span class="bg-amber-100 text-amber-600 px-1 rounded">POS</span>
+                    </h4>
+                    <div class="flex flex-col gap-1 relative z-10">
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="font-bold text-slate-500"><i class="fas fa-cash-register w-3 text-center opacity-70"></i> Tunai Masuk</span>
+                            <span class="font-black text-amber-700" id="rekon-aisnack-tunai">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="font-bold text-slate-500"><i class="fas fa-qrcode w-3 text-center opacity-70 text-blue-500"></i> QRIS</span>
+                            <span class="font-black text-blue-600" id="rekon-aisnack-qris">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+      <!-- 🚀 SUMMARY & EXPORT BAR (BARU) -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-sm mb-3 relative z-10">
+            <!-- Badges Akumulasi -->
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-center sm:justify-start text-[9px] md:text-[10px] font-black uppercase tracking-widest">
+                <div class="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-1.5 rounded-lg border border-emerald-100 shadow-inner">
+                    <i class="fas fa-check-circle"></i> Sesuai: <span id="rekon-sum-sesuai" class="text-xs">0</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-rose-50 text-rose-600 px-2.5 py-1.5 rounded-lg border border-rose-100 shadow-inner">
+                    <i class="fas fa-exclamation-circle"></i> Selisih: <span id="rekon-sum-selisih" class="text-xs">0</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-100 text-slate-500 px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-inner">
+                    <i class="fas fa-clock"></i> Pending: <span id="rekon-sum-pending" class="text-xs">0</span>
+                </div>
+            </div>
+            <!-- Action Ekspor -->
+            <div class="flex gap-2 w-full sm:w-auto">
+                <button onclick="superApp.exportRekonWA()" class="flex-1 sm:flex-none bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#128C7E] hover:to-[#075E54] text-white px-3 py-2 rounded-xl text-[10px] font-black shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 group">
+                    <i class="fab fa-whatsapp text-sm group-hover:scale-110 transition-transform"></i> Kirim WA
+                </button>
+                <button onclick="superApp.exportRekonPDF()" class="flex-1 sm:flex-none bg-rose-500 hover:bg-rose-600 text-white px-3 py-2 rounded-xl text-[10px] font-black shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 group">
+                    <i class="fas fa-file-pdf text-sm group-hover:scale-110 transition-transform"></i> Unduh PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- Pill Tabs Selector Super Compact -->
+        <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 w-full mb-2 shrink-0 z-20 shadow-inner">
+            <button onclick="superApp.switchRekonTab('qris')" id="subtab-rekon-qris" class="flex-1 py-2 px-1 bg-white text-blue-600 rounded-lg text-[10px] font-black shadow-sm transition flex items-center justify-center gap-1.5 border border-slate-200/50">
+                <i class="fas fa-qrcode text-[11px]"></i> QRIS
+            </button>
+            <button onclick="superApp.switchRekonTab('cash')" id="subtab-rekon-cash" class="flex-1 py-2 px-1 text-slate-500 hover:text-slate-700 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1.5 border border-transparent">
+                <i class="fas fa-money-bill-wave text-[11px]"></i> Cash
+            </button>
+            <button onclick="superApp.switchRekonTab('kasbon')" id="subtab-rekon-kasbon" class="flex-1 py-2 px-1 text-slate-500 hover:text-slate-700 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1.5 border border-transparent">
+                <i class="fas fa-hand-holding-usd text-[11px]"></i> OPEX
+            </button>
+        </div>
+
+        <!-- 🚀 KONTROL LIST INTERAKTIF (SEARCH, SORT & FILTER) -->
+        <div class="flex flex-col sm:flex-row gap-2 mb-2 bg-white p-2 rounded-xl shadow-sm border border-slate-100 z-20 sticky top-0">
+            <div class="relative flex-1">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                <input type="text" id="rekon-search" oninput="superApp._rekonState.search = this.value; superApp.updateRekonListUI();" placeholder="Cari cabang, nominal, atau catatan..." class="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-[10px] font-bold text-slate-700 outline-none focus:border-cyan-400 transition-all shadow-inner focus:shadow-sm">
+            </div>
+            <div class="flex gap-2 shrink-0">
+                <div class="relative bg-slate-50 border border-slate-200 rounded-lg flex items-center px-2 shadow-inner group cursor-pointer hover:border-cyan-300 transition-colors">
+                    <i class="fas fa-sort-amount-down text-slate-400 text-[10px] group-hover:text-cyan-500 transition-colors"></i>
+                    <select id="rekon-sort" onchange="superApp._rekonState.sort = this.value; superApp.updateRekonListUI();" class="bg-transparent border-none text-[9px] font-black text-slate-600 py-2 pl-1.5 pr-4 outline-none appearance-none cursor-pointer">
+                        <option value="date_desc">Tgl Terbaru</option>
+                        <option value="date_asc">Tgl Terlama</option>
+                        <option value="nom_desc">Nominal Tertinggi</option>
+                        <option value="nom_asc">Nominal Terendah</option>
+                        <option value="out_az">Cabang A-Z</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-2 text-slate-400 text-[8px] pointer-events-none"></i>
+                </div>
+                <div class="relative bg-slate-50 border border-slate-200 rounded-lg flex items-center px-2 shadow-inner group cursor-pointer hover:border-cyan-300 transition-colors">
+                    <i class="fas fa-filter text-slate-400 text-[10px] group-hover:text-cyan-500 transition-colors"></i>
+                    <select id="rekon-status" onchange="superApp._rekonState.status = this.value; superApp.updateRekonListUI();" class="bg-transparent border-none text-[9px] font-black text-slate-600 py-2 pl-1.5 pr-4 outline-none appearance-none cursor-pointer">
+                        <option value="all">Semua Status</option>
+                        <option value="Sesuai">✅ Sesuai / Lunas</option>
+                        <option value="Selisih">❌ Selisih / Sisa</option>
+                        <option value="Pending">⏳ Pending</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-2 text-slate-400 text-[8px] pointer-events-none"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🚀 Area Daftar Dinamis (List Card View) -->
+        <div class="flex-1 overflow-y-auto custom-scroll relative z-10 pr-1 pb-2">
+            <div id="rekon-content-qris" class="flex flex-col w-full h-full gap-2"></div>
+            <div id="rekon-content-cash" class="hidden flex-col w-full h-full gap-2"></div>
+            <div id="rekon-content-kasbon" class="hidden flex-col w-full h-full gap-2"></div>
+        </div>
+
+    </div>
+</div>
+
+      
 
 <!-- ========================================================================= -->
 <!-- 🛡️ VIEW: AUDIT & APPROVAL (AI-SNACK PLAYFUL BRANDING)                   -->
@@ -3301,7 +3477,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=682"></script>
+  <script src="app.js?v=704"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
