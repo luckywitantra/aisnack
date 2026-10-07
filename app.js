@@ -1,57 +1,92 @@
-// =========================================================================
-// 🚀 ENGINE: SMART LOCALSTORAGE COMPRESSOR (ANTI-5MB QUOTA EXCEEDED)
-// =========================================================================
-(function() {
-    const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(key, value) {
+// STORAGE SAFETY PATCH: database cache besar disimpan ke IndexedDB; tidak memangkas riwayat.
+(function () {
+    const nativeSetItem = Storage.prototype.setItem;
+    let quotaNoticeShown = false;
+    Storage.prototype.setItem = function (key, value) {
         try {
-            originalSetItem.apply(this, [key, value]);
-        } catch (e) {
-            // Jika error karena kuota memori browser HP penuh (5MB Limit)
-            if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.message.toLowerCase().includes('quota') || e.code === 22 || e.code === 1014) {
-                console.warn(`⚠️ Memori LocalStorage HP penuh saat menyimpan "${key}"! Melakukan kompresi otomatis...`);
-                
-                if (key === 'aisnack_db_cache') {
-                    try {
-                        let dbObj = JSON.parse(value);
-                        
-                        // Pangkas riwayat lama khusus untuk cadangan offline di HP (Sisakan data terbaru saja)
-                        if (dbObj.transactions && dbObj.transactions.length > 150) dbObj.transactions = dbObj.transactions.slice(-150);
-                        if (dbObj.laporanHarian && dbObj.laporanHarian.length > 60) dbObj.laporanHarian = dbObj.laporanHarian.slice(-60);
-                        if (dbObj.shifts && dbObj.shifts.length > 40) dbObj.shifts = dbObj.shifts.slice(-40);
-                        if (dbObj.kasKeluar && dbObj.kasKeluar.length > 50) dbObj.kasKeluar = dbObj.kasKeluar.slice(-50);
-                        if (dbObj.riwayatOpname && dbObj.riwayatOpname.length > 40) dbObj.riwayatOpname = dbObj.riwayatOpname.slice(-40);
-                        if (dbObj.barangMasuk && dbObj.barangMasuk.length > 40) dbObj.barangMasuk = dbObj.barangMasuk.slice(-40);
-                        if (dbObj.mutasi && dbObj.mutasi.length > 50) dbObj.mutasi = dbObj.mutasi.slice(-50);
-                        
-                        originalSetItem.apply(this, [key, JSON.stringify(dbObj)]);
-                        console.log("✅ Berhasil menyimpan cache setelah kompresi riwayat!");
-                        return;
-                    } catch (err2) {
-                        // Darurat mutlak: Jika masih penuh, simpan Master Produk & Outlet saja agar POS tetap bisa jualan offline!
-                        try {
-                            let dbObj = JSON.parse(value);
-                            let minimalDb = {
-                                status: 'sukses',
-                                masterProduk: dbObj.masterProduk || [],
-                                outlets: dbObj.outlets || [],
-                                hargaStokOutlet: dbObj.hargaStokOutlet || [],
-                                users: dbObj.users || [],
-                                pengaturan: dbObj.pengaturan || []
-                            };
-                            originalSetItem.apply(this, [key, JSON.stringify(minimalDb)]);
-                            console.log("✅ Berhasil menyimpan cache minimalis!");
-                            return;
-                        } catch(err3) {}
-                    }
+            const result = nativeSetItem.call(this, key, value);
+            if (String(key) === 'aisnack_db_cache') {
+                try { nativeSetItem.call(this, 'aisnack_db_cache_saved_at', String(Date.now())); } catch (_) {}
+                // Mirror only large caches; small cache writes stay lightweight.
+                if (String(value).length > 1500000 && typeof AisnackOfflineStore !== 'undefined') {
+                    AisnackOfflineStore.saveDatabaseCache(String(value)).catch(() => {});
                 }
-                // Cegah aplikasi crash/hang (Uncaught Promise Error) jika penyimpanan cache gagal
-                console.error(`❌ Gagal menyimpan "${key}" ke LocalStorage karena batas fisik memori HP.`);
-            } else {
-                throw e; // Lempar error lain jika bukan masalah kuota memori
             }
+            return result;
+        } catch (e) {
+            const quota = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.message || '')));
+            if (!quota) throw e;
+            if (String(key) === 'aisnack_db_cache' && typeof AisnackOfflineStore !== 'undefined') {
+                // Keep the full cache in IndexedDB instead of dropping history or replacing it with a truncated copy.
+                AisnackOfflineStore.saveDatabaseCache(String(value)).catch(err => {
+                    console.warn('Cache database tidak dapat disimpan ke IndexedDB:', err && err.message ? err.message : err);
+                });
+            }
+            if (!quotaNoticeShown) {
+                quotaNoticeShown = true;
+                console.warn('Kuota localStorage tercapai. Cache besar dialihkan ke IndexedDB bila tersedia; data bisnis tidak dipangkas otomatis.');
+            }
+            try { window.dispatchEvent(new CustomEvent('aisnack:storagequota', { detail: { key: String(key) } })); } catch (_) {}
+            // Preserve the old value if the write fails; do not throw and interrupt login/rendering.
+            return undefined;
         }
     };
+})();
+
+// IndexedDB stores both the durable offline queue and a full database-cache fallback.
+const AisnackOfflineStore = (() => {
+    const DB_NAME = 'aisnack-offline-v1';
+    const STORE = 'queue';
+    const DB_CACHE_STORE = 'databaseCache';
+    function openDb() {
+        return new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) return reject(new Error('IndexedDB tidak tersedia'));
+            const req = indexedDB.open(DB_NAME, 2);
+            req.onupgradeneeded = () => {
+                if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: '_req_id' });
+                if (!req.result.objectStoreNames.contains(DB_CACHE_STORE)) req.result.createObjectStore(DB_CACHE_STORE, { keyPath: 'id' });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error('Gagal membuka IndexedDB'));
+        });
+    }
+    async function saveDatabaseCache(value) {
+        const db = await openDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(DB_CACHE_STORE, 'readwrite');
+            tx.objectStore(DB_CACHE_STORE).put({ id: 'main', value: String(value), savedAt: Date.now() });
+            tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+        });
+        db.close();
+    }
+    async function getDatabaseCache() {
+        const db = await openDb();
+        const record = await new Promise((resolve, reject) => {
+            const req = db.transaction(DB_CACHE_STORE, 'readonly').objectStore(DB_CACHE_STORE).get('main');
+            req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error);
+        });
+        db.close();
+        return record;
+    }
+    async function putAll(items) {
+        const db = await openDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE, 'readwrite'); const store = tx.objectStore(STORE);
+            store.clear();
+            (items || []).forEach(item => { if (item && item._req_id) store.put(item); });
+            tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+        });
+        db.close();
+    }
+    async function getAll() {
+        const db = await openDb();
+        const items = await new Promise((resolve, reject) => {
+            const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+            req.onsuccess = () => resolve(req.result || []); req.onerror = () => reject(req.error);
+        });
+        db.close(); return items;
+    }
+    return { putAll, getAll, saveDatabaseCache, getDatabaseCache };
 })();
 
 const API_URL = "https://script.google.com/macros/s/AKfycbzj3MK6XFIvq7O9g_kA6_-RIyX8kezbhyNIhuQsqLaHR1L-EAiCuzuOpvHP6xb8MNNqIg/exec"; // <-- GANTI DENGAN URL API ANDA
@@ -239,7 +274,7 @@ const osKeyboard = {
 const superApp = {
     outlet: '', cart: [], printerChar: null, db: null, filteredProducts: [],
     payTotal: 0, payCash: 0, payChange: 0, payMethod: 'Tunai', activeShiftId: null, activeStaffTeam: [],
-    activeReprintTrx: null, currentUser: null, pinBuffer: '', ADMIN_PIN: '1234',
+    activeReprintTrx: null, currentUser: null, pinBuffer: '',
     offlineQueue: [], isOnline: navigator.onLine, cfdWindow: null, profitChart: null, isLoadingData: false, printerCharacteristic: null, printerDevice: null, isBluetoothSearching: false, isProcessing: false,
     cfdFocusHandlerAdded: false,
 
@@ -338,22 +373,18 @@ const superApp = {
                         this.showToast("✨ Yeay! Versi baru tersedia. Memuat ulang...", "success");
                     }
                     
-                    // 3. BAKAR CACHE LAWAS AGAR TIDAK BENTROK
-                    if ('caches' in window) {
-                        const cacheNames = await caches.keys();
-                        await Promise.all(cacheNames.map(name => caches.delete(name)));
-                    }
-
-                    // 4. CABUT PAKSA SERVICE WORKER LAWAS
-                    if ('serviceWorker' in navigator) {
+                    // Jangan menghapus cache milik aplikasi/origin lain dan jangan reload saat antrean belum aman.
+                    const pending = this.getPendingQueueCount();
+                    if (pending > 0) {
+                        if (typeof this.showToast === 'function') this.showToast(`Pembaruan ditunda: ${pending} transaksi/data masih menunggu sinkronisasi.`, 'warning');
+                    } else if ('serviceWorker' in navigator) {
                         const regs = await navigator.serviceWorker.getRegistrations();
-                        for(let reg of regs) { await reg.unregister(); }
+                        for (const reg of regs) {
+                            const swUrl = (reg.active && reg.active.scriptURL) || (reg.waiting && reg.waiting.scriptURL) || '';
+                            if (swUrl && new URL(swUrl).origin === location.origin && /(^|\/)sw\.js(?:$|[?#])/.test(swUrl)) reg.update().catch(() => {});
+                        }
+                        if (typeof this.showToast === 'function') this.showToast('Versi baru terdeteksi. Gunakan tombol pembaruan setelah antrean tersinkron.', 'success');
                     }
-                    
-                    // 5. Muat ulang halaman secara paksa dengan jeda dramatis agar toast terlihat
-                    setTimeout(() => {
-                        window.location.reload(true);
-                    }, 1500);
                 } else {
                     console.log("✅ Aplikasi sudah menggunakan versi paling mutakhir.");
                 }
@@ -386,6 +417,8 @@ const superApp = {
                             const btn = document.getElementById('btn-update-app');
                             if (btn) {
                                 btn.onclick = () => {
+                                    const pending = this.getPendingQueueCount();
+                                    if (pending > 0) { this.showToast(`Sinkronkan ${pending} data tertunda sebelum memperbarui aplikasi.`, 'warning'); return; }
                                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                                     newWorker.postMessage({ action: 'skipWaiting' });
                                 };
@@ -398,6 +431,7 @@ const superApp = {
             let refreshing;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 if (refreshing) return;
+                if (this.getPendingQueueCount() > 0) { this.showToast('Pembaruan siap. Antrean offline tetap disimpan; muat ulang setelah sinkronisasi.', 'warning'); return; }
                 refreshing = true;
                 window.location.reload();
             });
@@ -413,16 +447,33 @@ const superApp = {
         window.addEventListener('offline', () => { this.isOnline = false; this.updateNetworkUI(); });
         this.initAutoSync();
         
-        try { 
-            let queue = localStorage.getItem('aisnack_offline_queue'); 
-            this.offlineQueue = queue ? JSON.parse(queue) : []; 
-        } catch (e) { 
-            this.offlineQueue = []; 
-        }
+        try {
+            const queue = localStorage.getItem('aisnack_offline_queue');
+            this.offlineQueue = queue ? JSON.parse(queue) : [];
+            if (!Array.isArray(this.offlineQueue)) this.offlineQueue = [];
+        } catch (e) { this.offlineQueue = []; }
+        try {
+            const idbQueue = await AisnackOfflineStore.getAll();
+            const byId = new Map(this.offlineQueue.filter(x => x && x._req_id).map(x => [x._req_id, x]));
+            idbQueue.forEach(x => { if (x && x._req_id && !byId.has(x._req_id)) byId.set(x._req_id, x); });
+            this.offlineQueue = Array.from(byId.values());
+            this.persistOfflineQueue();
+        } catch (_) { /* localStorage remains a fallback on browsers without IndexedDB */ }
 
         try {
             const logStat = document.getElementById('login-status');
             let cacheDb = localStorage.getItem('aisnack_db_cache');
+            // Use the newest full cache if localStorage is over quota; never truncate history to fit.
+            try {
+                const idbCache = await AisnackOfflineStore.getDatabaseCache();
+                const localSavedAt = Number(localStorage.getItem('aisnack_db_cache_saved_at') || 0);
+                if (idbCache && idbCache.value && Number(idbCache.savedAt || 0) > localSavedAt) {
+                    cacheDb = idbCache.value;
+                    console.info('Cache database dipulihkan dari IndexedDB.');
+                }
+            } catch (cacheFallbackError) {
+                console.warn('Cache IndexedDB tidak tersedia; melanjutkan dengan cache lokal/server:', cacheFallbackError.message || cacheFallbackError);
+            }
             
             if (cacheDb) { 
                 this.db = JSON.parse(cacheDb); 
@@ -779,17 +830,17 @@ pullFreshData: async function(silent = false) {
                 else if (localVersion !== serverVersion.Nilai) {
                     console.log("🚀 Update manual terdeteksi! Membongkar paksa cache...");
                     localStorage.setItem('app_version', serverVersion.Nilai);
-                    
-                    if ('caches' in window) {
-                        const cacheNames = await caches.keys();
-                        await Promise.all(cacheNames.map(name => caches.delete(name)));
-                    }
-                    if ('serviceWorker' in navigator) {
+                    const pending = this.getPendingQueueCount();
+                    if (pending > 0) {
+                        this.showToast(`Pembaruan ditunda karena ${pending} data belum tersinkron.`, 'warning');
+                    } else if ('serviceWorker' in navigator) {
                         const regs = await navigator.serviceWorker.getRegistrations();
-                        for(let reg of regs) { await reg.unregister(); }
+                        for (const reg of regs) {
+                            const swUrl = (reg.active && reg.active.scriptURL) || (reg.waiting && reg.waiting.scriptURL) || '';
+                            if (swUrl && new URL(swUrl).origin === location.origin && /(^|\/)sw\.js(?:$|[?#])/.test(swUrl)) reg.update().catch(() => {});
+                        }
+                        this.showToast('Pembaruan aplikasi tersedia setelah antrean kosong.', 'success');
                     }
-                    
-                    setTimeout(() => { window.location.reload(true); }, 500);
                     return; 
                 }
             }
@@ -1257,53 +1308,57 @@ pullFreshData: async function(silent = false) {
     },
 
     
-    // =========================================================
-    // 🚀 ENGINE: API POST (XHR ANTI-GANTUNG & ANTI-CRASH DI HP)
-    // =========================================================
+    // Queue status helpers. The browser queue is persisted to localStorage + IndexedDB.
+    getPendingQueueCount: function() {
+        try {
+            const q = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]');
+            return Math.max(Array.isArray(this.offlineQueue) ? this.offlineQueue.length : 0, Array.isArray(q) ? q.length : 0);
+        } catch (_) { return Array.isArray(this.offlineQueue) ? this.offlineQueue.length : 0; }
+    },
+    persistOfflineQueue: async function() {
+        const queue = Array.isArray(this.offlineQueue) ? this.offlineQueue : [];
+        try { localStorage.setItem('aisnack_offline_queue', JSON.stringify(queue)); } catch (_) {}
+        try { await AisnackOfflineStore.putAll(queue); } catch (e) { console.warn('Antrean IndexedDB tidak dapat disimpan:', e); }
+        if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI();
+    },
+    enqueueOfflinePayload: async function(payload, reason) {
+        if (!payload._req_id) payload._req_id = 'REQ-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+        if (!this.offlineQueue.some(item => item && item._req_id === payload._req_id)) {
+            payload._queue_status = 'pending';
+            payload._queued_at = payload._queued_at || new Date().toISOString();
+            payload._queue_reason = reason || 'network';
+            this.offlineQueue.push(payload);
+        }
+        await this.persistOfflineQueue();
+        return { status: 'sukses', is_offline: true, queued: true, trx_id: payload.trx_id || payload.id_shift || payload._req_id };
+    },
+
+    // API POST: an ambiguous timeout is queued with the SAME request ID, never silently discarded.
     apiPost: async function(payload) {
-        // 🔒 LAPIS 3 MUTLAK: Pastikan semua Payload Punya ID Unik (Idempotency)
-        if (!payload._req_id) {
-            payload._req_id = 'REQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-        }
-
-        if (!this.isOnline) { 
-            this.offlineQueue.push(payload); 
-            localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
-            if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI(); 
-            return { status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift }; 
-        }
-
-        let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
-
-        return new Promise((resolve) => {
+        if (!payload._req_id) payload._req_id = 'REQ-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+        if (!this.isOnline) return this.enqueueOfflinePayload(payload, 'offline');
+        const rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+        return new Promise(resolve => {
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", rUrl, true);
-            xhr.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
-            
-            // 🚀 Tingkatkan Timeout jadi 15 detik agar server punya waktu proses sebelum dialihkan ke Offline Queue
-            xhr.timeout = 15000; 
-
+            let settled = false;
+            const finish = async value => { if (settled) return; settled = true; resolve(value); };
+            const queue = async reason => finish(await this.enqueueOfflinePayload(payload, reason));
+            xhr.open('POST', rUrl, true);
+            xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+            xhr.timeout = 20000;
             xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 400) {
-                    try { resolve(JSON.parse(xhr.responseText)); } 
-                    catch (e) { resolve({ status: 'sukses', pesan: 'Respon diterima' }); }
-                } else {
-                    handleOfflineFallback();
-                }
+                    try {
+                        const response = JSON.parse(xhr.responseText || '{}');
+                        const acknowledged = response && (response.status === 'sukses' || response.status === 'success' || response.pesan === 'Already Synced');
+                        if (acknowledged) finish(response);
+                        else queue('server-unconfirmed');
+                    } catch (_) { queue('invalid-response'); }
+                } else queue('http-' + xhr.status);
             };
-
-            const handleOfflineFallback = () => {
-                console.log("Koneksi HP melambat/terblokir, mengalihkan otomatis ke antrean offline.");
-                // Karena payload sudah punya _req_id yang unik, saat dikirim ulang nanti Server akan tahu ini barang yang sama
-                this.offlineQueue.push(payload); 
-                localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue)); 
-                if (typeof this.updateNetworkUI === 'function') this.updateNetworkUI(); 
-                resolve({ status: 'sukses', is_offline: true, trx_id: payload.trx_id || payload.id_shift });
-            };
-
-            xhr.onerror = handleOfflineFallback;
-            xhr.ontimeout = handleOfflineFallback;
-            xhr.send(JSON.stringify(payload));
+            xhr.onerror = () => queue('network-error');
+            xhr.ontimeout = () => queue('timeout-unknown-result');
+            try { xhr.send(JSON.stringify(payload)); } catch (_) { queue('send-error'); }
         });
     },openSyncCenter: function() {
         this.renderSyncQueue();
@@ -1441,34 +1496,37 @@ pullFreshData: async function(silent = false) {
     },
     
     syncOfflineQueue: async function() {
-        if (!this.isOnline || this.offlineQueue.length === 0) return;
-        this.showToast("Menyinkronkan antrean data offline...", "warning"); 
-        let failedQueue = [];
-        
-        for (let i = 0; i < this.offlineQueue.length; i++) { 
-            try { 
-                await fetch(API_URL, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'text/plain' }, 
-                    body: JSON.stringify(this.offlineQueue[i]) 
-                }); 
-            } catch (e) { 
-                failedQueue.push(this.offlineQueue[i]); 
-            } 
+        if (!this.isOnline || this._syncingOfflineQueue || !this.offlineQueue.length) return;
+        this._syncingOfflineQueue = true;
+        const remaining = [];
+        try {
+            this.showToast('Menyinkronkan antrean data offline...', 'warning');
+            for (const item of [...this.offlineQueue]) {
+                try {
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item) });
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    const body = await response.json();
+                    const acknowledged = body && (body.status === 'sukses' || body.status === 'success' || body.pesan === 'Already Synced');
+                    if (!acknowledged) { item._queue_status = 'failed'; item._last_error = 'Server belum mengonfirmasi'; remaining.push(item); }
+                } catch (e) {
+                    item._queue_status = 'pending'; item._last_error = String(e.message || e);
+                    remaining.push(item);
+                }
+            }
+            this.offlineQueue = remaining;
+            await this.persistOfflineQueue();
+            if (remaining.length === 0) {
+                this.showToast('Seluruh antrean telah dikonfirmasi server.', 'success');
+                try {
+                    const res = await fetch(API_URL + '?ts=' + Date.now(), { redirect: 'follow' });
+                    if (res.ok) { const data = await res.json(); if (data && data.status !== 'error') { this.db = data; this.refreshData(); } }
+                } catch (_) {}
+            } else this.showToast(`${remaining.length} data masih menunggu konfirmasi server.`, 'warning');
+        } finally {
+            this._syncingOfflineQueue = false;
+            this.updateNetworkUI();
+            if (typeof this.renderSyncQueue === 'function') this.renderSyncQueue();
         }
-        
-        this.offlineQueue = failedQueue; 
-        localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
-        
-        if (this.offlineQueue.length === 0) { 
-            this.showToast("Seluruh Antrean Selesai!"); 
-            try { 
-                const res = await fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' }); 
-                this.db = await res.json(); 
-                this.refreshData(); 
-            } catch (e) {} 
-        }
-        this.updateNetworkUI();
     },
 
     updateNetworkUI: function() {
@@ -6587,12 +6645,7 @@ refreshData: function() {
                     this.refreshStokOnly(); 
                 }
             } else if (res && res.status !== 'sukses' && !res.is_offline) {
-               let isAlreadyQueued = this.offlineQueue.some(q => q.trx_id === payload.trx_id);
-               if (!isAlreadyQueued) {
-                   this.offlineQueue.push(payload);
-                   localStorage.setItem('aisnack_offline_queue', JSON.stringify(this.offlineQueue));
-                   this.updateNetworkUI();
-               }
+               this.enqueueOfflinePayload(payload, 'transaction-unconfirmed');
             }
         }).catch(err => { console.log("Masuk ke antrean offline."); });
     },
@@ -13809,7 +13862,7 @@ openAIDeepDive: function(type, param) {
         setInterval(() => {
             // Pastikan perangkat sedang terhubung ke internet
             if (navigator.onLine) {
-                let offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]');
+                let offlineData = []; try { offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]'); } catch (_) {}
                 
                 // Jika ada data yang nyangkut, lakukan sinkronisasi senyap
                 if (offlineData.length > 0) {
@@ -13825,7 +13878,7 @@ openAIDeepDive: function(type, param) {
 
         // AUTO-SYNC KETIKA INTERNET KEMBALI MENYALA (Reconnect)
         window.addEventListener('online', () => {
-            let offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]');
+            let offlineData = []; try { offlineData = JSON.parse(localStorage.getItem('aisnack_offline_queue') || '[]'); } catch (_) {}
             if (offlineData.length > 0) {
                 this.showToast('Koneksi pulih. Mengirim data tertunda...', 'success');
                 if (typeof this.syncOfflineQueue === 'function') {
