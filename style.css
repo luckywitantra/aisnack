@@ -275,3 +275,26 @@ body {
 #vk-keys button.vk-special-key:active {
     background-color: #F0A800;
 }
+
+/* Ai-Snack ERP & POS — UX stability layer (2026.10.07) */
+:root { --aisnack-primary: #E5202B; --aisnack-accent: #FFB800; --aisnack-ink: #4A3B32; --aisnack-border: #e2e8f0; }
+body { background-color: #f5f7fa; color: #243044; }
+.glass-header, .glass-panel { background: rgba(255,255,255,.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-color: #e8edf3; box-shadow: 0 2px 10px rgba(15,23,42,.045); }
+.nav-active { background: #fff5d1; color: var(--aisnack-primary) !important; box-shadow: inset 3px 0 0 var(--aisnack-primary); transform: none; }
+.nav-active i, .nav-active span { color: var(--aisnack-primary) !important; }
+button, input, select, textarea { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(229,32,43,.32); outline-offset: 2px; }
+input, select, textarea { min-height: 40px; }
+table thead th { position: sticky; top: 0; z-index: 2; }
+td, th { overflow-wrap: anywhere; }
+@media (min-width: 1024px) { aside#sidebar { width: 252px; min-width: 252px; } }
+@media (max-width: 767px) {
+  body { overflow: hidden; }
+  .app-view { min-height: 0; }
+  #main-app { min-width: 0; }
+  table { font-size: 12px; }
+  th, td { padding: 8px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
