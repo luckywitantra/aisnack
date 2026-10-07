@@ -8608,7 +8608,7 @@ openDetailStokOpname: function(sku) {
                 
                 if (trCbs.length > 0) {
                     let items = Array.from(trCbs).map(cb => cb.value);
-                    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'bulk_approve_mutasi', items: items, status_app: status }) });
+                    await this.apiPost({ action: 'bulk_approve_mutasi', items: items, status_app: status });
                 }
                 
                 this.showToast(`Proses Masal (${status}) Berhasil!`, "success");
