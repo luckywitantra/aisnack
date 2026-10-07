@@ -1,26 +1,24 @@
 {
-  "id": "./",
   "name": "Ai-Snack ERP & POS Ultimate",
-  "short_name": "Ai-Snack",
-  "description": "Sistem Pembukuan, ERP, dan Mesin Kasir POS Terpadu Ai-Snack",
+  "short_name": "Ai-Snack POS",
+  "description": "Sistem kasir, persediaan, dan operasional outlet Ai-Snack",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#FFF5D1",
+  "background_color": "#f5f7fa",
   "theme_color": "#E5202B",
-  "categories": ["business", "finance", "productivity"],
+  "orientation": "any",
   "icons": [
     {
-      "src": "./logo-192.png",
+      "src": "icon-192.svg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "./logo-512.png",
+      "src": "icon-512.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
