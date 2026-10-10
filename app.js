@@ -5957,11 +5957,89 @@ selectOutlet: function(id) {
         this.setLoading(false);
     },
     
-updatePendingNotifications: function() {
+// =========================================================
+    // OWNER APPROVAL CENTER — one inbox for pending authorizations
+    // =========================================================
+    ownerApprovalItems: function() {
+        if (!this.db) return [];
+        const items = [];
+        const safeText = v => String(v == null ? '' : v).replace(/[<>]/g, '').trim();
+        const groupedOpname = typeof this.getGroupedOpname === 'function' ? this.getGroupedOpname() : [];
+        const groupedRestok = typeof this.getGroupedRestok === 'function' ? this.getGroupedRestok() : [];
+        groupedOpname.filter(x => String(x.Status || '').toLowerCase() === 'pending').forEach(op => {
+            items.push({ type: 'opname', id: `${op.Waktu || ''}|${op.Outlet || ''}`, title: 'Persetujuan Stok Opname', outlet: safeText(op.Outlet || 'Outlet tidak diketahui'), by: safeText(op.Kasir || 'Kasir'), date: safeText(op.Waktu || ''), detail: `${(op.Items || []).length} item stok`, icon: 'fa-clipboard-check', tone: 'amber', sort: Date.parse(op.Waktu) || 0, raw: { waktu: op.Waktu, outlet: op.Outlet } });
+        });
+        groupedRestok.filter(x => String(x.Status || '').toLowerCase() === 'pending').forEach(bm => {
+            items.push({ type: 'terima', id: safeText(bm.Surat_Jalan), title: 'Persetujuan Terima Barang', outlet: safeText(bm.Outlet || 'Outlet tidak diketahui'), by: safeText(bm.Kasir || 'Petugas'), date: safeText(bm.Waktu || ''), detail: `${(bm.Items || []).length} item · SJ ${safeText(bm.Surat_Jalan || '-')}`, icon: 'fa-truck-ramp-box', tone: 'emerald', sort: Date.parse(bm.Waktu) || 0, raw: { suratJalan: bm.Surat_Jalan } });
+        });
+        (this.db.laporanHarian || []).forEach(rep => {
+            const status = String(rep.Status_Approval || rep.status_approval || rep['Status Approval'] || '').trim().toLowerCase();
+            if (status !== 'pending edit') return;
+            const outlet = safeText(rep.Outlet || rep.Cabang || rep.Nama_Outlet || 'Outlet tidak diketahui');
+            const tanggal = safeText(rep.Tanggal || rep.Waktu || rep.Tanggal_Laporan || '');
+            items.push({ type: 'laporan', id: safeText(rep.ID_Laporan || rep.id_laporan || ''), title: 'Otorisasi Revisi Laporan Ai-CHA', outlet, by: safeText(rep.Kasir || rep.Username || rep.Nama_Kasir || 'Kasir'), date: tanggal, detail: 'Perubahan laporan harian menunggu persetujuan', icon: 'fa-file-invoice-dollar', tone: 'violet', sort: Date.parse(tanggal) || 0, raw: { id: rep.ID_Laporan || rep.id_laporan } });
+        });
+        return items.sort((a,b) => (b.sort || 0) - (a.sort || 0));
+    },
+
+    toggleOwnerApprovalCenter: function(force) {
+        const panel = document.getElementById('owner-approval-center-panel');
+        if (!panel) return;
+        const shouldOpen = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
+        if (shouldOpen) { this.refreshOwnerApprovalCenter(); panel.classList.remove('hidden'); }
+        else panel.classList.add('hidden');
+    },
+
+    refreshOwnerApprovalCenter: function() {
+        const list = document.getElementById('owner-approval-list');
+        const summary = document.getElementById('owner-approval-summary');
+        if (!list) return;
+        const role = String(this.currentUser && this.currentUser.Role || '').toLowerCase();
+        const canApprove = role.includes('owner') || role.includes('admin') || role.includes('supervisor');
+        if (!canApprove) { list.innerHTML = '<div class="p-6 text-center text-sm text-slate-400">Pusat otorisasi hanya tersedia untuk Owner.</div>'; return; }
+        const items = this.ownerApprovalItems();
+        if (summary) summary.textContent = items.length ? `${items.length} permintaan menunggu tindakan Anda` : 'Semua persetujuan sudah ditangani';
+        const count = document.getElementById('owner-approval-count');
+        if (count) { count.textContent = items.length > 99 ? '99+' : String(items.length); count.classList.toggle('hidden', items.length === 0); count.classList.toggle('flex', items.length > 0); }
+        const pulse = document.getElementById('owner-approval-pulse');
+        if (pulse) pulse.classList.toggle('hidden', items.length === 0);
+        if (!items.length) {
+            list.innerHTML = '<div class="py-9 px-4 text-center"><div class="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 mx-auto flex items-center justify-center text-2xl mb-3"><i class="fas fa-check-double"></i></div><p class="font-black text-slate-800 dark:text-white">Inbox bersih!</p><p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tidak ada otorisasi yang menunggu persetujuan.</p></div>';
+            return;
+        }
+        const palette = { amber: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20', emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20', violet: 'bg-violet-50 text-violet-700 border-violet-100 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/20' };
+        list.innerHTML = items.slice(0, 30).map((it, i) => `<div class="group rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-3 hover:border-indigo-200 dark:hover:border-indigo-500/50 hover:shadow-md transition-all"><div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${palette[it.tone] || palette.amber}"><i class="fas ${it.icon}"></i></div><div class="flex-1 min-w-0"><div class="flex items-start justify-between gap-2"><p class="text-xs font-black leading-snug text-slate-800 dark:text-slate-100">${it.title}</p><span class="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span></div><p class="text-[11px] font-bold text-indigo-600 dark:text-indigo-300 mt-1 truncate">Ai-CHA ${it.outlet}</p><p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">${it.detail}</p><div class="flex items-center justify-between gap-2 mt-2"><span class="text-[9px] text-slate-400 truncate"><i class="fas fa-user mr-1"></i>${it.by}</span><button type="button" onclick="superApp.openOwnerApprovalItem(${i})" class="shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black shadow-sm active:scale-95 transition">Tinjau <i class="fas fa-arrow-right ml-1"></i></button></div></div></div></div>`).join('') + (items.length > 30 ? `<p class="text-center text-[10px] text-slate-400 py-2">Menampilkan 30 dari ${items.length} permintaan.</p>` : '');
+        this._ownerApprovalItemsCache = items.slice(0, 30);
+    },
+
+    openOwnerApprovalItem: function(index) {
+        const items = this._ownerApprovalItemsCache || this.ownerApprovalItems().slice(0, 30);
+        const item = items[Number(index)];
+        if (!item) return;
+        this.toggleOwnerApprovalCenter(false);
+        if (item.type === 'opname') {
+            this.switchMenu('audit');
+            setTimeout(() => { this.toggleAuditTab('opname'); this.openDetailOpnameModal(item.raw.waktu, item.raw.outlet); }, 180);
+        } else if (item.type === 'terima') {
+            this.switchMenu('audit');
+            setTimeout(() => { this.toggleAuditTab('terima'); this.openDetailRestokModal(item.raw.suratJalan); }, 180);
+        } else if (item.type === 'laporan') {
+            this.switchMenu('laporan-harian');
+            if (item.raw.id) setTimeout(() => this.openApprovalModal(item.raw.id), 350);
+        }
+    },
+
+    updatePendingNotifications: function() {
         if (!this.db) return;
 
         let roleStr = this.currentUser ? String(this.currentUser.Role).toLowerCase() : '';
-        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner');
+        let isAdmin = roleStr.includes('admin') || roleStr.includes('owner') || roleStr.includes('supervisor');
+        const ownerCenterBtn = document.getElementById('btn-owner-approval-center');
+        if (ownerCenterBtn) {
+            const canSeeOwnerCenter = roleStr.includes('owner') || roleStr.includes('admin') || roleStr.includes('supervisor');
+            ownerCenterBtn.classList.toggle('hidden', !canSeeOwnerCenter);
+            ownerCenterBtn.classList.toggle('flex', canSeeOwnerCenter);
+        }
 
         // 🚀 MENGGUNAKAN GETGROUPED AGAR YANG DIHITUNG ADALAH "DOKUMEN LAPORAN", BUKAN "ITEM ECERAN"
         let groupedOpname = typeof this.getGroupedOpname === 'function' ? this.getGroupedOpname() : [];
@@ -5987,9 +6065,10 @@ updatePendingNotifications: function() {
         });
 
         // --- UPDATE UI OWNER (ADMIN) ---
+        const pendingDailyEdits = (this.db.laporanHarian || []).filter(rep => String(rep.Status_Approval || rep.status_approval || rep['Status Approval'] || '').trim().toLowerCase() === 'pending edit').length;
         const badgeAudit = document.getElementById('badge-audit');
         if (badgeAudit) {
-            let totalAudit = pOpnameTotal + pTerimaTotal;
+            let totalAudit = pOpnameTotal + pTerimaTotal + pendingDailyEdits;
             if (isAdmin && totalAudit > 0) {
                 badgeAudit.innerText = totalAudit > 99 ? '99+' : totalAudit;
                 badgeAudit.classList.remove('hidden');
@@ -6031,6 +6110,18 @@ updatePendingNotifications: function() {
                 badgeOpname.classList.add('hidden');
                 bannerOpname.classList.add('hidden');
             }
+        }
+        // Sinkronkan pusat notifikasi owner pada setiap refresh database.
+        const ownerPanel = document.getElementById('owner-approval-center-panel');
+        if (ownerPanel && !ownerPanel.classList.contains('hidden')) this.refreshOwnerApprovalCenter();
+        else {
+            const ownerCount = document.getElementById('owner-approval-count');
+            const ownerPulse = document.getElementById('owner-approval-pulse');
+            const ownerItems = this.ownerApprovalItems();
+            if (ownerCount) { ownerCount.textContent = ownerItems.length > 99 ? '99+' : String(ownerItems.length); ownerCount.classList.toggle('hidden', ownerItems.length === 0); ownerCount.classList.toggle('flex', ownerItems.length > 0); }
+            if (ownerPulse) ownerPulse.classList.toggle('hidden', ownerItems.length === 0);
+            const ownerSummary = document.getElementById('owner-approval-summary');
+            if (ownerSummary) ownerSummary.textContent = ownerItems.length ? `${ownerItems.length} permintaan menunggu tindakan Anda` : 'Semua persetujuan sudah ditangani';
         }
     },
 
@@ -14428,4 +14519,5 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
 
