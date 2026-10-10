@@ -6988,9 +6988,89 @@ refreshData: function() {
     },
 
     // =========================================================
+    // 👑 OWNER: BAGIKAN SNAPSHOT STOK SISTEM SAAT INI KE WHATSAPP
+    // =========================================================
+    sendCurrentStockWa: function() {
+        const role = this.currentUser ? String(this.currentUser.Role || '').toLowerCase() : '';
+        if (!role.includes('owner')) {
+            if (typeof this.showToast === 'function') this.showToast('Fitur ini khusus Owner.', 'error');
+            return;
+        }
+
+        const outlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim() || 'Outlet';
+        const master = (this.db.masterProduk || []).filter(p => {
+            const category = String(p.Kategori || '').toLowerCase();
+            return category === 'bahan' || category === 'pendukung';
+        });
+        if (!master.length) {
+            if (typeof this.showToast === 'function') this.showToast('Data master stok belum tersedia. Sinkronkan data terlebih dahulu.', 'error');
+            return;
+        }
+
+        const stockRows = master.map(p => {
+            const stock = (this.db.hargaStokOutlet || []).find(x => String(x.SKU) === String(p.SKU) && String(x.ID_Outlet) === String(this.outlet));
+            const qty = stock ? Number(stock.Stok_Toko ?? stock.Stok ?? 0) : 0;
+            return {
+                sku: String(p.SKU || '-'),
+                name: String(p.Nama_Produk || p.Nama || 'Produk tanpa nama'),
+                category: String(p.Kategori || '').toLowerCase() === 'bahan' ? 'Bahan Utama' : 'Bahan Pendukung',
+                qty: Number.isFinite(qty) ? qty : 0,
+                unit: String(p.Satuan || p.Unit || p.Satuan_Produk || '').trim()
+            };
+        }).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name, 'id'));
+
+        const now = new Date();
+        const stamp = now.toLocaleString('id-ID', { timeZone: 'Asia/Makassar', dateStyle: 'medium', timeStyle: 'short' }) + ' WITA';
+        const zeroCount = stockRows.filter(x => x.qty <= 0).length;
+        const bahanCount = stockRows.filter(x => x.category === 'Bahan Utama').length;
+        const pendukungCount = stockRows.length - bahanCount;
+        let message = `*📦 SNAPSHOT STOK SAAT INI — AI-SNACK*\n`;
+        message += `📍 Outlet: *${outlet}*\n🕒 Waktu: ${stamp}\n👤 Dibagikan oleh: ${String(this.currentUser.Username || 'Owner')}\n`;
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+        message += `📊 Total item: *${stockRows.length} SKU*\n🧪 Bahan utama: ${bahanCount} SKU\n🛍️ Bahan pendukung: ${pendukungCount} SKU\n🚨 Stok nol: *${zeroCount} SKU*\n`;
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+
+        let currentCategory = '';
+        stockRows.forEach(row => {
+            if (row.category !== currentCategory) {
+                currentCategory = row.category;
+                message += `\n*${currentCategory === 'Bahan Utama' ? '🧪 BAHAN UTAMA' : '🛍️ BAHAN PENDUKUNG'}*\n`;
+            }
+            const status = row.qty <= 0 ? ' 🔴 HABIS' : '';
+            const qtyText = Number(row.qty).toLocaleString('id-ID', { maximumFractionDigits: 3 });
+            const unitText = row.unit ? ` ${row.unit}` : '';
+            message += `${row.qty <= 0 ? '🔴' : '•'} ${row.name}\n   Stok: *${qtyText}${unitText}*${status}\n`;
+        });
+
+        message += `\n_Informasi ini berdasarkan stok sistem yang tersimpan di aplikasi saat pesan dibuat. Mohon konfirmasi jika ada transaksi offline yang belum tersinkron._`;
+        try {
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+            const opened = window.open(url, '_blank');
+            if (!opened) {
+                if (typeof this.showToast === 'function') this.showToast('WhatsApp tidak terbuka. Izinkan pop-up atau salin laporan dari menu yang muncul.', 'warning');
+                return;
+            }
+            try { opened.opener = null; } catch (_) {}
+            if (typeof this.showToast === 'function') this.showToast('Laporan stok siap dibagikan. Pilih grup WhatsApp tujuan.', 'success');
+        } catch (err) {
+            console.error('Gagal membuka WhatsApp stok saat ini:', err);
+            if (typeof this.showToast === 'function') this.showToast('Gagal menyiapkan laporan WhatsApp.', 'error');
+        }
+    },
+
+    // =========================================================
     // 🚀 2. RENDER OPNAME FISIK (TERHUBUNG KE SUB-TAB & MOBILE)
     // =========================================================
     renderOpname: function() {
+        const roleForStockWa = this.currentUser ? String(this.currentUser.Role || '').toLowerCase() : '';
+        const isOwnerForStockWa = roleForStockWa.includes('owner');
+        ['btn-owner-current-stock-wa-desktop', 'btn-owner-current-stock-wa-mobile'].forEach(id => {
+            const button = document.getElementById(id);
+            if (button) {
+                button.classList.toggle('hidden', !isOwnerForStockWa);
+                if (id.endsWith('desktop')) button.classList.toggle('flex', isOwnerForStockWa);
+            }
+        });
         const lbl = document.getElementById('lbl-opname-outlet'); 
         if (lbl) lbl.innerText = this.outlet;
 
