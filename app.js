@@ -2261,6 +2261,7 @@ pullFreshData: async function(silent = false) {
     // 🚀 MODUL LAPORAN HARIAN USAHA AI-CHA (NEW ENGINE)
     // =========================================================
     dailyExpensesList: [], // Memori daftar pengeluaran hari ini
+    dailyEditBaseline: null, // Snapshot data saat laporan dibuka untuk edit; mencegah approval untuk no-op
     targetBulanan: 180000000, // Default target Rp 180 Juta
 
     // 1. Inisialisasi & Ambil Perkiraan Cuaca Otomatis
@@ -2593,6 +2594,55 @@ pullFreshData: async function(silent = false) {
     },
 
    
+    // Normalisasi nilai laporan agar perbedaan format (mis. "10.000" vs 10000)
+    // atau urutan baris biaya tidak dianggap sebagai perubahan bisnis.
+    dailyReportDataSignature: function(data) {
+        const toNumber = value => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+            if (typeof this.getNumericValue === 'function') return this.getNumericValue(value ?? 0);
+            const parsed = Number(String(value ?? 0).trim().replace(/[^0-9,-]/g, '').replace(/,/g, '.'));
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const expenses = (Array.isArray(data.expenses) ? data.expenses : [])
+            .map(x => ({
+                nama: String(x.nama || x.Nama || '').trim().toUpperCase().replace(/\s+/g, ' '),
+                nominal: toNumber(x.nominal ?? x.Nominal ?? 0)
+            }))
+            .filter(x => x.nama && x.nominal > 0)
+            .sort((a, b) => a.nama.localeCompare(b.nama, 'id') || a.nominal - b.nominal);
+        return JSON.stringify({
+            cash: toNumber(data.cash),
+            qris: toNumber(data.qris),
+            bill: toNumber(data.bill),
+            pcs: toNumber(data.pcs),
+            expenses
+        });
+    },
+
+    buildDailyReportWaText: function(data) {
+        const net = Number(data.cash || 0) + Number(data.qris || 0);
+        const bill = Number(data.bill || 0);
+        const pcs = Number(data.pcs || 0);
+        const expenses = (Array.isArray(data.expenses) ? data.expenses : [])
+            .filter(x => String(x.nama || '').trim() && Number(x.nominal || 0) > 0);
+        const totalExpense = expenses.reduce((sum, x) => sum + Number(x.nominal || 0), 0);
+        const expText = expenses.length
+            ? expenses.map(x => `▪️ ${String(x.nama).trim().toUpperCase()}: Rp ${Number(x.nominal).toLocaleString('id-ID')}`).join('\n')
+            : '-';
+        const outlet = String(data.outlet || this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
+        const title = data.pending ? '*[DRAF REVISI — MENUNGGU OTORISASI OWNER]*' : '*Laporan Harian Ai-CHA*';
+        let text = `${title}\nUpdate Sales Report Outlet: *Ai-CHA ${outlet}*\nTanggal: ${data.tanggal || '-'}\nCuaca: ${data.cuaca || 'Tidak dicatat'}\n\n`;
+        text += `Net Sales: *Rp ${net.toLocaleString('id-ID')}*\n`;
+        text += `Amount Paid: Rp ${(bill > 0 ? Math.round(net / bill) : 0).toLocaleString('id-ID')}\n`;
+        text += `Amount Pcs: Rp ${(pcs > 0 ? Math.round(net / pcs) : 0).toLocaleString('id-ID')}\n`;
+        text += `Bill: ${bill.toLocaleString('id-ID')} Bill\nProduk Terjual: ${pcs.toLocaleString('id-ID')} Pcs\n\n`;
+        text += `Rincian Pembayaran:\n💵 Cash: Rp ${Number(data.cash || 0).toLocaleString('id-ID')}\n💳 QRIS: Rp ${Number(data.qris || 0).toLocaleString('id-ID')}\n`;
+        if (totalExpense > 0) text += `\nPengeluaran:\n${expText}\nTotal Pengeluaran: Rp ${totalExpense.toLocaleString('id-ID')}\n*Net Cash Laci: Rp ${(Number(data.cash || 0) - totalExpense).toLocaleString('id-ID')}*\n`;
+        text += `\nAkumulasi Bulanan: Rp ${Number(data.accumulation || net).toLocaleString('id-ID')}\nTarget Bulanan: Rp ${Number(this.targetBulanan || 0).toLocaleString('id-ID')}`;
+        if (data.pending) text += '\n\n_Catatan: angka revisi ini belum menjadi pembukuan resmi sampai disetujui Owner._';
+        return text;
+    },
+
     setTargetBulanan: function() {
         let val = prompt(`Masukkan Target Penjualan Bulanan untuk Cabang ${this.outlet} (Angka saja):`, this.targetBulanan);
         if (val !== null && !isNaN(val) && Number(val) > 0) {
@@ -2651,6 +2701,29 @@ pullFreshData: async function(silent = false) {
         
         let isOwner = this.currentUser && (this.currentUser.Role === 'owner' || this.currentUser.Role === 'supervisor');
         let statusApp = (isEdit && !isOwner) ? 'Pending Edit' : 'Disetujui';
+
+        // SMART NO-OP: kalender boleh dibuka kembali untuk mengirim ulang laporan.
+        // Jika angka dan rincian biaya sama dengan snapshot saat edit dibuka, jangan
+        // buat request update/Pending Edit baru dan jangan minta otorisasi Owner.
+        const currentSignature = this.dailyReportDataSignature({ cash, qris, bill, pcs, expenses: expValid });
+        const baseline = this.dailyEditBaseline;
+        if (this.editReportId && baseline && String(baseline.id) === String(idRep) && baseline.signature === currentSignature) {
+            const original = (this.db.laporanHarian || []).find(x => String(x.ID_Laporan) === String(idRep));
+            const isPendingDraft = !!(original && original.Status_Approval === 'Pending Edit' && original.Revisi_JSON);
+            const waText = this.buildDailyReportWaText({
+                cash, qris, bill, pcs, expenses: expValid,
+                outlet: cleanCurrOutlet, tanggal: tglTeks,
+                cuaca: (original && original.Cuaca) || this.currentDailyWeather,
+                accumulation: Number(this.currentAccumMonth || netSales), pending: isPendingDraft
+            });
+            this.isProcessing = false;
+            this.showToast('Tidak ada perubahan data. Otorisasi dilewati; laporan siap dikirim ulang ke WhatsApp.', 'success');
+            this.resetDailyForm();
+            this.renderLaporanHarianHistory();
+            if (typeof this.openWaLaporanModal === 'function') this.openWaLaporanModal(waText);
+            else if (typeof this.showWaModal === 'function') this.showWaModal(waText);
+            return;
+        }
 
         // ======================================================================
         // 🔒 LAPIS 1: UI BLOCKER (Lumpuhkan tombol)
@@ -3034,10 +3107,13 @@ pullFreshData: async function(silent = false) {
     resetDailyForm: function(skipDateReset = false) {
         // Reset memori edit
         this.editReportId = null;
+        this.dailyEditBaseline = null;
         let titleEl = document.getElementById('form-title-mode');
         let btnCancel = document.getElementById('btn-cancel-edit');
         if (titleEl) titleEl.innerText = "Input Data Hari Ini";
         if (btnCancel) btnCancel.classList.add('hidden');
+        const submitBtnForReset = document.querySelector('#lapharian-sec-input button[onclick="superApp.submitLaporanHarian()"]');
+        if (submitBtnForReset) submitBtnForReset.innerHTML = '<i class="fab fa-whatsapp text-sm"></i> SIMPAN & LAPOR';
 
         // Hanya kembali ke tanggal hari ini jika TIDAK sedang memuat tanggal masa lalu (skipDateReset false)
         if (!skipDateReset) {
@@ -3624,8 +3700,10 @@ pullFreshData: async function(silent = false) {
         let dateEl = document.getElementById('daily-form-date');
         let picker = document.getElementById('hidden-date-picker');
 
-        if (titleEl) titleEl.innerText = "📝 Ajukan Revisi Laporan";
+        if (titleEl) titleEl.innerText = "📝 Periksa / Revisi Laporan";
         if (btnCancel) btnCancel.classList.remove('hidden');
+        const submitBtnForEdit = document.querySelector('#lapharian-sec-input button[onclick="superApp.submitLaporanHarian()"]');
+        if (submitBtnForEdit) submitBtnForEdit.innerHTML = '<i class="fab fa-whatsapp text-sm"></i> KIRIM ULANG / SIMPAN REVISI';
 
         // Standarisasi Tanggal dengan Proteksi (Null Safety)
         let targetDateObj = typeof this.normalizeDateObj === 'function' ? this.normalizeDateObj(rep.Tanggal) : new Date(rep.Tanggal);
@@ -3660,6 +3738,24 @@ pullFreshData: async function(silent = false) {
             let tglTampil = typeof this.formatToIndoDate === 'function' ? this.formatToIndoDate(targetDateObj) : rep.Tanggal;
             this.showToast(`Memuat data tanggal ${tglTampil} untuk diperbaiki.`);
         }
+
+        // Snapshot baseline dibuat dari data yang benar-benar ditampilkan di form.
+        // Untuk laporan Pending Edit, baseline memakai draf revisi agar kirim ulang
+        // draf yang sama tidak membuat permintaan approval kedua.
+        let baselineExpenses = [];
+        try {
+            let parsedExpenses = typeof expJson === 'string' ? JSON.parse(expJson || '[]') : (expJson || []);
+            if (Array.isArray(parsedExpenses)) baselineExpenses = parsedExpenses;
+        } catch(e) {}
+        this.dailyEditBaseline = {
+            id: rep.ID_Laporan,
+            signature: this.dailyReportDataSignature({
+                cash: Number(cashVal || 0), qris: Number(qrisVal || 0),
+                bill: Number(billVal || 0), pcs: Number(pcsVal || 0), expenses: baselineExpenses
+            })
+        };
+        this.currentDailyWeather = rep.Cuaca || this.currentDailyWeather;
+        this.updateWeatherBadgeUI(this.currentDailyWeather, false);
 
         // Isi form dengan angka yang tepat & hindari NaN
         if (document.getElementById('daily-cash')) document.getElementById('daily-cash').value = Number(cashVal || 0).toLocaleString('id-ID');
@@ -14332,3 +14428,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
