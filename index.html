@@ -745,6 +745,9 @@
             </div>
             
             <div class="hidden md:flex gap-2.5 shrink-0">
+                <button id="btn-owner-current-stock-wa-desktop" onclick="superApp.sendCurrentStockWa()" class="hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-[0_8px_20px_rgba(16,185,129,0.22)] transition-all active:scale-95 items-center gap-2 border border-emerald-600/70 focus:outline-none focus:ring-4 focus:ring-emerald-200" title="Bagikan ringkasan stok sistem saat ini ke grup WhatsApp">
+                    <i class="fab fa-whatsapp text-base"></i><span>Forward Stok Saat Ini</span><i class="fas fa-arrow-up-right-from-square text-[10px] opacity-80"></i>
+                </button>
                 <button onclick="superApp.openWaHistory('opname')" class="bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border-2 border-slate-100 px-4 py-2.5 rounded-xl text-xs font-black shadow-sm transition-all active:scale-95 flex items-center gap-2">
                     <i class="fab fa-whatsapp text-base text-indigo-500"></i><span>Riwayat WA</span>
                 </button>
@@ -825,6 +828,9 @@
             
             <!-- PERBAIKAN: Tombol Aksi HP Tidak Lagi Menutup Layar, Tetapi Berada di Akhir Daftar -->
             <div class="flex flex-col gap-2.5 pt-4 border-t-2 border-dashed border-slate-200">
+                <button id="btn-owner-current-stock-wa-mobile" onclick="superApp.sendCurrentStockWa()" class="hidden w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black py-3.5 rounded-[1.25rem] text-xs shadow-[0_8px_20px_rgba(16,185,129,0.22)] flex items-center justify-center gap-2 active:scale-95 border border-emerald-600/70 focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                    <i class="fab fa-whatsapp text-lg"></i><span>Forward Stok Saat Ini ke Grup WA</span><i class="fas fa-arrow-up-right-from-square text-[10px] opacity-80"></i>
+                </button>
                 <button onclick="superApp.submitOpname()" class="w-full bg-gradient-to-r from-[#E5202B] to-[#CC1A24] text-white font-black py-3.5 rounded-[1.25rem] text-xs shadow-[0_6px_15px_rgba(229,32,43,0.3)] flex items-center justify-center gap-2 active:scale-95 border border-[#CC1A24]">
                     <i class="fas fa-paper-plane text-base"></i> KIRIM LAPORAN FINAL
                 </button>
@@ -3479,8 +3485,8 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=20261007.3"></script>
-<script src="offline-hardening.js?v=20261007.3"></script>
+  <script src="app.js?v=20261010.1"></script>
+<script src="offline-hardening.js?v=20261010.1"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
