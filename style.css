@@ -298,3 +298,36 @@ td, th { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Laporan Harian Ai-CHA — responsive finishing layer v3.3 */
+#view-laporan-harian { min-width: 0; }
+#view-laporan-harian #lapharian-sec-input,
+#view-laporan-harian #lapharian-sec-riwayat { min-width: 0; }
+#view-laporan-harian #daily-smart-save-notice { line-height: 1.45; }
+#view-laporan-harian input,
+#view-laporan-harian select,
+#view-laporan-harian button { -webkit-tap-highlight-color: transparent; }
+#view-laporan-harian input[type="number"],
+#view-laporan-harian input[inputmode="numeric"] { font-variant-numeric: tabular-nums; }
+#view-laporan-harian #daily-expenses-list { max-height: min(32vh, 260px); overscroll-behavior: contain; }
+#view-laporan-harian #history-table-wrapper { min-width: 0; }
+#view-laporan-harian #laporan-harian-mobile > div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  #view-laporan-harian { border-radius: 1rem; }
+  #view-laporan-harian > div:first-child { border-radius: 1rem; }
+  #view-laporan-harian #lapharian-sec-input { padding: .9rem !important; border-radius: 1.15rem !important; }
+  #view-laporan-harian #form-input-wrapper { gap: .75rem; }
+  #view-laporan-harian #daily-cash,
+  #view-laporan-harian #daily-qris,
+  #view-laporan-harian #daily-bill,
+  #view-laporan-harian #daily-pcs { min-height: 2.8rem; font-size: 1rem; }
+  #view-laporan-harian #daily-expenses-list > div { gap: .4rem; }
+  #view-laporan-harian #daily-expenses-list input { min-width: 0; }
+  #view-laporan-harian #daily-expenses-list input[inputmode="numeric"] { width: 6.25rem; }
+  #view-laporan-harian #lapharian-sec-riwayat { min-height: 60vh; }
+  #view-laporan-harian #laporan-harian-mobile { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+}
+@media (min-width: 1024px) {
+  #view-laporan-harian #lapharian-sec-input { width: min(100%, 440px); }
+}
