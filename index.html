@@ -1228,7 +1228,7 @@
             </div>
 
             <!-- Tab Mobile -->
-            <div class="flex sm:hidden w-full pt-2 border-t border-slate-100 dark:border-slate-700/50 gap-1.5">
+            <div class="flex lg:hidden w-full pt-2 border-t border-slate-100 dark:border-slate-700/50 gap-1.5">
                 <button type="button" id="subtab-lapharian-input" onclick="superApp.switchLapHarianSubTab('input')" class="flex-1 py-1.5 px-2 bg-[#FFF5D1] dark:bg-rose-500/10 border border-[#FFD874]/50 text-[#E5202B] rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-sm transition-colors">
                     <i class="fas fa-pen"></i> Input
                 </button>
@@ -1239,7 +1239,14 @@
         </div>
 
         <!-- 3. AREA KONTEN UTAMA (SCROLLABLE) -->
-        <div class="flex-1 overflow-y-auto custom-scroll p-3 lg:p-4 relative z-10 w-full flex flex-col min-h-0 gap-3">
+        <div class="flex-1 overflow-y-auto custom-scroll p-3 sm:p-4 lg:p-5 relative z-10 w-full flex flex-col min-h-0 gap-3 lg:gap-4">
+            <div id="daily-smart-save-notice" class="relative overflow-hidden rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-gradient-to-r from-emerald-50 via-white to-teal-50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/30 px-3.5 py-3 sm:px-4 flex items-start sm:items-center gap-3 shadow-sm">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm"><i class="fas fa-shield-check text-base"></i></div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-1.5"><span class="text-[11px] sm:text-xs font-black text-emerald-800 dark:text-emerald-300">Simpan Cerdas Aktif</span><span class="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/15 text-[8px] font-black tracking-wide text-emerald-700 dark:text-emerald-300 uppercase">Anti-otorisasi berulang</span></div>
+                    <p class="text-[10px] sm:text-[11px] leading-relaxed text-slate-600 dark:text-slate-300 mt-0.5">Buka kalender dan simpan ulang tanpa mengubah angka? Sistem akan melewati otorisasi dan menyiapkan laporan untuk dikirim ulang ke grup WhatsApp. Otorisasi hanya diperlukan jika data benar-benar berubah.</p>
+                </div>
+            </div>
             
             <!-- ================= DASHBOARD EKSEKUTIF ================= -->
             <div id="lapharian-executive-dashboard" class="hidden bg-gradient-to-br from-[#CC1A24] via-[#8a0b11] to-[#4A3B32] rounded-[1.25rem] text-white shadow-[0_8px_20px_rgba(229,32,43,0.2)] relative border border-[#E5202B]/50 w-full shrink-0">
@@ -3485,7 +3492,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=20261010.1"></script>
+  <script src="app.js?v=20261011.1"></script>
 <script src="offline-hardening.js?v=20261010.1"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
