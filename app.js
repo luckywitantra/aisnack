@@ -526,8 +526,15 @@ const superApp = {
                 if (!data || data.status === 'error') throw new Error(data ? data.pesan : "Server Timeout");
 
                 // --- PROSES DATA SUKSES ---
-                this.db = data; 
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(data));
+                // Pertahankan arsip lokal yang lebih tua, tetapi biarkan data server terbaru menang.
+                this.db = (this.db && this.db.masterProduk && typeof this.mergeDatabase === 'function')
+                    ? this.mergeDatabase(this.db, data)
+                    : data;
+                try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); }
+                catch (cacheWriteError) {
+                    console.warn('Cache lokal tidak dapat diperbarui; data server tetap aktif:', cacheWriteError.message || cacheWriteError);
+                    if (typeof AisnackOfflineStore !== 'undefined' && AisnackOfflineStore.saveDatabaseCache) AisnackOfflineStore.saveDatabaseCache(JSON.stringify(this.db)).catch(() => {});
+                }
                 
                 // 🚀 CEK VERSI APLIKASI LANGSUNG DARI DATA YANG BARU DATANG! (Tanpa Fetch tambahan)
                 if (data.pengaturan) {
@@ -566,10 +573,10 @@ const superApp = {
                 // 🚀 INJECT PENARIK DATA LATAR BELAKANG
                 setTimeout(() => {
                     if (typeof this.pullBackgroundData === 'function') {
-                        console.log("⏰ Memicu penarikan data latar belakang (90 Hari)...");
+                        console.log("⏰ Memicu sinkronisasi riwayat latar belakang (90 hari)...");
                         this.pullBackgroundData();
                     }
-                }, 3000);
+                }, 12000);
             };
 
             // Logika eksekusi latar belakang vs pemblokiran layar
@@ -900,6 +907,8 @@ pullFreshData: async function(silent = false) {
         merged.masterProduk = newDb.masterProduk || oldDb.masterProduk;
         merged.outlets = newDb.outlets || oldDb.outlets;
         merged.hargaStokOutlet = newDb.hargaStokOutlet || oldDb.hargaStokOutlet;
+        // Snapshot stok gudang wajib mengikuti server saat tersedia.
+        merged.stokGudang = newDb.stokGudang || oldDb.stokGudang;
         
         merged.users = newDb.users || oldDb.users;
         merged.pengaturan = newDb.pengaturan || oldDb.pengaturan;
@@ -955,44 +964,33 @@ pullFreshData: async function(silent = false) {
     // 🚀 2. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI & MENGGUNAKAN MERGE)
     // =========================================================================
     pullBackgroundData: async function() {
-        console.log("⏳ Memulai sinkronisasi data latar belakang (90 Hari)...");
+        if (this._backgroundPullInFlight) return;
+        this._backgroundPullInFlight = true;
+        console.log("⏳ Memulai sinkronisasi riwayat latar belakang (90 hari)...");
         try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=90", { 
-                method: 'GET',
-                redirect: 'follow',
-                cache: 'no-store'
-            });
-
-            // 🛠️ PERBAIKAN 2: TAMENG ANTI-HTML CRASH DITERAPKAN DI SINI
+            const res = await fetch(API_URL + "?action=get_history_data&history=90&ts=" + Date.now(), { method: 'GET', redirect: 'follow', cache: 'no-store' });
             const rawText = await res.text();
-            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) {
-                throw new Error("Server Google sibuk (HTML Error).");
-            }
-            
+            if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) throw new Error("Server Google sibuk (HTML Error).");
             const data = JSON.parse(rawText);
-            
-            if (data && data.status === 'sukses') {
-                // 🚀 WAJIB MERGE
-                this.db = this.mergeDatabase(this.db, data);
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
-                
-                if (typeof this.updatePendingNotifications === 'function') this.updatePendingNotifications();
-                
-                if (this.currentUser) {
-                    if (this.cart.length === 0) this.refreshData();
-                    if (typeof this.renderReport === 'function' && !document.getElementById('view-report')?.classList.contains('hidden')) this.renderReport();
-                    if (typeof this.generateAIReport === 'function' && !document.getElementById('view-ai')?.classList.contains('hidden')) this.generateAIReport();
-                }
-
-                console.log("✅ Sinkronisasi latar belakang 90 hari selesai dan berhasil digabung!");
+            if (!res.ok || !data || data.status !== 'sukses') throw new Error((data && data.pesan) || ('HTTP ' + res.status));
+            this.db = this.mergeDatabase(this.db, data);
+            try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); }
+            catch (cacheWriteError) {
+                console.warn('Cache localStorage penuh saat sinkronisasi riwayat:', cacheWriteError.message || cacheWriteError);
+                if (typeof AisnackOfflineStore !== 'undefined' && AisnackOfflineStore.saveDatabaseCache) await AisnackOfflineStore.saveDatabaseCache(JSON.stringify(this.db)).catch(() => {});
             }
-        } catch (e) {
-            console.warn("Sinkronisasi latar belakang dilewati:", e.message);
-        }
+            if (typeof this.updatePendingNotifications === 'function') this.updatePendingNotifications();
+            if (this.currentUser) {
+                if (this.cart.length === 0) this.refreshData();
+                if (typeof this.renderReport === 'function' && !document.getElementById('view-report')?.classList.contains('hidden')) this.renderReport();
+                if (typeof this.generateAIReport === 'function' && !document.getElementById('view-ai')?.classList.contains('hidden')) this.generateAIReport();
+            }
+            console.log("✅ Sinkronisasi riwayat 90 hari selesai; master/stok tidak diunduh ulang.");
+        } catch (e) { console.warn("Sinkronisasi riwayat latar belakang dilewati:", e.message); }
+        finally { this._backgroundPullInFlight = false; }
     },
 
-    
-    // =========================================================================
+        // =========================================================================
     // 🚀 ENGINE KHUSUS ARSIP LAWAS (DENGAN POP-UP KONFIRMASI CANTIK)
     // =========================================================================
     pullDeepArchiveData: async function() {
@@ -1012,7 +1010,7 @@ pullFreshData: async function(silent = false) {
         this.isProcessing = true;
 
         try {
-            const res = await fetch(API_URL + "?ts=" + new Date().getTime() + "&history=all", { 
+            const res = await fetch(API_URL + "?action=get_history_data&ts=" + new Date().getTime() + "&history=all", { 
                 method: 'GET',
                 redirect: 'follow',
                 cache: 'no-store'
@@ -1518,8 +1516,17 @@ pullFreshData: async function(silent = false) {
             if (remaining.length === 0) {
                 this.showToast('Seluruh antrean telah dikonfirmasi server.', 'success');
                 try {
-                    const res = await fetch(API_URL + '?ts=' + Date.now(), { redirect: 'follow' });
-                    if (res.ok) { const data = await res.json(); if (data && data.status !== 'error') { this.db = data; this.refreshData(); } }
+                    const res = await fetch(API_URL + '?ts=' + Date.now() + '&history=31', { redirect: 'follow', cache: 'no-store' });
+                    if (res.ok) {
+                        const rawText = await res.text();
+                        if (rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html')) throw new Error('Server membalas HTML');
+                        const data = JSON.parse(rawText);
+                        if (data && data.status === 'sukses') {
+                            this.db = this.mergeDatabase(this.db, data);
+                            try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); } catch (cacheWriteError) { console.warn('Cache tidak dapat diperbarui setelah sinkronisasi:', cacheWriteError.message || cacheWriteError); }
+                            this.refreshData();
+                        }
+                    }
                 } catch (_) {}
             } else this.showToast(`${remaining.length} data masih menunggu konfirmasi server.`, 'warning');
         } finally {
@@ -13368,8 +13375,38 @@ openAIDeepDive: function(type, param) {
     // =========================================================
     // 🚀 UPDATE ENGINE RENDER TABEL (KOLOM AKTUAL DIPISAH)
     // =========================================================
-   renderRekon: function() {
-        this.loadRekonDataFromCloud(); 
+   renderRekon: async function() {
+        // Log_Rekon berukuran besar; muat saat menu Rekon benar-benar dibuka.
+        if (!this._rekonLoaded) {
+            if (!this._rekonLoadPromise) {
+                this._rekonLoadPromise = (async () => {
+                    try {
+                        const res = await fetch(API_URL + '?action=get_rekon_data&ts=' + Date.now(), { redirect: 'follow', cache: 'no-store' });
+                        const rawText = await res.text();
+                        if (rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html')) throw new Error('Server membalas HTML');
+                        const data = JSON.parse(rawText);
+                        if (!res.ok || !data || data.status !== 'sukses' || !Array.isArray(data.rekon)) throw new Error((data && data.pesan) || 'Format data rekon tidak valid');
+                        this.db = this.db || {};
+                        this.db.rekon = data.rekon;
+                        this._rekonLoaded = true;
+                        try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); }
+                        catch (cacheWriteError) {
+                            console.warn('Cache rekon tidak dapat disimpan ke localStorage:', cacheWriteError.message || cacheWriteError);
+                            if (typeof AisnackOfflineStore !== 'undefined' && AisnackOfflineStore.saveDatabaseCache) await AisnackOfflineStore.saveDatabaseCache(JSON.stringify(this.db)).catch(() => {});
+                        }
+                    } catch (err) {
+                        console.warn('Gagal memuat data Rekon:', err.message || err);
+                        this.showToast('Data Rekon belum berhasil dimuat. Periksa koneksi lalu buka menu Rekon kembali.', 'error');
+                        throw err;
+                    } finally { this._rekonLoadPromise = null; }
+                })();
+            }
+            try { await this._rekonLoadPromise; } catch (_) {
+                // Jika server tidak tersedia, izinkan cache rekon yang sudah ada tetap dipakai offline.
+                if (!this.db || !Array.isArray(this.db.rekon)) return;
+            }
+        }
+        this.loadRekonDataFromCloud();
 
         const startInput = document.getElementById('rekon-filter-start');
         const endInput = document.getElementById('rekon-filter-end');
@@ -14511,3 +14548,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
