@@ -609,6 +609,25 @@ const superApp = {
 
     
     
+  // Verify stored salted PIN hashes while retaining legacy plaintext compatibility until migration is run.
+    hashPinForCache: async function(pin) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('Peramban tidak mendukung verifikasi PIN aman. Buka aplikasi melalui HTTPS.');
+        const bytes = new Uint8Array(16); window.crypto.getRandomValues(bytes);
+        const salt = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+        const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}:${String(pin)}`));
+        const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2,'0')).join('');
+        return `sha256$${salt}$${hex}`;
+    },
+    verifyStoredPin: async function(pin, storedValue) {
+        const stored = String(storedValue == null ? '' : storedValue);
+        if (!stored.startsWith('sha256$')) return stored === String(pin); // legacy records work until migration
+        const parts = stored.split('$');
+        if (parts.length !== 3 || !window.crypto || !window.crypto.subtle) return false;
+        const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${parts[1]}:${String(pin)}`));
+        const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2,'0')).join('');
+        return hex === parts[2];
+    },
+
   addPin: function(num) {
         // 🛑 SATPAM 1: Tolak ketikan jika aplikasi sedang proses update / bersiap reload
         if (this.isSystemUpdating) {
@@ -659,7 +678,7 @@ const superApp = {
         }
     },
     
-    processLogin: function() {
+    processLogin: async function() {
         if (this.isProcessing) return; this.isProcessing = true;
         if (!this.db || !this.db.users) { 
             this.showToast('Koneksi ke Database belum siap.', 'error'); 
@@ -667,7 +686,10 @@ const superApp = {
         }
 
         // 🚀 Cek PIN Kasir
-        let user = this.db.users.find(u => String(u.PIN) === String(this.pinBuffer));
+        let user = null;
+        for (const candidate of (this.db.users || [])) {
+            if (await this.verifyStoredPin(this.pinBuffer, candidate.PIN)) { user = candidate; break; }
+        }
         
         if (user) {
             this.currentUser = user; 
@@ -1353,6 +1375,7 @@ pullFreshData: async function(silent = false) {
                         const response = JSON.parse(xhr.responseText || '{}');
                         const acknowledged = response && (response.status === 'sukses' || response.status === 'success' || response.pesan === 'Already Synced');
                         if (acknowledged) finish(response);
+                        else if (payload.action === 'checkout' && response && response.status === 'error') finish(response);
                         else queue('server-unconfirmed');
                     } catch (_) { queue('invalid-response'); }
                 } else queue('http-' + xhr.status);
@@ -1440,7 +1463,31 @@ pullFreshData: async function(silent = false) {
         html += createCard('Data Lainnya', 'fa-database', cLain, 'bg-slate-500 text-white', 'bg-slate-500', 'lain');
 
         if (html === '') html = createCard('Antrean Sistem', 'fa-server', totalQueue, 'bg-[#FFB800] text-white', 'bg-[#FFB800]', 'sistem');
+        const blocked = offlineData.filter(x => x && typeof x === 'object' && x._queue_status === 'blocked');
+        if (blocked.length) {
+            const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
+            html += `<div class="mt-4 border border-amber-200 bg-amber-50 rounded-2xl p-3"><h4 class="font-black text-amber-900 text-xs mb-2">Transaksi perlu pemeriksaan (${blocked.length})</h4><p class="text-[10px] text-amber-800 mb-3">Antrean ini tidak dicoba ulang otomatis agar tidak membuat ketidakpastian transaksi. Periksa stok dan log server sebelum mencoba lagi.</p>`;
+            blocked.forEach(item => {
+                const key = esc(item._req_id || '');
+                const label = esc(item.trx_id || item.id_transaksi || item._req_id || 'Transaksi');
+                const err = esc(item._last_error || item._queue_reason || 'Perlu pemeriksaan server');
+                html += `<div class="border-t border-amber-200 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"><div class="min-w-0"><div class="font-bold text-[11px] text-slate-800 break-all">${label}</div><div class="text-[10px] text-amber-800 break-words">${err}</div></div><button class="shrink-0 rounded-lg bg-amber-700 text-white px-3 py-2 text-[10px] font-black" onclick="superApp.retryBlockedQueueItem('${key}')">Periksa & Coba Lagi</button></div>`;
+            });
+            html += `</div>`;
+        }
         listEl.innerHTML = html;
+    },
+
+    retryBlockedQueueItem: async function(reqId) {
+        const item = (this.offlineQueue || []).find(x => x && x._req_id === reqId);
+        if (!item) return this.showToast('Antrean tidak ditemukan. Muat ulang daftar antrean.', 'error');
+        item._queue_status = 'pending';
+        item._queue_reason = 'manual-retry-after-review';
+        delete item._last_error;
+        await this.persistOfflineQueue();
+        this.renderSyncQueue();
+        if (this.isOnline) await this.syncOfflineQueue();
+        else this.showToast('Jaringan offline. Transaksi tetap tersimpan di antrean.', 'warning');
     },
 
     executeVisualSync: function() {
@@ -1503,6 +1550,7 @@ pullFreshData: async function(silent = false) {
         try {
             this.showToast('Menyinkronkan antrean data offline...', 'warning');
             for (const item of [...this.offlineQueue]) {
+                if (item && item._queue_status === 'blocked') { remaining.push(item); continue; }
                 try {
                     const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item) });
                     if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1512,7 +1560,14 @@ pullFreshData: async function(silent = false) {
                         const trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(item.id_transaksi));
                         if (trx) { if (!(this.receiptAuditState(trx) === 'sent' && item.status_cetak === 'Gagal')) trx.Status_Cetak = item.status_cetak; delete trx._cetak_sync_pending; }
                     }
-                    if (!acknowledged) { item._queue_status = 'failed'; item._last_error = 'Server belum mengonfirmasi'; remaining.push(item); }
+                    if (!acknowledged) {
+                        if (item.action === 'checkout' && body && body.status === 'error') {
+                            item._queue_status = 'blocked';
+                            item._queue_reason = 'server-rejected';
+                            item._last_error = String(body.pesan || 'Server menolak checkout; perlu pemeriksaan sebelum dicoba ulang');
+                        } else { item._queue_status = 'failed'; item._last_error = 'Server belum mengonfirmasi'; }
+                        remaining.push(item);
+                    }
                 } catch (e) {
                     item._queue_status = 'pending'; item._last_error = String(e.message || e);
                     remaining.push(item);
@@ -5278,7 +5333,7 @@ selectOutlet: function(id) {
         // Update Memori Lokal Secara Instan (Agar UI Cepat)
         if (!this.db.users) this.db.users = [];
         if (mode === 'add') {
-            this.db.users.push({ Username: fId, ID_User: fId, Nama: fNama, Role: fRole, Outlet: fOutlet, ID_Outlet: fOutlet, PIN: fPin });
+            this.db.users.push({ Username: fId, ID_User: fId, Nama: fNama, Role: fRole, Outlet: fOutlet, ID_Outlet: fOutlet, PIN: await this.hashPinForCache(fPin) });
         } else {
             let idx = this.db.users.findIndex(x => (x.Username || x.ID_User) === oldUsername);
             if (idx > -1) {
@@ -5286,7 +5341,7 @@ selectOutlet: function(id) {
                 this.db.users[idx].Role = fRole;
                 this.db.users[idx].Outlet = fOutlet;
                 this.db.users[idx].ID_Outlet = fOutlet;
-                if (fPin && fPin.length === 4) this.db.users[idx].PIN = fPin;
+                if (fPin && fPin.length === 4) this.db.users[idx].PIN = await this.hashPinForCache(fPin);
             }
         }
         localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
@@ -6772,7 +6827,7 @@ refreshData: function() {
             }
         }, 500);
 
-        this.apiPost(payload).then(res => {
+        this.apiPost(payload).then(async res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
                 // Checkout now exists server-side; retry any print event that arrived first.
                 if (this.isOnline && this.offlineQueue.some(x => x.action === 'update_status_cetak' && x.id_transaksi === trxID)) {
@@ -6781,8 +6836,24 @@ refreshData: function() {
                 if (typeof this.refreshStokOnly === 'function') {
                     this.refreshStokOnly(); 
                 }
+            } else if (res && res.status === 'error' && !res.is_offline) {
+               // A definite server rejection is not a transient timeout. Preserve the paid/printed local record,
+               // but block automatic retries until an operator reviews the server reason and stock state.
+               const localTrx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(trxID));
+               if (localTrx) { localTrx._server_sync_status = 'rejected'; localTrx._server_sync_error = String(res.pesan || 'Server menolak transaksi'); }
+               payload._queue_status = 'blocked';
+               payload._queue_reason = 'server-rejected';
+               payload._last_error = String(res.pesan || 'Server menolak transaksi; perlu pemeriksaan');
+               await this.enqueueOfflinePayload(payload, 'server-rejected-review-required');
+               const queued = this.offlineQueue.find(x => x && x._req_id === payload._req_id);
+               if (queued) { queued._queue_status = 'blocked'; queued._queue_reason = 'server-rejected'; queued._last_error = payload._last_error; }
+               await this.persistOfflineQueue();
+               try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); } catch (_) {}
+               this.refreshData();
+               this.showToast('Server menolak transaksi. Catatan lokal dipertahankan dan ditahan untuk pemeriksaan; jangan lakukan pembayaran ulang.', 'error');
+               this.renderSyncQueue();
             } else if (res && res.status !== 'sukses' && !res.is_offline) {
-               this.enqueueOfflinePayload(payload, 'transaction-unconfirmed');
+               await this.enqueueOfflinePayload(payload, 'transaction-unconfirmed');
             }
         }).catch(err => { console.log("Masuk ke antrean offline."); });
     },
@@ -10835,9 +10906,13 @@ openDetailStokOpname: function(sku) {
         this.openModal('modal-detail');
     },
 
-    promptVoidTrx: function() {
+    promptVoidTrx: async function() {
         let pin = prompt("Masukkan PIN Super Admin (Owner) untuk Membatalkan & Mengembalikan Stok:");
-        let adminUser = (this.db.users || []).find(u => String(u.Role).toLowerCase().includes('admin') && String(u.PIN) === String(pin));
+        if (pin === null) return;
+        let adminUser = null;
+        for (const u of (this.db.users || [])) {
+            if (String(u.Role).toLowerCase().includes('admin') && await this.verifyStoredPin(pin, u.PIN)) { adminUser = u; break; }
+        }
         if(adminUser) { this.executeVoidTrx(this.activeReprintTrx.ID_TRX); } else { this.showToast("PIN Salah atau Anda bukan Admin! Batal ditolak.", "error"); }
     },
 executeVoidTrx: async function(trxId) {
@@ -10913,7 +10988,7 @@ executeVoidTrx: async function(trxId) {
         const filterOutEl = document.getElementById('ai-filter-outlet');
         if(filterOutEl && filterOutEl.options.length <= 1) {
             let opts = '<option value="Semua">Semua Cabang (Global)</option>';
-            let uniqueOutlets = [...new Set((this.db.transactions || []).map(t => t.Outlet))];
+            let uniqueOutlets = [...new Set(this.uniqueTransactionsById(this.db.transactions || []).map(t => t.Outlet))];
             uniqueOutlets.forEach(o => { if(o) opts += `<option value="${o}">${o}</option>`; });
             filterOutEl.innerHTML = opts;
             
@@ -10934,7 +11009,12 @@ executeVoidTrx: async function(trxId) {
         let itemStats = {}; 
 
         // 4. Looping Ekstraksi Transaksi LENGKAP (Termasuk Kalkulasi HPP)
-        (this.db.transactions || []).forEach(t => {
+        const financialTransactions = this.uniqueTransactionsById(this.db.transactions || []);
+        if (this.lastAnalyticsDuplicateRows > 0 && this._lastCfoDuplicateWarningCount !== this.lastAnalyticsDuplicateRows) {
+            this._lastCfoDuplicateWarningCount = this.lastAnalyticsDuplicateRows;
+            this.showToast(`CFO mengecualikan ${this.lastAnalyticsDuplicateRows} baris transaksi ber-ID ganda dari perhitungan. Periksa Audit_Integritas sebelum koreksi data historis.`, 'warning');
+        }
+        financialTransactions.forEach(t => {
             if (t.Status !== 'Sukses') return;
             let trxDate = this.parseDateId(t.Tanggal);
 
@@ -11614,7 +11694,7 @@ openAIDeepDive: function(type, param) {
                 }
             }
             if (!skuTarget) {
-                for (let t of (this.db.transactions || [])) {
+                for (let t of this.uniqueTransactionsById(this.db.transactions || [])) {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                     for (let it of items) {
                         if (String(it.nama || '').trim().toLowerCase() === paramLower) {
@@ -11676,7 +11756,7 @@ openAIDeepDive: function(type, param) {
         // 🚀 2. KUMPULKAN TRANSAKSI & PREPARE SPARKLINE DATA
         // ====================================================================
         if (['hourly', 'branch', 'product', 'payment', 'pcs'].includes(type)) {
-            (this.db.transactions || []).forEach(t => {
+            this.uniqueTransactionsById(this.db.transactions || []).forEach(t => {
                 if (t.Status !== 'Sukses') return;
                 if (!isDataValid(t.Tanggal, t.Outlet)) return;
 
@@ -12894,6 +12974,20 @@ openAIDeepDive: function(type, param) {
         if (status === 'Sudah' || status === 'Terkirim') return 'sent';
         if (status === 'Tidak Dicetak' || status === 'Gagal') return 'not_printed';
         return 'unverified';
+    },
+
+    // Financial analytics use one row per transaction ID; raw history remains untouched for audit/review.
+    uniqueTransactionsById: function(rows) {
+        const result = [], seen = new Set();
+        let duplicateRows = 0;
+        (Array.isArray(rows) ? rows : []).forEach(t => {
+            const id = String((t && t.ID_TRX) || '').trim();
+            if (!id) { result.push(t); return; }
+            if (seen.has(id)) { duplicateRows++; return; }
+            seen.add(id); result.push(t);
+        });
+        this.lastAnalyticsDuplicateRows = duplicateRows;
+        return result;
     },
 
     toggleMobileCart: function() {
@@ -14574,3 +14668,4 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
+
