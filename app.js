@@ -942,6 +942,9 @@ pullFreshData: async function(silent = false) {
         // --- C. TERAPKAN KE SELURUH TABEL RIWAYAT ---
         merged.laporanHarian = mergeHistoryArray(oldDb.laporanHarian, newDb.laporanHarian, 'ID_Laporan', 'id_laporan');
         merged.transactions = mergeHistoryArray(oldDb.transactions, newDb.transactions, 'ID_TRX', 'id_trx');
+        // A server snapshot may lag behind a just-written Bluetooth print event.
+        const pendingPrints = new Map((oldDb.transactions || []).filter(t => t._cetak_sync_pending).map(t => [String(t.ID_TRX), t]));
+        merged.transactions.forEach(t => { const pending = pendingPrints.get(String(t.ID_TRX)); if (pending && t.Status_Cetak !== 'Sudah' && t.Status_Cetak !== 'Terkirim') { t.Status_Cetak = pending.Status_Cetak; t._cetak_sync_pending = true; } });
         merged.shifts = mergeHistoryArray(oldDb.shifts, newDb.shifts, 'ID_Shift', 'id_shift');
         merged.kasKeluar = mergeHistoryArray(oldDb.kasKeluar, newDb.kasKeluar, 'ID_Kas', 'id_kas_keluar');
         
@@ -1505,6 +1508,10 @@ pullFreshData: async function(silent = false) {
                     if (!response.ok) throw new Error('HTTP ' + response.status);
                     const body = await response.json();
                     const acknowledged = body && (body.status === 'sukses' || body.status === 'success' || body.pesan === 'Already Synced');
+                    if (acknowledged && item.action === 'update_status_cetak') {
+                        const trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(item.id_transaksi));
+                        if (trx) { if (!(this.receiptAuditState(trx) === 'sent' && item.status_cetak === 'Gagal')) trx.Status_Cetak = item.status_cetak; delete trx._cetak_sync_pending; }
+                    }
                     if (!acknowledged) { item._queue_status = 'failed'; item._last_error = 'Server belum mengonfirmasi'; remaining.push(item); }
                 } catch (e) {
                     item._queue_status = 'pending'; item._last_error = String(e.message || e);
@@ -6701,9 +6708,9 @@ refreshData: function() {
         let kasirPrefix = this.currentUser ? this.currentUser.Username.substring(0,3).toUpperCase() : 'KSR';
         let trxID = `TRX-${kasirPrefix}-${d.getTime()}`;
 
-        let isPrintSuccess = this.printerCharacteristic ? true : false;
+        let isPrintReady = !!this.printerCharacteristic;
         
-        const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintSuccess ? 'Sudah' : 'Belum' };
+        const payload = { action: 'checkout', trx_id: trxID, outlet: this.outlet, kasir: this.currentUser.Username, metode_bayar: this.payMethod, total: this.payTotal, tunai: this.payCash, kembali: this.payChange, items: this.cart, id_shift: this.activeShiftId, tim_operasional: this.activeStaffTeam, antrian: noAntrian, status_cetak: isPrintReady ? 'Belum' : 'Tidak Dicetak' };
 
         if (!this.db.transactions) this.db.transactions = [];
         this.db.transactions.push({ 
@@ -6711,7 +6718,7 @@ refreshData: function() {
             Outlet: this.outlet, Kasir: this.currentUser.Username, Metode_Bayar: this.payMethod, 
             Total_Bayar: this.payTotal, Tunai: this.payCash, Kembalian: this.payChange, 
             Items_JSON: JSON.stringify(this.cart), ID_Shift: this.activeShiftId, Status: 'Sukses', Antrian: noAntrian,
-            Status_Cetak: isPrintSuccess ? 'Sudah' : 'Belum'
+            Status_Cetak: isPrintReady ? 'Menunggu' : 'Tidak Dicetak'
         });
 
         this.cart.forEach(item => {
@@ -6725,7 +6732,7 @@ refreshData: function() {
         this.showToast(`Transaksi Sukses! No Antrian: ${noAntrian}`);
 
         // 🚀 CETAK DUAL STRUK (PELANGGAN & DAPUR)
-        if (isPrintSuccess) {
+        if (isPrintReady) {
             // 🛠️ PERBAIKAN 1: Kloning data keranjang sebelum dihapus oleh sistem di bawah
             let printItems = JSON.parse(JSON.stringify(this.cart));
             let printTotal = this.payTotal;
@@ -6738,10 +6745,10 @@ refreshData: function() {
             .then(() => {
                 // Jeda 1.5 detik (dipercepat), lalu cetak Struk Dapur menggunakan memori kloning
                 setTimeout(() => {
-                    this.printReceipt(trxID, this.outlet, printTotal, printCash, printChange, printItems, 'Sukses', null, noAntrian, false, printMethod, 'kitchen');
+                    this.printReceipt(trxID, this.outlet, printTotal, printCash, printChange, printItems, 'Sukses', null, noAntrian, false, printMethod, 'kitchen').catch(e => console.warn('Cetak tiket dapur gagal:', e));
                 }, 1500); 
             })
-            .catch(e => console.log("Gagal print background"));
+            .catch(e => { console.warn('Gagal cetak struk pelanggan:', e); this.laporStrukGagal(trxID); });
         }
 
         this._lastPaidTotal = this.payTotal;
@@ -6767,8 +6774,9 @@ refreshData: function() {
 
         this.apiPost(payload).then(res => {
             if (res && res.status === 'sukses' && !res.is_offline) {
-                if (isPrintSuccess) {
-                    this.laporStrukDicetak(trxID);
+                // Checkout now exists server-side; retry any print event that arrived first.
+                if (this.isOnline && this.offlineQueue.some(x => x.action === 'update_status_cetak' && x.id_transaksi === trxID)) {
+                    setTimeout(() => this.syncOfflineQueue(), 1200);
                 }
                 if (typeof this.refreshStokOnly === 'function') {
                     this.refreshStokOnly(); 
@@ -8989,7 +8997,8 @@ openDetailStokOpname: function(sku) {
                         let cleanTime = this.cleanTimeOnly(t.Waktu);
                         let antrianTeks = t.Antrian ? `<span class="text-[9px] font-black bg-[#FFB800] text-white px-2 py-0.5 rounded shadow-sm">Q:${t.Antrian}</span>` : '';
                         let statusCetak = t.Status_Cetak || 'Belum';
-                        let warningStruk = (isAdmin && t.Status === 'Sukses' && statusCetak !== 'Sudah') ? `<span class="text-[8px] font-black bg-rose-100 text-[#E5202B] px-1.5 py-0.5 rounded border border-rose-200 animate-pulse">NO PRINT</span>` : '';
+                        let auditCetak = this.receiptAuditState(t);
+                        let warningStruk = (isAdmin && t.Status === 'Sukses' && auditCetak === 'not_printed') ? `<span class="text-[8px] font-black bg-rose-100 text-[#E5202B] px-1.5 py-0.5 rounded border border-rose-200">NO PRINT</span>` : ((isAdmin && t.Status === 'Sukses' && auditCetak === 'unverified') ? `<span class="text-[8px] font-black bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">BELUM TERVERIFIKASI</span>` : '');
 
                         trxHtml += `<tr class="${rowBg} transition-colors border-b border-slate-100">
                             <td class="py-3.5 px-4 whitespace-nowrap text-xs">
@@ -12664,8 +12673,8 @@ openAIDeepDive: function(type, param) {
 
                 if (t.Status === 'Sukses') {
                     staffData[kasir].trxCount += 1;
-                    if (t.Status_Cetak === 'Sudah') staffData[kasir].printCount += 1;
-                    else globalNoPrint += 1; // Transaksi sukses tapi tidak di-print
+                    if (this.receiptAuditState(t) === 'sent') staffData[kasir].printCount += 1;
+                    else if (this.receiptAuditState(t) === 'not_printed') globalNoPrint += 1; // Transaksi sukses tapi tidak di-print
                 } else {
                     staffData[kasir].batalCount += 1;
                     globalVoid += 1;
@@ -12768,7 +12777,7 @@ openAIDeepDive: function(type, param) {
                 let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                 let itemStr = items.map(i => `${i.qty}x ${i.nama}`).join(', ');
 
-                if (t.Status === 'Sukses' && t.Status_Cetak !== 'Sudah') {
+                if (t.Status === 'Sukses' && this.receiptAuditState(t) === 'not_printed') {
                     countNoPrint++;
                     htmlNoPrint += `<tr class="border-b border-slate-100"><td class="py-2 px-3 text-xs">${wStr}</td><td class="py-2 px-3 text-xs font-bold text-slate-700">${t.ID_TRX}</td><td class="py-2 px-3 text-xs max-w-[150px] truncate" title="${itemStr}">${itemStr}</td><td class="py-2 px-3 text-right font-black text-brand-600">Rp ${(Number(t.Total_Bayar)||0).toLocaleString('id-ID')}</td></tr>`;
                 } else if (t.Status !== 'Sukses') {
@@ -12846,29 +12855,46 @@ openAIDeepDive: function(type, param) {
         if(modal && modalContent) { modal.classList.remove('hidden'); setTimeout(() => modalContent.classList.add('modal-enter-active'), 10); }
     },
 
-    laporStrukDicetak: async function(idTrx) {
-        try {
-            // 1. Kirim laporan ke Google Sheets di latar belakang
-            this.apiPost({ action: 'update_status_cetak', id_transaksi: idTrx });
-            
-            // 2. Cari transaksinya
-            let trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(idTrx));
-            if (trx) {
-                trx.Status_Cetak = 'Sudah';
-                
-                // 🚀 PERBAIKAN 3: Simpan ke Database Lokal yang benar
-                localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
-                
-                // Segarkan Layar Histori Transaksi secara paksa (agar lencana NO PRINT langsung menghilang di depan mata kasir)
-                if (document.getElementById('view-report') && !document.getElementById('view-report').classList.contains('hidden')) {
-                    if (typeof this.renderReport === 'function') this.renderReport();
-                }
-            }
-        } catch (e) {
-            console.log("Gagal mengirim laporan status cetak ke server", e);
+    // Status 'Terkirim' means Bluetooth accepted all bytes, NOT proof of paper output.
+    // Persist the event before trying the network; checkout is always queued first when offline.
+    laporStrukDicetak: async function(idTrx, isReprint = false) {
+        const trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(idTrx));
+        if (!idTrx || !trx) return;
+        trx.Status_Cetak = 'Terkirim';
+        trx._cetak_sync_pending = true;
+        try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); } catch (e) { console.warn('Cache status cetak penuh:', e); }
+        const event = {
+            action: 'update_status_cetak', id_transaksi: idTrx,
+            status_cetak: 'Terkirim', jenis_cetak: isReprint ? 'Cetak Ulang' : 'Cetak Awal',
+            waktu_cetak: new Date().toISOString(),
+            _req_id: 'PRINT-' + idTrx + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+        };
+        await this.enqueueOfflinePayload(event, 'print-status-ack-pending');
+        if (this.isOnline) this.syncOfflineQueue();
+        if (document.getElementById('view-report') && !document.getElementById('view-report').classList.contains('hidden')) {
+            if (typeof this.renderReport === 'function') this.renderReport();
         }
     },
 
+    laporStrukGagal: async function(idTrx) {
+        const trx = (this.db.transactions || []).find(t => String(t.ID_TRX) === String(idTrx));
+        if (!trx || this.receiptAuditState(trx) === 'sent') return;
+        trx.Status_Cetak = 'Gagal';
+        trx._cetak_sync_pending = true;
+        try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); } catch (_) {}
+        await this.enqueueOfflinePayload({action:'update_status_cetak', id_transaksi:idTrx, status_cetak:'Gagal',
+            jenis_cetak:'Cetak Awal', waktu_cetak:new Date().toISOString(),
+            _req_id:'PRINT-FAIL-'+idTrx+'-'+Date.now()}, 'print-failed');
+        if (this.isOnline) this.syncOfflineQueue();
+    },
+
+    // Historical 'Belum' is ambiguous in older releases, not proof of cashier fault.
+    receiptAuditState: function(t) {
+        const status = String(t.Status_Cetak || 'Belum').trim();
+        if (status === 'Sudah' || status === 'Terkirim') return 'sent';
+        if (status === 'Tidak Dicetak' || status === 'Gagal') return 'not_printed';
+        return 'unverified';
+    },
 
     toggleMobileCart: function() {
         const aside = document.getElementById('cart-aside');
@@ -14527,8 +14553,8 @@ openAIDeepDive: function(type, param) {
                 }
             }
 
-            if (isReprint && id && status === 'Sukses' && receiptMode === 'customer') {
-                this.laporStrukDicetak(id);
+            if (id && status === 'Sukses' && receiptMode === 'customer') {
+                await this.laporStrukDicetak(id, isReprint);
             }
 
         } catch(e) { 
@@ -14548,4 +14574,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
