@@ -546,3 +546,19 @@ td, th { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .aicha-report-form input,.aicha-report-form select,.aicha-report-form textarea { transition:none; }
 }
+
+
+/* PWA install prompt — isolated from POS application layout */
+#aisnack-pwa-overlay{position:fixed;inset:0;z-index:100200;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.68);backdrop-filter:blur(8px)}
+#aisnack-pwa-card{width:min(100%,440px);background:#fff;color:#0f172a;border:1px solid rgba(148,163,184,.35);border-radius:24px;box-shadow:0 24px 80px rgba(0,0,0,.28);overflow:hidden;font-family:inherit}
+#aisnack-pwa-card .pwa-head{background:linear-gradient(135deg,#E5202B,#b91c1c);color:#fff;padding:22px;display:flex;align-items:center;gap:14px}
+#aisnack-pwa-card .pwa-logo{width:54px;height:54px;object-fit:contain;border-radius:14px;background:#fff;padding:3px;flex-shrink:0}
+#aisnack-pwa-card .pwa-body{padding:20px}
+#aisnack-pwa-card .pwa-btn{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:pointer;min-height:46px}
+#aisnack-pwa-card .pwa-primary{background:#E5202B;color:#fff;width:100%}
+#aisnack-pwa-card .pwa-secondary{background:#f1f5f9;color:#334155;width:100%;margin-top:9px}
+#aisnack-pwa-card .pwa-status{font-size:12px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;padding:10px 12px;border-radius:10px;margin-top:12px;line-height:1.5}
+#aisnack-pwa-card .pwa-close{background:transparent;border:0;color:inherit;font-size:25px;line-height:1;cursor:pointer;margin-left:auto}
+#aisnack-pwa-card .pwa-instructions{font-size:13px;line-height:1.55;margin-top:12px;color:#334155}
+@media(prefers-color-scheme:dark){#aisnack-pwa-card{background:#111827;color:#f8fafc;border-color:#334155}#aisnack-pwa-card .pwa-status{background:#1e293b;color:#cbd5e1;border-color:#334155}#aisnack-pwa-card .pwa-secondary{background:#334155;color:#f8fafc}#aisnack-pwa-card .pwa-instructions{color:#cbd5e1}}
+
