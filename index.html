@@ -58,7 +58,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#E5202B">
   <meta name="color-scheme" content="light dark">
-  <meta name="application-version" content="2026.10.11-gudang-master-responsive-v3.5">
+  <meta name="application-version" content="2026.10.22-backdated-transaction-ui-v3.9.1">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -366,6 +366,11 @@
         <div class="h-[2px] bg-slate-100 dark:bg-slate-800 flex-1 rounded-full"></div>
     </div>
     
+    <button onclick="superApp.openBackdatedTransactionModal()" id="nav-transaksi-susulan" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
+        <div class="w-8 flex justify-center"><i class="fas fa-calendar-plus group-hover:scale-110 transition-transform duration-300 text-lg text-amber-500"></i></div>
+        <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Transaksi Susulan</span>
+    </button>
+
     <button onclick="superApp.switchMenu('audit')" id="nav-audit" class="nav-btn w-full flex items-center px-4 py-3.5 rounded-[1.25rem] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-300 transition-all duration-300 group border border-transparent">
         <div class="w-8 flex justify-center"><i class="fas fa-user-check group-hover:scale-110 transition-transform duration-300 text-lg text-rose-500"></i></div>
         <span class="font-black text-sm ml-3 group-hover:translate-x-1 transition-transform duration-300">Audit & Persetujuan</span>
@@ -3526,8 +3531,8 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=20261013.2"></script>
-<script src="offline-hardening.js?v=20261011.3"></script>
+  <script src="app.js?v=20261022.4"></script>
+<script src="offline-hardening.js?v=20261022.2"></script>
 
   <!-- 2. BARU JALANKAN SCRIPT INLINE ANDA -->
   <script>
