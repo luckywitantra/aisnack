@@ -1,7 +1,7 @@
 /* Ai-Snack ERP & POS service worker — safe, scoped cache lifecycle */
 'use strict';
 const CACHE_PREFIX = 'aisnack-erp-pos-';
-const CACHE_NAME = CACHE_PREFIX + '2026.10.13.2';
+const CACHE_NAME = CACHE_PREFIX + '2026.10.22.4';
 const APP_SHELL = ['./', './index.html', './app.js', './offline-hardening.js', './style.css', './manifest.json', './icon-192.svg', './icon-512.svg'];
 const CDN_SHELL = [
   'https://cdn.tailwindcss.com',
@@ -21,7 +21,7 @@ self.addEventListener('install', event => { event.waitUntil(precache()); });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-self.addEventListener('message', event => { if (event.data && event.data.action === 'skipWaiting') self.skipWaiting(); });
+self.addEventListener('message', event => { if (event.data && (event.data.action === 'skipWaiting' || event.data.action === 'safeActivate')) self.skipWaiting(); });
 self.addEventListener('fetch', event => {
   const req = event.request; const url = new URL(req.url);
   if (req.method !== 'GET') return;
