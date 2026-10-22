@@ -1,8 +1,8 @@
 /* Ai-Snack ERP & POS service worker — safe, scoped cache lifecycle */
 'use strict';
 const CACHE_PREFIX = 'aisnack-erp-pos-';
-const CACHE_NAME = CACHE_PREFIX + '2026.10.22.4';
-const APP_SHELL = ['./', './index.html', './app.js', './offline-hardening.js', './style.css', './manifest.json', './icon-192.svg', './icon-512.svg'];
+const CACHE_NAME = CACHE_PREFIX + '2026.10.23.1';
+const APP_SHELL = ['./', './index.html', './app.js', './offline-hardening.js', './style.css', './manifest.json', './icon-192.svg', './icon-512.svg', './icon-192.png', './icon-512.png', './pwa-install.js'];
 const CDN_SHELL = [
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/chart.js',
@@ -31,7 +31,7 @@ self.addEventListener('fetch', event => {
   }
   event.respondWith(fetch(req).then(response => {
     if (response && (response.ok || response.type === 'opaque')) {
-      const sameOriginAsset = url.origin === self.location.origin && (req.mode === 'navigate' || /\.(?:html|js|css|json|svg)$/.test(url.pathname));
+      const sameOriginAsset = url.origin === self.location.origin && (req.mode === 'navigate' || /\.(?:html|js|css|json|svg|png)$/.test(url.pathname));
       const isKnownCdn = CDN_SHELL.some(x => new URL(x).origin === url.origin && new URL(x).pathname === url.pathname);
       if (sameOriginAsset || isKnownCdn) { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(req, copy)); }
     }
