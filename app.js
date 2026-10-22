@@ -348,50 +348,80 @@ const superApp = {
     // =========================================================================
     // 🚀 RADAR SILUMAN: CEK UPDATE OTOMATIS SAAT APLIKASI DIBUKA
     // =========================================================================
-   // =========================================================================
-    // 🚀 RADAR UPDATE SILUMAN (VERSI OPTIMASI TANPA FETCH GANDA)
+    // SAFE AUTO UPDATE MANAGER — download automatically, activate only when safe
     // =========================================================================
+    _pendingUpdateWorker: null,
+    _autoUpdateTimer: null,
+    _updateReloading: false,
+    _updateNoticeShown: false,
+
     checkVersionFromData: async function(pengaturanData) {
         try {
-            if (!pengaturanData || !Array.isArray(pengaturanData)) return;
-            
-            let serverVersion = pengaturanData.find(x => x.Pengaturan === 'Versi_Aplikasi');
-            if (serverVersion) {
-                let localVersion = localStorage.getItem('app_version');
-                
-                if (!localVersion) {
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                } 
-                else if (localVersion !== serverVersion.Nilai) {
-                    console.log(`🚀 Versi baru terdeteksi! (Lokal: ${localVersion} -> Server: ${serverVersion.Nilai})`);
-                    
-                    // 1. Kunci versi baru di memori
-                    localStorage.setItem('app_version', serverVersion.Nilai);
-                    
-                    // 2. Notifikasi Playful
-                    if (typeof this.showToast === 'function') {
-                        this.showToast("✨ Yeay! Versi baru tersedia. Memuat ulang...", "success");
-                    }
-                    
-                    // Jangan menghapus cache milik aplikasi/origin lain dan jangan reload saat antrean belum aman.
-                    const pending = this.getPendingQueueCount();
-                    if (pending > 0) {
-                        if (typeof this.showToast === 'function') this.showToast(`Pembaruan ditunda: ${pending} transaksi/data masih menunggu sinkronisasi.`, 'warning');
-                    } else if ('serviceWorker' in navigator) {
-                        const regs = await navigator.serviceWorker.getRegistrations();
-                        for (const reg of regs) {
-                            const swUrl = (reg.active && reg.active.scriptURL) || (reg.waiting && reg.waiting.scriptURL) || '';
-                            if (swUrl && new URL(swUrl).origin === location.origin && /(^|\/)sw\.js(?:$|[?#])/.test(swUrl)) reg.update().catch(() => {});
-                        }
-                        if (typeof this.showToast === 'function') this.showToast('Versi baru terdeteksi. Gunakan tombol pembaruan setelah antrean tersinkron.', 'success');
-                    }
-                } else {
-                    console.log("✅ Aplikasi sudah menggunakan versi paling mutakhir.");
-                }
+            if (!Array.isArray(pengaturanData)) return;
+            const entry = pengaturanData.find(x => x.Pengaturan === 'Versi_Aplikasi');
+            if (!entry || !entry.Nilai) return;
+            const serverVersion = String(entry.Nilai).trim();
+            const localVersion = localStorage.getItem('app_version');
+            if (!localVersion) {
+                localStorage.setItem('app_version', serverVersion);
+                return;
             }
-        } catch (e) {
-            console.warn("📡 Gagal mengecek versi dari data:", e.message);
+            if (localVersion !== serverVersion) {
+                console.info(`Versi backend baru terdeteksi (${localVersion} → ${serverVersion}); menunggu worker dan kondisi aman.`);
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of regs) {
+                        const swUrl = (reg.active && reg.active.scriptURL) || (reg.waiting && reg.waiting.scriptURL) || '';
+                        if (swUrl && new URL(swUrl).origin === location.origin && /(^|\/)sw\.js(?:$|[?#])/.test(swUrl)) reg.update().catch(() => {});
+                    }
+                }
+                this._pendingServerVersion = serverVersion;
+                this.scheduleSafeAutoUpdateCheck();
+            }
+        } catch (e) { console.warn('Gagal memeriksa versi aplikasi:', e.message); }
+    },
+
+    hasUnsavedCriticalWork: function() {
+        if (this.isProcessing) return true;
+        if (Array.isArray(this.cart) && this.cart.length > 0) return true;
+        if (this.getPendingQueueCount() > 0) return true;
+        // Guard against forms whose values differ from their initial values.
+        const selectors = '#lapharian-sec-input input, #lapharian-sec-input select, #lapharian-sec-input textarea, #modal-transaksi-susulan input, #modal-transaksi-susulan select, #modal-transaksi-susulan textarea';
+        for (const el of document.querySelectorAll(selectors)) {
+            if (el.disabled || el.type === 'button' || el.type === 'submit' || el.type === 'hidden') continue;
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                if (el.checked !== el.defaultChecked) return true;
+            } else if (el.tagName === 'SELECT') {
+                if ([...el.options].some(o => o.selected !== o.defaultSelected)) return true;
+            } else if (el.value !== el.defaultValue) return true;
         }
+        return false;
+    },
+
+    scheduleSafeAutoUpdateCheck: function() {
+        if (this._autoUpdateTimer) clearTimeout(this._autoUpdateTimer);
+        this._autoUpdateTimer = setTimeout(() => this.tryApplyPendingUpdate(), 2500);
+    },
+
+    tryApplyPendingUpdate: function() {
+        if (!this._pendingUpdateWorker || this._updateReloading) return;
+        if (this.hasUnsavedCriticalWork()) {
+            const pending = this.getPendingQueueCount();
+            if (!this._updateNoticeShown && typeof this.showToast === 'function') {
+                this.showToast(pending > 0 ? `Pembaruan otomatis menunggu ${pending} data tersinkron.` : 'Pembaruan tersedia dan akan diterapkan otomatis setelah pekerjaan penting selesai.', 'warning');
+                this._updateNoticeShown = true;
+            }
+            this._autoUpdateTimer = setTimeout(() => this.tryApplyPendingUpdate(), 10000);
+            return;
+        }
+        if (!navigator.onLine) {
+            this._autoUpdateTimer = setTimeout(() => this.tryApplyPendingUpdate(), 15000);
+            return;
+        }
+        this._updateReloading = true;
+        if (typeof this.showToast === 'function') this.showToast('Pembaruan siap. Aplikasi akan diperbarui otomatis karena kondisi sudah aman.', 'success');
+        try { this._pendingUpdateWorker.postMessage({ action: 'safeActivate' }); }
+        catch (e) { this._updateReloading = false; console.warn('Aktivasi update ditunda:', e); }
     },
 
     // =========================================================================
@@ -399,43 +429,57 @@ const superApp = {
     // =========================================================================
     init: async function() {
         
-        // --- 🚀 SERVICE WORKER REGISTRATION ---
+        // --- SAFE AUTO UPDATE REGISTRATION ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(registration => {
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                const inspectWorker = worker => {
+                    if (!worker) return;
+                    worker.addEventListener('statechange', () => {
+                        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                            this._pendingUpdateWorker = worker;
                             const banner = document.getElementById('update-banner');
                             if (banner) {
-                                banner.classList.remove('hidden');
-                                setTimeout(() => {
-                                    banner.classList.remove('translate-y-20', 'opacity-0');
-                                }, 100);
+                                banner.classList.remove('hidden', 'translate-y-20', 'opacity-0');
+                                const p = banner.querySelector('p');
+                                if (p) p.textContent = 'Pembaruan sudah diunduh. Aplikasi akan memasangnya otomatis setelah transaksi dan data aman.';
                             }
-                            
                             const btn = document.getElementById('btn-update-app');
                             if (btn) {
+                                btn.innerHTML = '<span>Update sekarang</span> <i class="fas fa-rotate text-[10px]"></i>';
                                 btn.onclick = () => {
-                                    const pending = this.getPendingQueueCount();
-                                    if (pending > 0) { this.showToast(`Sinkronkan ${pending} data tertunda sebelum memperbarui aplikasi.`, 'warning'); return; }
-                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                                    newWorker.postMessage({ action: 'skipWaiting' });
+                                    if (this.hasUnsavedCriticalWork()) {
+                                        this.showToast('Update ditunda agar transaksi, formulir, dan antrean tidak terganggu.', 'warning');
+                                        this.scheduleSafeAutoUpdateCheck();
+                                        return;
+                                    }
+                                    this.tryApplyPendingUpdate();
                                 };
                             }
+                            this.scheduleSafeAutoUpdateCheck();
                         }
                     });
-                });
-            }).catch(err => console.log('SW Reg Error:', err));
+                };
+                if (registration.waiting && navigator.serviceWorker.controller) {
+                    this._pendingUpdateWorker = registration.waiting;
+                    this.scheduleSafeAutoUpdateCheck();
+                }
+                inspectWorker(registration.installing);
+                registration.addEventListener('updatefound', () => inspectWorker(registration.installing));
+                registration.update().catch(() => {});
+            }).catch(err => console.warn('Registrasi service worker gagal:', err));
 
-            let refreshing;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                if (this.getPendingQueueCount() > 0) { this.showToast('Pembaruan siap. Antrean offline tetap disimpan; muat ulang setelah sinkronisasi.', 'warning'); return; }
-                refreshing = true;
-                window.location.reload();
+                if (this._updateReloading) {
+                    const version = this._pendingServerVersion || localStorage.getItem('app_version');
+                    if (version) localStorage.setItem('app_version', version);
+                    window.location.reload();
+                }
             });
         }
+        // Check again whenever work may have completed or the device comes back online.
+        window.addEventListener('online', () => this.scheduleSafeAutoUpdateCheck());
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) this.scheduleSafeAutoUpdateCheck(); });
+        document.addEventListener('focusout', () => this.scheduleSafeAutoUpdateCheck(), true);
         // ----------------------------------------------
 
         if (new URLSearchParams(window.location.search).get('mode') === 'cfd') { this.initCFD(); return; }
@@ -1175,6 +1219,134 @@ pullFreshData: async function(silent = false) {
         if (loader && lText) { lText.innerText = text; if (show) { loader.classList.remove('hidden'); loader.classList.add('flex'); } else { loader.classList.add('hidden'); loader.classList.remove('flex'); } }
     },
     // FUNGSI UNTUK MEMBUKA MODAL APAPUN
+    openBackdatedTransactionModal: function() {
+        const role = String(this.currentUser && this.currentUser.Role || '').toLowerCase();
+        if (!role.includes('admin') && !role.includes('owner')) return this.showToast('Fitur ini hanya untuk Admin/Owner.', 'error');
+        const products = (this.db && this.db.masterProduk || []).filter(p => {
+            const c = String(p.Kategori || '').toLowerCase();
+            return p.SKU && c !== 'bahan' && c !== 'pendukung' && !c.includes('bahan') && !c.includes('pendukung');
+        });
+        const outlets = [...new Set([...(this.db && this.db.outlets || []).map(o => String(o.ID_Outlet || o.Nama_Outlet || '').trim()), ...(this.db && this.db.hargaStokOutlet || []).map(o => String(o.ID_Outlet || '').trim())].filter(Boolean))];
+        const cashiers = (this.db && this.db.users || []).filter(u => !/admin|owner/i.test(String(u.Role || '')));
+        const safe = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const outletOptions = outlets.map(o => `<option value="${safe(o)}" ${String(o).toLowerCase()===String(this.outlet||'').toLowerCase()?'selected':''}>${safe(o)}</option>`).join('');
+        const cashierOptions = cashiers.map(u => `<option value="${safe(u.Username)}" data-role="${safe(u.Role||'Kasir')}">${safe(u.Username)} — ${safe(u.Role||'Kasir')}</option>`).join('');
+        const productOptions = products.map(p => `<option value="${safe(p.SKU)}" data-name="${safe(p.Nama_Produk)}" data-bahan="${safe(p.SKU_Bahan||p.SKU)}">${safe(p.Nama_Produk)} (${safe(p.SKU)})</option>`).join('');
+        const body = document.getElementById('modal-form-body');
+        const title = document.getElementById('modal-form-title');
+        const btn = document.getElementById('modal-form-btn');
+        const modalContent = document.getElementById('modal-form-content');
+        if (!body || !btn) return;
+        if (modalContent) { modalContent.classList.remove('max-w-md','p-6','lg:p-8','rounded-[2.5rem]'); modalContent.classList.add('susulan-modal-content'); }
+        if (title) title.textContent = 'Input Transaksi Susulan Admin';
+        const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        body.innerHTML = `
+          <div class="susulan-shell">
+            <div class="susulan-hero">
+              <div class="susulan-hero-icon"><i class="fas fa-calendar-check"></i></div>
+              <div class="susulan-hero-copy"><div class="susulan-eyebrow">ADMIN WORKSPACE · AUDIT READY</div><h4>Transaksi Susulan</h4><p>Catat transaksi yang terjadi sebelumnya dengan kontrol stok dan jejak audit yang jelas.</p></div>
+              <div class="susulan-status-pill"><i class="fas fa-shield-alt"></i><span>Mode Admin</span></div>
+            </div>
+            <div class="susulan-alert"><i class="fas fa-info-circle"></i><div><b>Periksa sebelum menyimpan</b><span>Tanggal transaksi dan tanggal input dicatat terpisah. Pastikan transaksi belum tercatat agar omzet dan stok tidak dihitung ganda.</span></div></div>
+            <div class="susulan-layout">
+              <section class="susulan-panel susulan-details-panel">
+                <div class="susulan-section-head"><span class="susulan-section-icon"><i class="fas fa-calendar-alt"></i></span><div><h5>Informasi transaksi</h5><p>Waktu, outlet, kasir, dan pembayaran</p></div></div>
+                <div class="susulan-fields-grid">
+                  <label class="susulan-field"><span>Tanggal transaksi <em>*</em></span><input id="susulan-date" type="date" max="${localDate}" value="${localDate}" required></label>
+                  <label class="susulan-field"><span>Waktu transaksi <em>*</em></span><input id="susulan-time" type="time" value="12:00" required></label>
+                  <label class="susulan-field"><span>Outlet <em>*</em></span><select id="susulan-outlet" required>${outletOptions}</select></label>
+                  <label class="susulan-field"><span>Kasir yang bertugas <em>*</em></span><select id="susulan-cashier" required>${cashierOptions}</select></label>
+                  <label class="susulan-field"><span>Metode pembayaran</span><select id="susulan-payment"><option>Tunai</option><option>QRIS</option><option>Transfer</option><option>Kartu</option><option>Lainnya</option></select></label>
+                  <label class="susulan-field"><span>Nominal dibayar (tunai)</span><input id="susulan-paid" type="number" min="0" value="0" inputmode="numeric"></label>
+                </div>
+                <div class="susulan-subnote"><i class="fas fa-history"></i><span>Gunakan waktu transaksi sebenarnya, bukan waktu saat data dimasukkan.</span></div>
+              </section>
+              <section class="susulan-panel susulan-items-panel">
+                <div class="susulan-section-head"><span class="susulan-section-icon"><i class="fas fa-shopping-basket"></i></span><div><h5>Rincian produk</h5><p>Tambahkan barang, jumlah, dan harga pada transaksi</p></div><button id="susulan-add-item" type="button" class="susulan-add-btn"><i class="fas fa-plus"></i><span>Tambah barang</span></button></div>
+                <div id="susulan-items" class="susulan-items-list"></div>
+                <div class="susulan-total-card"><div><span>Nilai transaksi</span><small>Jumlah seluruh item</small></div><strong id="susulan-total">Rp0</strong></div>
+                <div class="susulan-stock-block"><div class="susulan-block-title"><i class="fas fa-boxes-stacked"></i> Perlakuan stok</div>
+                  <label class="susulan-choice"><input type="radio" name="susulan-stock-mode" value="kurangi" checked><span class="susulan-choice-mark"></span><span class="susulan-choice-copy"><b>Kurangi stok sekarang</b><small>Gunakan jika transaksi belum tercermin pada saldo stok sistem.</small></span></label>
+                  <label class="susulan-choice"><input type="radio" name="susulan-stock-mode" value="sudah_tercermin"><span class="susulan-choice-mark"></span><span class="susulan-choice-copy"><b>Stok sudah tercermin</b><small>Jangan kurangi lagi hanya jika stok ini sudah diperhitungkan pada saldo sekarang.</small></span></label>
+                </div>
+              </section>
+              <section class="susulan-panel susulan-audit-panel">
+                <div class="susulan-section-head"><span class="susulan-section-icon"><i class="fas fa-clipboard-check"></i></span><div><h5>Alasan dan otorisasi</h5><p>Informasi wajib untuk jejak audit</p></div></div>
+                <label class="susulan-field"><span>Alasan input susulan <em>*</em></span><textarea id="susulan-reason" rows="3" placeholder="Contoh: transaksi tanggal 20 Oktober belum tersimpan karena gangguan jaringan; bukti pembayaran telah diverifikasi." required></textarea><small>Minimal 10 karakter. Untuk stok yang sudah tercermin, alasan minimal 20 karakter.</small></label>
+                <div class="susulan-fields-grid susulan-auth-grid"><label class="susulan-field"><span>Username Admin/Owner <em>*</em></span><input id="susulan-admin-user" value="${safe(this.currentUser && this.currentUser.Username || '')}" autocomplete="username" required></label><label class="susulan-field"><span>Konfirmasi PIN (4 digit) <em>*</em></span><input id="susulan-admin-pin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="new-password" placeholder="••••" required></label></div>
+                <div id="susulan-error" class="susulan-error hidden" role="alert"></div>
+              </section>
+            </div>
+            <div class="susulan-footer-note"><i class="fas fa-lock"></i><span>Data akan divalidasi oleh server dan dicatat pada log audit. Jangan masukkan transaksi yang sudah tercatat.</span></div>
+          </div>`;
+        const itemWrap = document.getElementById('susulan-items');
+        const addRow = () => {
+            const row = document.createElement('div'); row.className='susulan-item';
+            row.innerHTML = `<label class="susulan-product-wrap"><span>Produk</span><select class="susulan-product" required><option value="">Pilih produk…</option>${productOptions}</select></label><label class="susulan-qty-wrap"><span>Qty</span><input class="susulan-qty" type="number" min="1" step="1" value="1" inputmode="numeric" aria-label="Kuantitas"></label><label class="susulan-price-wrap"><span>Harga / unit (Rp)</span><input class="susulan-price" type="number" min="0" step="1" value="0" inputmode="numeric" aria-label="Harga per unit"></label><button type="button" class="susulan-remove" aria-label="Hapus barang" title="Hapus barang"><i class="fas fa-trash-alt"></i><span>Hapus</span></button>`;
+            itemWrap.appendChild(row);
+            const productSelect=row.querySelector('.susulan-product'), priceInput=row.querySelector('.susulan-price');
+            productSelect.addEventListener('change',()=>{
+                const selected=productSelect.selectedOptions[0]; const sku=productSelect.value; const outlet=document.getElementById('susulan-outlet').value;
+                const priceRow=(this.db.hargaStokOutlet||[]).find(x=>String(x.SKU)===sku && String(x.ID_Outlet).replace(/^Ai-Snack\s+/i,'').trim().toLowerCase()===String(outlet).replace(/^Ai-Snack\s+/i,'').trim().toLowerCase());
+                const price=priceRow?Number(priceRow.Harga_Jual||0):0; priceInput.value=String(price); this._recalcBackdatedTotal();
+            });
+            row.querySelector('.susulan-qty').addEventListener('input',()=>this._recalcBackdatedTotal());
+            priceInput.addEventListener('input',()=>this._recalcBackdatedTotal());
+            row.querySelector('.susulan-remove').addEventListener('click',()=>{row.remove();this._recalcBackdatedTotal();});
+        };
+        this._backdatedProductOptions = productOptions;
+        this._recalcBackdatedTotal = function(){
+            let total=0; itemWrap.querySelectorAll('.susulan-item').forEach(r=>{total+=Math.max(0,Number(r.querySelector('.susulan-qty').value)||0)*Math.max(0,Number(r.querySelector('.susulan-price').value)||0);});
+            const el=document.getElementById('susulan-total'); if(el) el.textContent='Rp'+Math.round(total).toLocaleString('id-ID');
+            const pay=document.getElementById('susulan-payment'), paid=document.getElementById('susulan-paid'); if(pay && paid && pay.value!=='Tunai') paid.value=String(Math.round(total));
+            return Math.round(total);
+        };
+        document.getElementById('susulan-add-item').addEventListener('click',addRow);
+        document.getElementById('susulan-outlet').addEventListener('change',()=>{itemWrap.querySelectorAll('.susulan-product').forEach(sel=>sel.dispatchEvent(new Event('change')));});
+        document.getElementById('susulan-payment').addEventListener('change',()=>this._recalcBackdatedTotal());
+        addRow();
+        btn.textContent='Validasi & Simpan Transaksi Susulan';
+        btn.onclick=()=>this.submitBackdatedTransaction(false);
+        this.openModal('modal-form');
+    },
+
+    submitBackdatedTransaction: async function(overridePossibleDuplicate) {
+        const el=id=>document.getElementById(id);
+        const date=el('susulan-date')?.value, time=el('susulan-time')?.value, outlet=el('susulan-outlet')?.value, cashier=el('susulan-cashier')?.value;
+        const payment=el('susulan-payment')?.value, reason=String(el('susulan-reason')?.value||'').trim(), admin=String(el('susulan-admin-user')?.value||'').trim(), pin=String(el('susulan-admin-pin')?.value||'').trim();
+        const errorBox=el('susulan-error'); if(errorBox){errorBox.classList.add('hidden');errorBox.textContent='';}
+        const showError=msg=>{if(errorBox){errorBox.textContent=msg;errorBox.classList.remove('hidden');}else this.showToast(msg,'error');};
+        if(!date||!time||!outlet||!cashier||reason.length<10||!/^\d{4}$/.test(pin)) return showError('Lengkapi tanggal, waktu, outlet, kasir, alasan minimal 10 karakter, dan PIN Admin 4 digit.');
+        const items=[]; let invalid=false;
+        document.querySelectorAll('#susulan-items .susulan-item').forEach(row=>{
+            const sel=row.querySelector('.susulan-product'), opt=sel?.selectedOptions[0], qty=Number(row.querySelector('.susulan-qty')?.value), price=Number(row.querySelector('.susulan-price')?.value);
+            if(!sel?.value||!opt||!Number.isInteger(qty)||qty<=0||!Number.isFinite(price)||price<0){invalid=true;return;}
+            items.push({sku:sel.value,sku_bahan:opt.dataset.bahan||sel.value,nama:opt.dataset.name||opt.textContent,qty,price});
+        });
+        if(invalid||!items.length) return showError('Pilih produk dan pastikan kuantitas serta harga setiap item valid.');
+        const total=items.reduce((sum,x)=>sum+x.qty*x.price,0); const paid=payment==='Tunai'?Number(el('susulan-paid')?.value||0):total;
+        if(!Number.isFinite(total)||total<=0||!Number.isFinite(paid)||paid<total) return showError('Total harus lebih dari nol dan nominal dibayar tidak boleh kurang dari total.');
+        const stockMode=document.querySelector('input[name="susulan-stock-mode"]:checked')?.value||'kurangi';
+        if(stockMode==='sudah_tercermin'&&reason.length<20) return showError('Jika stok sudah tercermin, alasan wajib minimal 20 karakter dan menjelaskan alasannya.');
+        const role=String((this.db.users||[]).find(u=>String(u.Username).toLowerCase()===admin.toLowerCase())?.Role||'Kasir');
+        const payload={action:'input_transaksi_susulan',_req_id:'BACKDATED-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),admin_username:admin,admin_pin:pin,tanggal_transaksi:date,waktu_transaksi:time,outlet,kasir:cashier,role_kasir:role,metode_bayar:payment,dibayar:paid,total_konfirmasi:Math.round(total),items,alasan:reason,mode_stok:stockMode,override_possible_duplicate:!!overridePossibleDuplicate};
+        const btn=el('modal-form-btn'); if(btn){btn.disabled=true;btn.textContent='Memvalidasi dan menyimpan…';}
+        try {
+            const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+            const data=await res.json();
+            if(data.status==='perlu_konfirmasi_duplikat'&&!overridePossibleDuplicate){
+                const lines=(data.duplikat||[]).map(d=>`${d.id} (baris ${d.row})`).join('\n');
+                if(confirm(`${data.pesan}\n\n${lines}\n\nApakah Anda sudah memastikan transaksi ini memang berbeda dan tetap ingin melanjutkan?`)) return await this.submitBackdatedTransaction(true);
+                return;
+            }
+            if(data.status!=='sukses') throw new Error(data.pesan||'Server menolak transaksi susulan.');
+            this.showToast(`Transaksi susulan tersimpan: ${data.trx_id}`,'success');
+            this.closeModal('modal-form');
+            try { const fresh=await fetch(API_URL+'?ts='+Date.now()+'&history=31',{redirect:'follow',cache:'no-store'}); const db=await fresh.json(); if(db&&db.status==='sukses'){this.db={...this.db,...db};try{localStorage.setItem('aisnack_db_cache',JSON.stringify(this.db));}catch(_){} this.refreshData();} } catch(refreshErr){console.warn('Transaksi tersimpan; refresh data perlu diulang.',refreshErr);}
+        } catch(err) { showError(String(err.message||err)); }
+        finally { if(btn && document.getElementById('modal-form')&&!document.getElementById('modal-form').classList.contains('hidden')){btn.disabled=false;btn.textContent='Validasi & Simpan Transaksi Susulan';} }
+    },
+
     openModal: function(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
@@ -1217,7 +1389,13 @@ pullFreshData: async function(silent = false) {
                 // Jalur B: Jaga-jaga jika ID -content lupa dibuat di HTML, langsung tutup paksa!
                 modal.classList.add('hidden'); 
             }
-        } 
+        }
+        if (id === 'modal-form') {
+            const formContent = document.getElementById('modal-form-content');
+            if (formContent) { formContent.classList.remove('max-w-3xl'); formContent.classList.add('max-w-md'); }
+            const pinField = document.getElementById('susulan-admin-pin');
+            if (pinField) pinField.value = '';
+        }
     },
 
     // 🚀 FUNGSI BARU: Menampilkan Popup Peringatan Fungsi Menu
@@ -2602,6 +2780,7 @@ pullFreshData: async function(silent = false) {
 
         let daftarPengeluaran = [...new Set((this.db.masterPengeluaran || []).map(x => (x.Nama || x.NAMA_PENGELUARAN || '').toUpperCase()).filter(Boolean))];
 
+        cont.classList.add('aicha-expense-list');
         cont.innerHTML = this.dailyExpensesList.map(item => `
             <div class="flex items-center gap-2">
                 <input type="text" list="exp-datalist" value="${item.nama}" 
@@ -2776,9 +2955,47 @@ pullFreshData: async function(silent = false) {
         // buat request update/Pending Edit baru dan jangan minta otorisasi Owner.
         const currentSignature = this.dailyReportDataSignature({ cash, qris, bill, pcs, expenses: expValid });
         const baseline = this.dailyEditBaseline;
-        if (this.editReportId && baseline && String(baseline.id) === String(idRep) && baseline.signature === currentSignature) {
-            const original = (this.db.laporanHarian || []).find(x => String(x.ID_Laporan) === String(idRep));
-            const isPendingDraft = !!(original && original.Status_Approval === 'Pending Edit' && original.Revisi_JSON);
+        const original = this.editReportId
+            ? (this.db.laporanHarian || []).find(x => String(x.ID_Laporan) === String(idRep))
+            : null;
+        // No-op guard uses both the form snapshot and the authoritative values loaded
+        // from the report. This covers stale/missing baseline state and expense JSON
+        // that was normalized differently by older app versions.
+        let storedSignature = null;
+        if (original) {
+            let compareCash = original.Cash;
+            let compareQris = original.QRIS;
+            let compareBill = original.Bill;
+            let comparePcs = original.Pcs;
+            let compareExpensesJson = original.Pengeluaran_JSON;
+            if (String(original.Status_Approval || '').trim().toLowerCase() === 'pending edit' && original.Revisi_JSON) {
+                try {
+                    const revObj = typeof original.Revisi_JSON === 'string' ? JSON.parse(original.Revisi_JSON || '{}') : original.Revisi_JSON;
+                    if (revObj && revObj.net_sales !== undefined) {
+                        compareCash = revObj.cash;
+                        compareQris = revObj.qris;
+                        compareBill = revObj.bill;
+                        comparePcs = revObj.pcs;
+                        compareExpensesJson = revObj.pengeluaran_json;
+                    }
+                } catch (e) { /* fallback to approved values */ }
+            }
+            let compareExpenses = [];
+            try {
+                compareExpenses = typeof compareExpensesJson === 'string'
+                    ? JSON.parse(compareExpensesJson || '[]')
+                    : (compareExpensesJson || []);
+                if (!Array.isArray(compareExpenses)) compareExpenses = [];
+            } catch (e) { compareExpenses = []; }
+            storedSignature = this.dailyReportDataSignature({
+                cash: compareCash, qris: compareQris, bill: compareBill,
+                pcs: comparePcs, expenses: compareExpenses
+            });
+        }
+        const baselineMatches = !!(baseline && String(baseline.id) === String(idRep) && baseline.signature === currentSignature);
+        const storedMatches = !!(storedSignature && storedSignature === currentSignature);
+        if (this.editReportId && (baselineMatches || storedMatches)) {
+            const isPendingDraft = !!(original && String(original.Status_Approval || '').trim().toLowerCase() === 'pending edit' && original.Revisi_JSON);
             const waText = this.buildDailyReportWaText({
                 cash, qris, bill, pcs, expenses: expValid,
                 outlet: cleanCurrOutlet, tanggal: tglTeks,
@@ -3581,9 +3798,36 @@ pullFreshData: async function(silent = false) {
     },
 
     // =========================================================
+    // MOBILE-FIRST UX: laporan Ai-CHA, touch target dan aksi sticky
+    // =========================================================
+    enhanceDailyReportResponsiveUI: function() {
+        const section = document.getElementById('lapharian-sec-input');
+        if (!section || section.dataset.aichaResponsiveEnhanced === '1') return;
+        section.dataset.aichaResponsiveEnhanced = '1';
+        section.classList.add('aicha-report-form');
+        const fields = ['daily-cash','daily-qris','daily-bill','daily-pcs'];
+        fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('aicha-report-input');
+                if (id === 'daily-cash' || id === 'daily-qris') el.setAttribute('inputmode','numeric');
+                else el.setAttribute('inputmode','numeric');
+                el.setAttribute('autocomplete','off');
+            }
+        });
+        const expenses = document.getElementById('daily-expenses-list');
+        if (expenses) expenses.classList.add('aicha-expense-list');
+        const submit = section.querySelector('button[onclick="superApp.submitLaporanHarian()"]');
+        if (submit) submit.classList.add('aicha-report-submit');
+        const cancel = document.getElementById('btn-cancel-edit');
+        if (cancel) cancel.classList.add('aicha-report-cancel');
+    },
+
+    // =========================================================
     // 🚀 SWITCHER SUB-TAB LAPORAN HARIAN (RESPONSIVE FULL HEIGHT)
     // =========================================================
     switchLapHarianSubTab: function(tab) {
+        this.enhanceDailyReportResponsiveUI();
         const secInput = document.getElementById('lapharian-sec-input');
         const secRiwayat = document.getElementById('lapharian-sec-riwayat');
         const btnInput = document.getElementById('subtab-lapharian-input');
