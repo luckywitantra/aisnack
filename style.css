@@ -561,4 +561,3 @@ td, th { overflow-wrap: anywhere; }
 #aisnack-pwa-card .pwa-close{background:transparent;border:0;color:inherit;font-size:25px;line-height:1;cursor:pointer;margin-left:auto}
 #aisnack-pwa-card .pwa-instructions{font-size:13px;line-height:1.55;margin-top:12px;color:#334155}
 @media(prefers-color-scheme:dark){#aisnack-pwa-card{background:#111827;color:#f8fafc;border-color:#334155}#aisnack-pwa-card .pwa-status{background:#1e293b;color:#cbd5e1;border-color:#334155}#aisnack-pwa-card .pwa-secondary{background:#334155;color:#f8fafc}#aisnack-pwa-card .pwa-instructions{color:#cbd5e1}}
-
