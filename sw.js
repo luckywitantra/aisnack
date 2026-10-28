@@ -1,7 +1,7 @@
 /* Ai-Snack ERP & POS service worker — safe, scoped cache lifecycle */
 'use strict';
 const CACHE_PREFIX = 'aisnack-erp-pos-';
-const CACHE_NAME = CACHE_PREFIX + '2026.10.23.2';
+const CACHE_NAME = CACHE_PREFIX + '2026.10.23.3';
 const APP_SHELL = ['/aisnack/', '/aisnack/index.html', '/aisnack/app.js', '/aisnack/offline-hardening.js', '/aisnack/style.css', '/aisnack/manifest.json', '/aisnack/icon-192.svg', '/aisnack/icon-512.svg', '/aisnack/icon-192.png', '/aisnack/icon-512.png', '/aisnack/pwa-install.js'];
 const CDN_SHELL = [
   'https://cdn.tailwindcss.com',
