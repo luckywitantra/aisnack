@@ -561,3 +561,404 @@ td, th { overflow-wrap: anywhere; }
 #aisnack-pwa-card .pwa-close{background:transparent;border:0;color:inherit;font-size:25px;line-height:1;cursor:pointer;margin-left:auto}
 #aisnack-pwa-card .pwa-instructions{font-size:13px;line-height:1.55;margin-top:12px;color:#334155}
 @media(prefers-color-scheme:dark){#aisnack-pwa-card{background:#111827;color:#f8fafc;border-color:#334155}#aisnack-pwa-card .pwa-status{background:#1e293b;color:#cbd5e1;border-color:#334155}#aisnack-pwa-card .pwa-secondary{background:#334155;color:#f8fafc}#aisnack-pwa-card .pwa-instructions{color:#cbd5e1}}
+
+
+/* v4.1.0 — Mobile UX: Laporan Harian Ai-CHA + scrollable history */
+#view-laporan-harian, #view-lapharian, [id*="view-laporan-harian"] {
+  min-width: 0;
+}
+#view-laporan-harian #lapharian-sec-riwayat,
+#view-laporan-harian #history-table-wrapper,
+#view-laporan-harian #laporan-harian-mobile {
+  min-width: 0;
+  min-height: 0;
+}
+#view-laporan-harian #history-table-wrapper {
+  display: block;
+  width: 100%;
+  max-height: min(68vh, 720px);
+  overflow-y: auto !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y pan-x;
+}
+#view-laporan-harian #history-table-wrapper > div {
+  min-height: 0;
+}
+#view-laporan-harian #laporan-harian-mobile {
+  display: grid;
+  gap: .65rem;
+  max-height: min(68vh, 720px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: .15rem .15rem .75rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+#view-laporan-harian #laporan-harian-tbody tr {
+  break-inside: avoid;
+}
+#view-laporan-harian .custom-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+@media (max-width: 767px) {
+  #view-laporan-harian {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  #view-laporan-harian .grid {
+    min-width: 0;
+  }
+  #view-laporan-harian #lapharian-sec-riwayat {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  #view-laporan-harian #history-table-wrapper {
+    max-height: 65vh;
+    min-height: 320px;
+  }
+  #view-laporan-harian #laporan-harian-mobile {
+    max-height: 65vh;
+    min-height: 240px;
+  }
+  #view-laporan-harian input,
+  #view-laporan-harian select,
+  #view-laporan-harian button {
+    max-width: 100%;
+  }
+}
+/* Transaction-susulan form: comfortable mobile viewport and scrolling */
+#modal-transaksi-susulan,
+#modal-form {
+  overscroll-behavior: contain;
+}
+#modal-form {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#modal-form #modal-form-content {
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+@media (max-width: 767px) {
+  #modal-form {
+    align-items: flex-start !important;
+    padding: .5rem !important;
+  }
+  #modal-form #modal-form-content {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 1rem);
+    margin: 0 auto;
+    border-radius: 1.15rem;
+  }
+}
+
+
+/* v4.2.0 RESPONSIVE HARDENING — single-page scroll model on mobile */
+html, body { min-height: 100%; }
+body { overscroll-behavior-y: none; }
+#main-content-scroll {
+  min-width: 0;
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+.app-view { min-width: 0; }
+.app-view > * { min-width: 0; }
+@media (max-width: 767px) {
+  #main-content-scroll {
+    height: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: .75rem !important;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-view {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    scroll-margin-top: .5rem;
+  }
+  #view-laporan-harian:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  #view-laporan-harian:not(.hidden) > div:first-child {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  #view-laporan-harian:not(.hidden) > div:first-child > div.flex-1.overflow-y-auto,
+  #view-laporan-harian:not(.hidden) #lapharian-sec-riwayat,
+  #view-laporan-harian:not(.hidden) #history-table-wrapper {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  #view-laporan-harian:not(.hidden) #lapharian-sec-riwayat {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: .75rem !important;
+    width: 100% !important;
+  }
+  #view-laporan-harian:not(.hidden) #history-table-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: .5rem;
+  }
+  #view-laporan-harian:not(.hidden) #laporan-harian-mobile {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) !important;
+    gap: .65rem !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom,0px)) !important;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  #view-laporan-harian:not(.hidden) .overflow-y-auto {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Touch targets and prevent horizontal page overflow */
+  .app-view button, .app-view input, .app-view select, .app-view textarea {
+    max-width: 100%;
+  }
+  .app-view table { max-width: 100%; }
+  .app-view .overflow-x-auto { max-width: 100%; }
+  .app-view input[type="date"], .app-view input[type="datetime-local"] { min-width: 0; }
+}
+/* Keep independent list panels scrollable where they have a bounded height. */
+#daily-expenses-list, #exec-expense-list, #owner-approval-list,
+#cfd-cart-list, #product-list, #cart-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* Motion reduction for accessibility and smoother lower-powered phones. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Critical visibility guard: hidden views must remain hidden at every breakpoint. */
+.app-view.hidden,
+.app-view[hidden] {
+  display: none !important;
+}
+
+
+/* ========================================================================== */
+/* v4.3.0 TOUCH-FIRST SCROLLING — all menus, mobile, desktop touchscreens       */
+/* Scroll by swiping/dragging content; scrollbar is never the only affordance. */
+/* ========================================================================== */
+html, body {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  overscroll-behavior-y: none;
+}
+#main-content-scroll {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  touch-action: pan-y pan-x;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+/* Any explicitly scrollable panel must accept direct touch/trackpad gestures. */
+.overflow-y-auto, .overflow-auto, .custom-scroll,
+[id$="-list"], [id$="-container"], [id$="-wrapper"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.overflow-y-auto, .overflow-auto, .custom-scroll {
+  touch-action: pan-y pan-x;
+}
+/* Give the active view a natural content height when its content exceeds viewport. */
+.app-view:not(.hidden) {
+  min-width: 0;
+  scroll-margin-block: 12px;
+}
+.app-view:not(.hidden) :is(input, select, textarea, button, a, [role="button"]) {
+  touch-action: manipulation;
+}
+/* The report should scroll with the content, not require grabbing its scrollbar. */
+#view-laporan-harian:not(.hidden) {
+  min-height: 100%;
+}
+#view-laporan-harian:not(.hidden) #history-table-wrapper,
+#view-laporan-harian:not(.hidden) #laporan-harian-mobile {
+  touch-action: pan-y pan-x;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* Improve touchscreen targets on cashier PCs without enlarging desktop layouts. */
+@media (pointer: coarse) {
+  button, [role="button"], input[type="checkbox"], input[type="radio"], select {
+    touch-action: manipulation;
+  }
+  button, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+  #main-content-scroll {
+    scroll-padding-block: 12px;
+  }
+}
+/* Phones: the page itself is the primary vertical scroll surface. */
+@media (max-width: 767px) {
+  #main-content-scroll {
+    height: 100% !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y;
+    scroll-behavior: auto;
+  }
+  .app-view:not(.hidden) {
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+  /* Do not trap gestures in nested scroll panels on phones; scroll the page instead. */
+  .app-view:not(.hidden) .overflow-y-auto:not(#product-list):not(#cart-container):not(#daily-expenses-list):not(#exec-expense-list):not(#owner-approval-list):not(#cfd-cart-list) {
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+/* Keep scroll interaction responsive and respect accessibility preferences. */
+@media (prefers-reduced-motion: reduce) {
+  #main-content-scroll { scroll-behavior: auto; }
+}
+
+
+/* ========================================================================== */
+/* v4.3.1 — POS PORTRAIT TOUCH FIX + CASHIER TOUCHSCREEN HARDENING              */
+/* ========================================================================== */
+
+/* Explicitly allow touch/pen/mouse-wheel scrolling across the app shell. */
+#main-content-scroll,
+#view-pos,
+#product-list,
+#cart-container,
+#mobile-cart-overlay,
+#cart-aside {
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#main-content-scroll { touch-action: pan-y pan-x; }
+#product-list, #cart-container { touch-action: pan-y; }
+
+/* Portrait phone: avoid nested fixed-height/flex scroll traps in POS.
+   The page scrolls naturally; product results get their own bounded viewport. */
+@media (max-width: 767px) and (orientation: portrait) {
+  #main-content-scroll {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior-y: auto !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-behavior: auto !important;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #view-pos:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    touch-action: pan-y !important;
+  }
+  #view-pos:not(.hidden) > .flex-1.flex.flex-col {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding-bottom: 1rem !important;
+  }
+  #product-list {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 180px !important;
+    max-height: 52vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    padding-bottom: 1rem !important;
+  }
+  #cart-aside {
+    touch-action: pan-y !important;
+  }
+  #cart-container {
+    min-height: 100px !important;
+    max-height: 38vh !important;
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+/* Coarse-pointer devices include cashier touchscreens. Make gestures reliable
+   without disabling native controls or changing mouse/keyboard behavior. */
+@media (pointer: coarse) {
+  #main-content-scroll,
+  .overflow-y-auto,
+  .overflow-auto,
+  .custom-scroll {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pan-x;
+  }
+  #product-list, #cart-container {
+    touch-action: pan-y;
+  }
+  button, [role="button"], a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Desktop touchscreen + trackpad: do not require scrollbar-thumb targeting. */
+@media (min-width: 768px) {
+  #main-content-scroll {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y pan-x;
+  }
+  #product-list, #cart-container {
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+}
