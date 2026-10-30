@@ -1,3 +1,37 @@
+
+// v4.4.2: Normalize payment breakdown for legacy and split-payment transactions.
+function aisnackGetPaymentBreakdown(transaction) {
+    const t = transaction || {};
+    const findValue = (names) => {
+        const keys = Object.keys(t);
+        for (const name of names) {
+            if (t[name] !== undefined && t[name] !== null && String(t[name]).trim() !== '') return t[name];
+            const key = keys.find(k => String(k).trim().toLowerCase() === String(name).trim().toLowerCase());
+            if (key && t[key] !== undefined && t[key] !== null && String(t[key]).trim() !== '') return t[key];
+        }
+        return '';
+    };
+    const total = Math.max(0, Number(findValue(['Total_Bayar','Total Bayar','Total_Bayar_Rp'])) || 0);
+    const raw = findValue(['Pembayaran_Rinci_JSON','pembayaran_rinci','Pembayaran Rinci JSON','Pembayaran_Rinci']);
+    let rows = [];
+    if (Array.isArray(raw)) rows = raw;
+    else if (raw && typeof raw === 'object') rows = [raw];
+    else if (typeof raw === 'string' && raw.trim()) {
+        try { const parsed = JSON.parse(raw); rows = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []); } catch (_) { rows = []; }
+    }
+    let cash = 0, qris = 0;
+    rows.forEach(row => {
+        const method = String(row && (row.metode ?? row.Metode ?? row.method ?? row.METHOD) || '').trim().toLowerCase();
+        const amount = Math.max(0, Number(row && (row.nominal ?? row.Nominal ?? row.amount ?? row.Amount)) || 0);
+        if (method === 'tunai') cash += amount;
+        else if (method === 'qris') qris += amount;
+    });
+    if (rows.length && Math.round(cash + qris) === Math.round(total)) return { cash, qris, total, hasBreakdown: true };
+    const method = String(findValue(['Metode_Bayar','Metode Bayar','metode_bayar']) || 'Tunai').trim().toLowerCase();
+    if (method === 'qris') return { cash: 0, qris: total, total, hasBreakdown: false };
+    return { cash: total, qris: 0, total, hasBreakdown: false };
+}
+
 // STORAGE SAFETY PATCH: database cache besar disimpan ke IndexedDB; tidak memangkas riwayat.
 (function () {
     const nativeSetItem = Storage.prototype.setItem;
@@ -585,12 +619,9 @@ const superApp = {
                     this.checkVersionFromData(data.pengaturan);
                 }
                 
+                if (typeof this.applyCFDPromoSettings === 'function') this.applyCFDPromoSettings(this.db.pengaturan || data.pengaturan || []);
                 let logoData = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Logo_Aplikasi');
                 if (logoData) { localStorage.setItem('app_logo_url', logoData.Nilai); this.updateAppLogos(logoData.Nilai); }
-                let pStandby = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Standby');
-                if (pStandby) localStorage.setItem('cfd_promo_standby', pStandby.Nilai);
-                let pTransaksi = (this.db.pengaturan || []).find(x => x.Pengaturan === 'Promo_Transaksi');
-                if (pTransaksi) localStorage.setItem('cfd_promo_transaksi', pTransaksi.Nilai);
 
                 let tPelanggan = (this.db.pengaturan || []).find(x => x.Pengaturan === 'aisnack_receipt_template');
                 if (tPelanggan && tPelanggan.Nilai) localStorage.setItem('aisnack_receipt_template', tPelanggan.Nilai);
@@ -920,9 +951,9 @@ pullFreshData: async function(silent = false) {
             
             // 🚀 STRICT SMART MERGE 
             if (typeof this.mergeDatabase === 'function') {
-                this.db = this.mergeDatabase(this.db, data);
+                this.db = this.mergeDatabase(this.db, data); if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan);
             } else {
-                this.db = data;
+                this.db = data; if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan);
             }
             localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
 
@@ -1042,7 +1073,7 @@ pullFreshData: async function(silent = false) {
             if (rawText.trim().startsWith("<!DOCTYPE") || rawText.trim().startsWith("<html")) throw new Error("Server Google sibuk (HTML Error).");
             const data = JSON.parse(rawText);
             if (!res.ok || !data || data.status !== 'sukses') throw new Error((data && data.pesan) || ('HTTP ' + res.status));
-            this.db = this.mergeDatabase(this.db, data);
+            this.db = this.mergeDatabase(this.db, data); if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan);
             try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); }
             catch (cacheWriteError) {
                 console.warn('Cache localStorage penuh saat sinkronisasi riwayat:', cacheWriteError.message || cacheWriteError);
@@ -1095,7 +1126,7 @@ pullFreshData: async function(silent = false) {
             
             if (data && data.status === 'sukses') {
                 // 🛠️ PERBAIKAN 3: GANTI this.db = data MENJADI MERGE (Anti hapus data offline)
-                this.db = this.mergeDatabase(this.db, data);
+                this.db = this.mergeDatabase(this.db, data); if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan);
                 localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
                 
                 this.showToast("✅ Seluruh arsip data lawas berhasil dimuat & digabung!", "success");
@@ -1256,13 +1287,16 @@ pullFreshData: async function(silent = false) {
                   <label class="susulan-field"><span>Waktu transaksi <em>*</em></span><input id="susulan-time" type="time" value="12:00" required></label>
                   <label class="susulan-field"><span>Outlet <em>*</em></span><select id="susulan-outlet" required>${outletOptions}</select></label>
                   <label class="susulan-field"><span>Kasir yang bertugas <em>*</em></span><select id="susulan-cashier" required>${cashierOptions}</select></label>
-                  <label class="susulan-field"><span>Metode pembayaran</span><select id="susulan-payment"><option>Tunai</option><option>QRIS</option><option>Transfer</option><option>Kartu</option><option>Lainnya</option></select></label>
-                  <label class="susulan-field"><span>Nominal dibayar (tunai)</span><input id="susulan-paid" type="number" min="0" value="0" inputmode="numeric"></label>
-                  <div class="susulan-field" style="grid-column:1/-1">
-                    <span>Rincian pembayaran (bisa lebih dari satu metode)</span>
-                    <div id="susulan-payment-splits" class="grid gap-2"></div>
+                  <div class="susulan-field susulan-payment-unified" style="grid-column:1/-1">
+                    <span>Pembayaran transaksi <em>*</em></span>
+                    <div class="susulan-payment-summary">
+                      <div><small>Total transaksi</small><strong id="susulan-payment-total">Rp0</strong></div>
+                      <div><small>Total dibayar</small><strong id="susulan-payment-paid-total">Rp0</strong></div>
+                      <div><small>Selisih</small><strong id="susulan-payment-difference">Rp0</strong></div>
+                    </div>
+                    <div id="susulan-payment-splits" class="susulan-payment-list"></div>
                     <button id="susulan-add-payment" type="button" class="susulan-add-btn mt-2"><i class="fas fa-plus"></i><span>Tambah metode pembayaran</span></button>
-                    <small class="text-slate-500">Gunakan jika satu transaksi dibayar gabungan, misalnya Tunai + QRIS. Total nominal harus sama dengan total transaksi.</small>
+                    <small class="text-slate-500">Isi satu baris untuk pembayaran tunggal. Tambahkan baris jika pembayaran digabung, misalnya Tunai + QRIS. Total pembayaran wajib sama dengan total transaksi.</small>
                   </div>
                 </div>
                 <div class="susulan-subnote"><i class="fas fa-history"></i><span>Gunakan waktu transaksi sebenarnya, bukan waktu saat data dimasukkan.</span></div>
@@ -1301,26 +1335,47 @@ pullFreshData: async function(silent = false) {
             row.querySelector('.susulan-remove').addEventListener('click',()=>{row.remove();this._recalcBackdatedTotal();});
         };
         this._backdatedProductOptions = productOptions;
-        this._recalcBackdatedTotal = function(){
-            let total=0; itemWrap.querySelectorAll('.susulan-item').forEach(r=>{total+=Math.max(0,Number(r.querySelector('.susulan-qty').value)||0)*Math.max(0,Number(r.querySelector('.susulan-price').value)||0);});
-            const el=document.getElementById('susulan-total'); if(el) el.textContent='Rp'+Math.round(total).toLocaleString('id-ID');
-            const pay=document.getElementById('susulan-payment'), paid=document.getElementById('susulan-paid'); if(pay && paid && pay.value!=='Tunai') paid.value=String(Math.round(total));
-            return Math.round(total);
-        };
-        document.getElementById('susulan-add-item').addEventListener('click',addRow);
-        document.getElementById('susulan-outlet').addEventListener('change',()=>{itemWrap.querySelectorAll('.susulan-product').forEach(sel=>sel.dispatchEvent(new Event('change')));});
-        document.getElementById('susulan-payment').addEventListener('change',()=>this._recalcBackdatedTotal());
-        const splitWrap=document.getElementById('susulan-payment-splits');
+        const paymentWrap=document.getElementById('susulan-payment-splits');
         const paymentOptions=['Tunai','QRIS','Transfer','Kartu','Lainnya'];
+        const money=value=>'Rp'+Math.round(Number(value)||0).toLocaleString('id-ID');
         const addPaymentSplit=()=>{
-          if(!splitWrap) return;
+          if(!paymentWrap) return;
           const row=document.createElement('div');
           row.className='susulan-payment-row';
-          row.innerHTML=`<label class="min-w-0"><span class="block text-[10px] font-extrabold text-slate-500 mb-1">Metode</span><select class="susulan-split-method">${paymentOptions.map(p=>`<option>${p}</option>`).join('')}</select></label><label class="min-w-0"><span class="block text-[10px] font-extrabold text-slate-500 mb-1">Nominal (Rp)</span><input class="susulan-split-amount" type="number" min="0" step="1" inputmode="numeric" placeholder="Contoh: 150000"></label><button type="button" class="susulan-remove-payment bg-rose-50 text-rose-600" aria-label="Hapus metode pembayaran" title="Hapus metode"><i class="fas fa-trash"></i></button>`;
-          row.querySelector('.susulan-remove-payment').onclick=()=>{row.remove();this._recalcBackdatedTotal();};
+          row.innerHTML=`<label class="susulan-payment-method"><span>Metode pembayaran</span><select class="susulan-split-method" aria-label="Metode pembayaran">${paymentOptions.map(p=>`<option>${p}</option>`).join('')}</select></label><label class="susulan-payment-amount"><span>Nominal (Rp)</span><input class="susulan-split-amount" type="number" min="0" step="1" inputmode="numeric" placeholder="Masukkan nominal" aria-label="Nominal pembayaran"></label><button type="button" class="susulan-remove-payment" aria-label="Hapus metode pembayaran" title="Hapus metode"><i class="fas fa-trash"></i></button>`;
+          row.querySelector('.susulan-remove-payment').onclick=()=>{
+            if(paymentWrap.querySelectorAll('.susulan-payment-row').length<=1){row.querySelector('.susulan-split-amount').value='';row.querySelector('.susulan-split-method').value='Tunai';}
+            else row.remove();
+            this._recalcBackdatedTotal();
+          };
           row.querySelector('.susulan-split-amount').addEventListener('input',()=>this._recalcBackdatedTotal());
-          splitWrap.appendChild(row);
+          row.querySelector('.susulan-split-method').addEventListener('change',()=>this._recalcBackdatedTotal());
+          paymentWrap.appendChild(row);
+          this._recalcBackdatedTotal();
         };
+        this._recalcBackdatedTotal = function(){
+            let total=0;
+            itemWrap.querySelectorAll('.susulan-item').forEach(r=>{total+=Math.max(0,Number(r.querySelector('.susulan-qty').value)||0)*Math.max(0,Number(r.querySelector('.susulan-price').value)||0);});
+            total=Math.round(total);
+            const totalEl=document.getElementById('susulan-total'); if(totalEl) totalEl.textContent=money(total);
+            const payRows=[...(paymentWrap?.querySelectorAll('.susulan-payment-row')||[])];
+            const paid=payRows.reduce((sum,row)=>sum+Math.max(0,Number(row.querySelector('.susulan-split-amount')?.value)||0),0);
+            const paymentTotal=document.getElementById('susulan-payment-total');
+            const paidTotal=document.getElementById('susulan-payment-paid-total');
+            const difference=document.getElementById('susulan-payment-difference');
+            if(paymentTotal) paymentTotal.textContent=money(total);
+            if(paidTotal) paidTotal.textContent=money(paid);
+            if(difference){
+              const delta=paid-total;
+              difference.textContent=delta===0?'Sesuai':(delta>0?'Lebih '+money(delta):'Kurang '+money(Math.abs(delta)));
+              difference.classList.toggle('is-balanced',total>0&&delta===0);
+              difference.classList.toggle('is-unbalanced',total<=0||delta!==0);
+            }
+            return total;
+        };
+        this._recalcBackdatedTotal();
+        document.getElementById('susulan-add-item').addEventListener('click',addRow);
+        document.getElementById('susulan-outlet').addEventListener('change',()=>{itemWrap.querySelectorAll('.susulan-product').forEach(sel=>sel.dispatchEvent(new Event('change')));});
         document.getElementById('susulan-add-payment')?.addEventListener('click',addPaymentSplit);
         addPaymentSplit();
 
@@ -1333,7 +1388,7 @@ pullFreshData: async function(silent = false) {
     submitBackdatedTransaction: async function(overridePossibleDuplicate) {
         const el=id=>document.getElementById(id);
         const date=el('susulan-date')?.value, time=el('susulan-time')?.value, outlet=el('susulan-outlet')?.value, cashier=el('susulan-cashier')?.value;
-        const payment=el('susulan-payment')?.value, reason=String(el('susulan-reason')?.value||'').trim(), admin=String(el('susulan-admin-user')?.value||'').trim(), pin=String(el('susulan-admin-pin')?.value||'').trim();
+        const reason=String(el('susulan-reason')?.value||'').trim(), admin=String(el('susulan-admin-user')?.value||'').trim(), pin=String(el('susulan-admin-pin')?.value||'').trim();
         const errorBox=el('susulan-error'); if(errorBox){errorBox.classList.add('hidden');errorBox.textContent='';}
         const showError=msg=>{if(errorBox){errorBox.textContent=msg;errorBox.classList.remove('hidden');}else this.showToast(msg,'error');};
         if(!date||!time||!outlet||!cashier||reason.length<10||!/^\d{4}$/.test(pin)) return showError('Lengkapi tanggal, waktu, outlet, kasir, alasan minimal 10 karakter, dan PIN Admin 4 digit.');
@@ -1345,19 +1400,19 @@ pullFreshData: async function(silent = false) {
         });
         if(invalid||!items.length) return showError('Pilih produk dan pastikan kuantitas serta harga setiap item valid.');
         const total=items.reduce((sum,x)=>sum+x.qty*x.price,0);
-        const splitRows=[...document.querySelectorAll('#susulan-payment-splits > div')];
-        const paymentSplits=splitRows.map(row=>({metode:String(row.querySelector('.susulan-split-method')?.value||'').trim(),nominal:Number(row.querySelector('.susulan-split-amount')?.value||0)})).filter(x=>x.metode&&x.nominal>0);
-        const hasSplit=paymentSplits.length>0;
+        const splitRows=[...document.querySelectorAll('#susulan-payment-splits .susulan-payment-row')];
+        const paymentSplits=splitRows.map(row=>({metode:String(row.querySelector('.susulan-split-method')?.value||'').trim(),nominal:Number(row.querySelector('.susulan-split-amount')?.value||0)}));
+        if(!paymentSplits.length || paymentSplits.some(x=>!x.metode||!Number.isFinite(x.nominal)||x.nominal<=0)) return showError('Isi metode dan nominal yang valid pada setiap baris pembayaran, atau hapus baris yang tidak digunakan.');
         const splitTotal=paymentSplits.reduce((s,x)=>s+x.nominal,0);
-        const paid=hasSplit?splitTotal:(payment==='Tunai'?Number(el('susulan-paid')?.value||0):total);
-        const effectivePayment=hasSplit?[...new Set(paymentSplits.map(x=>x.metode))].join(' + '):payment;
-        if(!Number.isFinite(total)||total<=0||!Number.isFinite(paid)||paid<total) return showError('Total harus lebih dari nol dan nominal pembayaran tidak boleh kurang dari total.');
-        if(hasSplit && Math.round(paid)!==Math.round(total)) return showError('Jika memakai beberapa metode pembayaran, jumlah seluruh nominal harus sama persis dengan total transaksi.');
-        if(hasSplit && paymentSplits.length<2) return showError('Tambahkan minimal dua metode pembayaran atau kosongkan seluruh rincian untuk memakai metode tunggal.');
+        const paid=Math.round(splitTotal);
+        const effectivePayment=[...new Set(paymentSplits.map(x=>x.metode))].join(' + ');
+        if(!Number.isFinite(total)||total<=0||!Number.isFinite(paid)) return showError('Total transaksi atau pembayaran tidak valid.');
+        if(Math.round(paid)!==Math.round(total)) return showError('Total pembayaran harus sama persis dengan total transaksi. Periksa nilai Selisih sebelum menyimpan.');
+        if(paymentSplits.some((x,i)=>paymentSplits.some((y,j)=>j<i&&y.metode===x.metode))) return showError('Setiap metode pembayaran hanya boleh satu baris. Gabungkan nominal pada metode yang sama.');
         const stockMode=document.querySelector('input[name="susulan-stock-mode"]:checked')?.value||'kurangi';
         if(stockMode==='sudah_tercermin'&&reason.length<20) return showError('Jika stok sudah tercermin, alasan wajib minimal 20 karakter dan menjelaskan alasannya.');
         const role=String((this.db.users||[]).find(u=>String(u.Username).toLowerCase()===admin.toLowerCase())?.Role||'Kasir');
-        const payload={action:'input_transaksi_susulan',_req_id:'BACKDATED-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),admin_username:admin,admin_pin:pin,tanggal_transaksi:date,waktu_transaksi:time,outlet,kasir:cashier,role_kasir:role,metode_bayar:effectivePayment,dibayar:paid,pembayaran_rinci:paymentSplits,total_konfirmasi:Math.round(total),items,alasan:reason,mode_stok:stockMode,override_possible_duplicate:!!overridePossibleDuplicate};
+        const payload={action:'input_transaksi_susulan',_req_id:'BACKDATED-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),admin_username:admin,admin_pin:pin,tanggal_transaksi:date,waktu_transaksi:time,outlet,kasir:cashier,role_kasir:role,metode_bayar:effectivePayment,dibayar:paid,pembayaran_rinci:paymentSplits,nominal_tunai:paymentSplits.filter(x=>x.metode==='Tunai').reduce((s,x)=>s+x.nominal,0),total_konfirmasi:Math.round(total),items,alasan:reason,mode_stok:stockMode,override_possible_duplicate:!!overridePossibleDuplicate};
         const btn=el('modal-form-btn'); if(btn){btn.disabled=true;btn.textContent='Memvalidasi dan menyimpan…';}
         try {
             const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
@@ -1790,7 +1845,7 @@ pullFreshData: async function(silent = false) {
                         if (rawText.trim().startsWith('<!DOCTYPE') || rawText.trim().startsWith('<html')) throw new Error('Server membalas HTML');
                         const data = JSON.parse(rawText);
                         if (data && data.status === 'sukses') {
-                            this.db = this.mergeDatabase(this.db, data);
+                            this.db = this.mergeDatabase(this.db, data); if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan);
                             try { localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db)); } catch (cacheWriteError) { console.warn('Cache tidak dapat diperbarui setelah sinkronisasi:', cacheWriteError.message || cacheWriteError); }
                             this.refreshData();
                         }
@@ -1869,56 +1924,160 @@ pullFreshData: async function(silent = false) {
         }
     },
     
-   changePromoImage: function(type) {
-        let fileInput = document.createElement('input'); 
-        fileInput.type = 'file'; 
-        fileInput.accept = 'image/*'; 
-        
-        fileInput.onchange = (event) => {
-            const file = event.target.files[0]; 
-            if (!file || this.isProcessing) return; 
-            
-            let loadingText = type === 'standby' ? "Mengunggah Promo Standby..." : "Mengunggah Promo Transaksi...";
-            this.setLoading(true, loadingText);
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.apiPost({ 
-                    action: 'update_promo_dual',
-                    promoType: type,
-                    base64: e.target.result, 
-                    fileName: file.name, 
-                    mimeType: file.type 
-                }).then(res => { 
-                    if (res.status === 'sukses') { 
-                        const storageKey = type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi';
-                        localStorage.setItem(storageKey, res.url); 
-                        this.syncStorage(); 
-                        this.setLoading(false); 
-                        this.showToast(`Promo ${type.toUpperCase()} Berhasil Diperbarui!`); 
-                    } else {
-                        this.setLoading(false);
-                        this.showToast("Gagal upload: " + res.pesan, "error");
-                    }
-                }).catch(() => {
-                    this.setLoading(false); this.showToast("Koneksi bermasalah", "error");
+   // Slideshow settings are backed by Google Sheets; localStorage is only a fast cache.
+    applyCFDPromoSettings: function(rows) {
+        if (!Array.isArray(rows)) return;
+        const map = {};
+        rows.forEach(r => { if (r && r.Pengaturan) map[String(r.Pengaturan)] = r.Nilai; });
+        const applyList = (type, key) => {
+            const raw = map[key]; if (raw == null || raw === '') return;
+            let urls = [];
+            try { const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; if (Array.isArray(parsed)) urls = parsed; else if (typeof parsed === 'string' && /^https?:/i.test(parsed)) urls = [parsed]; }
+            catch (_) { if (typeof raw === 'string' && /^https?:/i.test(raw)) urls = [raw]; }
+            urls = Array.from(new Set(urls.filter(u => typeof u === 'string' && /^https?:/i.test(u)))).slice(0,30);
+            localStorage.setItem(type === 'standby' ? 'cfd_promo_standby_list' : 'cfd_promo_transaksi_list', JSON.stringify(urls));
+            localStorage.setItem(type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi', urls[0] || '');
+        };
+        applyList('standby','Promo_Standby'); applyList('transaksi','Promo_Transaksi');
+        const settings = map['CFD_Slideshow_Settings'];
+        if (settings) {
+            try {
+                const cfg = typeof settings === 'string' ? JSON.parse(settings) : settings;
+                ['standby','transaksi'].forEach(type => {
+                    const v = cfg[type] || {};
+                    if (v.duration != null) localStorage.setItem(`cfd_promo_${type}_duration`, String(Math.max(1,Math.min(30,parseInt(v.duration,10)||7))));
+                    if (v.enabled != null) localStorage.setItem(`cfd_promo_${type}_enabled`, String(v.enabled !== false));
+                    if (Array.isArray(v.flags)) localStorage.setItem(`cfd_promo_${type}_slide_flags`, JSON.stringify(v.flags));
                 });
-            }; 
-            reader.readAsDataURL(file);
-        }; 
+            } catch(e) { console.warn('Pengaturan slideshow server tidak dapat dibaca',e); }
+        }
+        if (map['Logo_Aplikasi']) { localStorage.setItem('app_logo_url', String(map['Logo_Aplikasi'])); if (this.updateAppLogos) this.updateAppLogos(String(map['Logo_Aplikasi'])); }
+        if (map['Logo_Effect']) { localStorage.setItem('app_logo_effect', String(map['Logo_Effect'])); if (this.applyLogoEffect) this.applyLogoEffect(String(map['Logo_Effect'])); const effectSelect=document.getElementById('global-logo-effect'); if(effectSelect) effectSelect.value=String(map['Logo_Effect']); } else { const effectSelect=document.getElementById('global-logo-effect'); if(effectSelect) effectSelect.value=localStorage.getItem('app_logo_effect')||'shimmer'; }
+        if (new URLSearchParams(location.search).get('mode') === 'cfd') { this._cfdStartSlideshow('standby'); this._cfdStartSlideshow('transaksi'); }
+    },
+    persistCFDSlideshowSettings: async function() {
+        const cfg = {};
+        ['standby','transaksi'].forEach(type => {
+            let flags=[]; try { flags=JSON.parse(localStorage.getItem(`cfd_promo_${type}_slide_flags`)||'[]'); } catch(_) {}
+            cfg[type] = { duration:this._promoGetDuration(type), enabled:this._promoGetEnabled(type), flags:flags };
+        });
+        const res = await this.apiPost({action:'save_cfd_slideshow_settings',settings:cfg,_req_id:'CFDSET-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)});
+        if (!res || res.status !== 'sukses') throw new Error((res && res.pesan) || 'Gagal menyimpan pengaturan slideshow ke server.');
+        return res;
+    },
+   _promoManagerType: 'standby',
+    _promoManagerPreviewTimer: null,
+    _promoManagerPreviewIndex: 0,
+    _promoGetDuration: function(type) { const key = type === 'standby' ? 'cfd_promo_standby_duration' : 'cfd_promo_transaksi_duration'; const n = parseInt(localStorage.getItem(key) || '7', 10); return Math.max(1, Math.min(30, Number.isFinite(n) ? n : 7)); },
+    _promoGetEnabled: function(type) { const key = type === 'standby' ? 'cfd_promo_standby_enabled' : 'cfd_promo_transaksi_enabled'; return localStorage.getItem(key) !== 'false'; },
+    _promoSaveList: function(type, urls) { const listKey = type === 'standby' ? 'cfd_promo_standby_list' : 'cfd_promo_transaksi_list'; const legacyKey = type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi'; const settingKey = type === 'standby' ? 'Promo_Standby' : 'Promo_Transaksi'; urls = Array.from(new Set((urls || []).filter(u => typeof u === 'string' && /^https?:/i.test(u)))).slice(0,30); localStorage.setItem(listKey, JSON.stringify(urls)); localStorage.setItem(legacyKey, urls[0] || ''); this.syncStorage(); this.apiPost({action:'update_pengaturan',kunci:settingKey,nilai:JSON.stringify(urls)}).then(r=>{if(!r||r.status!=='sukses')console.warn('Daftar promo belum tersimpan di server',r);}).catch(e=>console.warn('Gagal menyimpan daftar promo ke server',e)); return urls; },
+    openPromoManager: function(type) {
+        this._promoManagerType = type === 'transaksi' ? 'transaksi' : 'standby';
+        const modal = document.getElementById('modal-promo-manager'); if (!modal) return;
+        const isStandby = this._promoManagerType === 'standby';
+        document.getElementById('promo-manager-title').textContent = isStandby ? 'Slideshow Promo Standby' : 'Slideshow Promo Transaksi';
+        document.getElementById('promo-manager-kicker').textContent = isStandby ? 'LAYAR STANDBY' : 'LAYAR TRANSAKSI';
+        const duration = this._promoGetDuration(this._promoManagerType); document.getElementById('promo-manager-duration').value = duration; this.updatePromoDurationLabel(duration);
+        document.getElementById('promo-manager-enabled').checked = this._promoGetEnabled(this._promoManagerType);
+        modal.classList.remove('hidden'); modal.classList.add('flex'); this.renderPromoManagerList();
+    },
+    closePromoManager: function() { const modal = document.getElementById('modal-promo-manager'); if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); } if (this._promoManagerPreviewTimer) clearInterval(this._promoManagerPreviewTimer); this._promoManagerPreviewTimer = null; },
+    updatePromoDurationLabel: function(value) { const el = document.getElementById('promo-manager-duration-label'); if (el) el.textContent = `${value} detik`; },
+    renderPromoManagerList: function() {
+        const type = this._promoManagerType; const urls = this._cfdGetSlides(type); const list = document.getElementById('promo-manager-list'); if (!list) return;
+        document.getElementById('promo-manager-total').textContent = `${urls.length} foto`;
+        const preview = document.getElementById('promo-manager-preview-img'); const empty = document.getElementById('promo-manager-empty');
+        if (urls.length) { preview.src = urls[Math.min(this._promoManagerPreviewIndex, urls.length - 1)] || urls[0]; preview.classList.remove('hidden'); empty.classList.add('hidden'); document.getElementById('promo-manager-preview-count').textContent = `Foto ${Math.min(this._promoManagerPreviewIndex, urls.length - 1) + 1} dari ${urls.length}`; }
+        else { preview.removeAttribute('src'); preview.classList.add('hidden'); empty.classList.remove('hidden'); document.getElementById('promo-manager-preview-count').textContent = 'Foto 0 dari 0'; }
+        list.innerHTML = '';
+        if (!urls.length) { list.innerHTML = '<div class="p-5 rounded-2xl border border-dashed border-slate-300 text-center text-sm text-slate-500">Belum ada foto. Tekan Tambah foto untuk mulai membuat slideshow.</div>'; return; }
+        urls.forEach((url, i) => {
+            const row = document.createElement('div'); row.className = 'promo-manager-row flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white';
+            const img = document.createElement('img'); img.src = url; img.alt = `Promo ${i+1}`; img.className = 'w-20 h-14 sm:w-28 sm:h-16 object-cover rounded-lg bg-slate-100 shrink-0';
+            const meta = document.createElement('div'); meta.className = 'min-w-0 flex-1'; meta.innerHTML = `<div class="font-extrabold text-sm text-slate-800">Foto ${i+1}</div><div class="text-[11px] text-slate-500 truncate" title="${String(url).replace(/"/g,'&quot;')}">${String(url).replace(/[<>]/g,'')}</div><label class="inline-flex items-center gap-2 mt-2 text-xs font-bold text-slate-600"><input type="checkbox" class="promo-slide-enabled accent-blue-600" data-index="${i}" checked> Tampilkan</label>`;
+            const controls = document.createElement('div'); controls.className = 'flex flex-col sm:flex-row gap-1 shrink-0';
+            [['↑','up',i===0],['↓','down',i===urls.length-1],['×','remove',false]].forEach(([label,act,disabled])=>{ const b=document.createElement('button'); b.type='button'; b.textContent=label; b.title=act==='up'?'Geser ke atas':act==='down'?'Geser ke bawah':'Hapus foto'; b.className='w-9 h-9 rounded-lg font-black '+(act==='remove'?'bg-rose-50 text-rose-600 hover:bg-rose-100':'bg-slate-100 text-slate-700 hover:bg-slate-200'); b.disabled=disabled; b.style.opacity=disabled?'.35':'1'; b.onclick=()=>this.reorderPromoSlide(i,act); controls.appendChild(b); });
+            row.append(img,meta,controls); list.appendChild(row);
+        });
+    },
+    reorderPromoSlide: function(index, action) { const type=this._promoManagerType; let urls=this._cfdGetSlides(type); const flagsKey=type==='standby'?'cfd_promo_standby_slide_flags':'cfd_promo_transaksi_slide_flags'; let flags=[]; try{flags=JSON.parse(localStorage.getItem(flagsKey)||'[]')}catch(_){} if(flags.length!==urls.length)flags=urls.map(()=>true); if (action==='remove') { if (!confirm(`Hapus foto ${index+1} dari slideshow perangkat ini? File di Google Drive tidak dihapus.`)) return; urls.splice(index,1); flags.splice(index,1); } else { const target=action==='up'?index-1:index+1; if(target<0||target>=urls.length)return; [urls[index],urls[target]]=[urls[target],urls[index]]; [flags[index],flags[target]]=[flags[target],flags[index]]; } this._promoSaveList(type,urls); localStorage.setItem(flagsKey,JSON.stringify(flags)); this._promoManagerPreviewIndex=Math.min(this._promoManagerPreviewIndex,Math.max(0,urls.length-1)); this.renderPromoManagerList(); },
+    previewPromoSlideshow: function() { if (this._promoManagerPreviewTimer) clearInterval(this._promoManagerPreviewTimer); const urls=this._cfdGetSlides(this._promoManagerType); if (!urls.length) { this.showToast('Tambahkan foto terlebih dahulu untuk melihat preview.','warning'); return; } this._promoManagerPreviewIndex=0; this.renderPromoManagerList(); this._promoManagerPreviewTimer=setInterval(()=>{ const latest=this._cfdGetSlides(this._promoManagerType); if(!latest.length){clearInterval(this._promoManagerPreviewTimer);return;} this._promoManagerPreviewIndex=(this._promoManagerPreviewIndex+1)%latest.length; this.renderPromoManagerList(); }, this._promoGetDuration(this._promoManagerType)*1000); this.showToast('Preview slideshow berjalan.','success'); },
+    savePromoManager: function() {
+        const type=this._promoManagerType; const duration=Math.max(1,Math.min(30,parseInt(document.getElementById('promo-manager-duration').value||'7',10))); const enabled=document.getElementById('promo-manager-enabled').checked;
+        const list=document.getElementById('promo-manager-list'); const checks=Array.from(list.querySelectorAll('.promo-slide-enabled')); let urls=this._cfdGetSlides(type); const disabledIndices=checks.filter(c=>!c.checked).map(c=>Number(c.dataset.index));
+        // Persist ordered list plus enabled flags, without deleting disabled URLs.
+        const enabledKey=type==='standby'?'cfd_promo_standby_slide_flags':'cfd_promo_transaksi_slide_flags'; const flags=urls.map((_,i)=>!disabledIndices.includes(i)); localStorage.setItem(enabledKey,JSON.stringify(flags));
+        localStorage.setItem(type==='standby'?'cfd_promo_standby_duration':'cfd_promo_transaksi_duration',String(duration)); localStorage.setItem(type==='standby'?'cfd_promo_standby_enabled':'cfd_promo_transaksi_enabled',String(enabled));
+        this._cfdSlideIndex[type]=0; this._cfdStartSlideshow(type); this.persistCFDSlideshowSettings().then(()=>this.showToast('Pengaturan slideshow tersimpan di server dan perangkat.','success')).catch(e=>this.showToast('Tersimpan lokal, tetapi sinkronisasi server gagal: '+e.message,'warning')); this.closePromoManager();
+    },
+
+   changePromoImage: function(type) {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.multiple = true;
+        fileInput.onchange = async (event) => {
+            const files = Array.from(event.target.files || []).filter(f => /^image\//i.test(f.type));
+            if (!files.length || this.isProcessing || this._promoUploadInFlight) return;
+            this._promoUploadInFlight = true;
+            if (files.length > 20) { this.showToast('Maksimal 20 foto sekali unggah.', 'error'); return; }
+            const storageKey = type === 'standby' ? 'cfd_promo_standby_list' : 'cfd_promo_transaksi_list';
+            const legacyKey = type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi';
+            let urls = [];
+            try { const old = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(old)) urls = old; } catch (_) {}
+            if (!urls.length) { const legacy = localStorage.getItem(legacyKey); if (legacy && /^https?:/i.test(legacy)) urls = [legacy]; }
+            this.setLoading(true, `Mengunggah ${files.length} foto promo ${type}...`);
+            const readFile = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Gagal membaca ' + file.name)); reader.readAsDataURL(file); });
+            try {
+                // Tambahkan foto baru secara berurutan; ID stabil per file mencegah duplikasi saat retry jaringan.
+                const uploadSessionId = 'PROMO-' + type + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,9);
+                for (let idx = 0; idx < files.length; idx++) {
+                    const file = files[idx];
+                    this.setLoading(true, `Mengunggah foto ${idx + 1}/${files.length}...`);
+                    const dataUrl = await readFile(file);
+                    const uploadReqId = uploadSessionId + '-' + idx;
+                    const res = await this.apiPost({ action:'update_promo_dual', promoType:type, base64:dataUrl, fileName:file.name, mimeType:file.type, appendToSlideshow:true, _req_id:uploadReqId });
+                    if (!res || res.status !== 'sukses' || !res.url) throw new Error((res && res.pesan) || ('Upload gagal: ' + file.name));
+                    urls = Array.from(new Set((Array.isArray(res.urls) ? res.urls : urls.concat([res.url])).filter(Boolean))).slice(-30);
+                }
+                localStorage.setItem(storageKey, JSON.stringify(urls));
+                localStorage.setItem(legacyKey, urls[0] || '');
+                this.syncStorage();
+                await this.persistCFDSlideshowSettings().catch(e => console.warn('Pengaturan slideshow belum tersinkron:',e));
+                this.setLoading(false);
+                if (this._promoManagerType === type && document.getElementById('modal-promo-manager') && !document.getElementById('modal-promo-manager').classList.contains('hidden')) this.renderPromoManagerList();
+                this.showToast(`${files.length} foto promo ${type.toUpperCase()} berhasil ditambahkan. Total ${urls.length} foto.`);
+            } catch (err) {
+                this.setLoading(false);
+                this.showToast('Upload promo belum selesai: ' + (err.message || err), 'error');
+            } finally { this._promoUploadInFlight = false; fileInput.value = ''; }
+        };
         fileInput.click();
     },
 
     // Fungsi untuk merubah gambar logo secara serempak di seluruh sudut aplikasi
     updateAppLogos: function(url) {
         if (!url) return;
-        document.querySelectorAll('.app-logo-img').forEach(img => {
-            img.src = url;
-        });
+        document.querySelectorAll('.app-logo-img').forEach(img => { img.src = url; });
+        this.applyLogoEffect(localStorage.getItem('app_logo_effect') || 'shimmer');
     },
 
+    applyLogoEffect: function(effect) {
+        const allowed = ['none','shimmer','glow','float','pulse']; effect = allowed.includes(effect) ? effect : 'shimmer';
+        document.querySelectorAll('.app-logo-img').forEach(img => {
+            const holder = img.closest('.app-logo-effect-host') || img.parentElement;
+            if (!holder) return;
+            holder.classList.remove('logo-effect-shimmer','logo-effect-glow','logo-effect-float','logo-effect-pulse');
+            if (effect !== 'none') holder.classList.add('app-logo-effect-host','logo-effect-' + effect);
+        });
+    },
+    setGlobalLogoEffect: async function(effect) {
+        const allowed=['none','shimmer','glow','float','pulse']; if(!allowed.includes(effect)) effect='shimmer';
+        localStorage.setItem('app_logo_effect',effect); this.applyLogoEffect(effect);
+        try { const r=await this.apiPost({action:'update_pengaturan',kunci:'Logo_Effect',nilai:effect}); if(!r||r.status!=='sukses') throw new Error((r&&r.pesan)||'Gagal menyimpan efek logo'); this.showToast('Efek logo global berhasil disimpan.','success'); }
+        catch(e) { this.showToast('Efek diterapkan di perangkat ini, tetapi belum tersimpan di server: '+e.message,'warning'); }
+    },
     // Fungsi pengunggah file logo baru langsung menuju Google Drive
     changeAppLogo: function() {
+        if (this._logoUploadInFlight) { this.showToast('Unggahan logo sedang berjalan.','warning'); return; }
         let fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/*';
@@ -1928,6 +2087,7 @@ pullFreshData: async function(silent = false) {
             if (!file) return;
             if (this.isProcessing) return;
             
+            this._logoUploadInFlight = true;
             this.setLoading(true, "Mengunggah Logo Baru ke Google Drive...");
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -1944,14 +2104,14 @@ pullFreshData: async function(silent = false) {
                         this.updateAppLogos(res.url); // Ubah visual logo kasir saat itu juga
                         this.syncStorage(); // Sinkronkan ke layar pelanggan (CFD)
                         this.setLoading(false);
-                        this.showToast("Logo Aplikasi Berhasil Diperbarui Secara Global!");
+                        this.showToast("Logo Aplikasi Berhasil Diperbarui Secara Global!"); this._logoUploadInFlight = false;
                     } else {
                         this.setLoading(false);
-                        this.showToast("Gagal menyimpan logo: " + res.pesan, "error");
+                        this.showToast("Gagal menyimpan logo: " + res.pesan, "error"); this._logoUploadInFlight = false;
                     }
                 }).catch(() => {
                     this.setLoading(false);
-                    this.showToast("Koneksi internet bermasalah saat upload", "error");
+                    this.showToast("Koneksi internet bermasalah saat upload", "error"); this._logoUploadInFlight = false;
                 });
             };
             reader.readAsDataURL(file);
@@ -1988,32 +2148,144 @@ pullFreshData: async function(silent = false) {
         }));
     },
     
-   initCFD: function() {
-        document.getElementById('login-screen').classList.add('hidden'); document.getElementById('sidebar').classList.add('hidden'); document.getElementById('main-app').classList.add('hidden');
-        const cfdScreen = document.getElementById('cfd-screen'); if (cfdScreen) cfdScreen.classList.remove('hidden');
-        
-        window.addEventListener('storage', (e) => { 
-            if (e.key === 'ai_snack_cfd' || e.key === 'cfd_promo_standby' || e.key === 'cfd_promo_transaksi' || e.key === 'app_logo_url') { 
-                let data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); if (data.outlet) this.renderCFD(data); 
-                let newLogo = localStorage.getItem('app_logo_url'); if (newLogo) this.updateAppLogos(newLogo);
-            } 
-        });
-        
-        let initialData = localStorage.getItem('ai_snack_cfd'); if (initialData) this.renderCFD(JSON.parse(initialData));
-        
-        let bgStandby = localStorage.getItem('cfd_promo_standby'); 
-        let bgScreen = localStorage.getItem('cfd_promo_transaksi'); 
-        if (bgStandby) { const bg1 = document.getElementById('cfd-bg-standby'); if (bg1) bg1.style.backgroundImage = `url('${bgStandby}')`; }
-        if (bgScreen) { const bg2 = document.getElementById('cfd-bg-screen'); if (bg2) bg2.style.backgroundImage = `url('${bgScreen}')`; }
-        
-        let savedLogo = localStorage.getItem('app_logo_url');
-        if (savedLogo) { this.updateAppLogos(savedLogo); }
+   _cfdSlides: { standby: [], transaksi: [] },
+    _cfdSlideIndex: { standby: 0, transaksi: 0 },
+    _cfdSlideTimers: { standby: null, transaksi: null },
+    _cfdSlideRequestToken: { standby: 0, transaksi: 0 },
+    _cfdSlideLastChange: { standby: 0, transaksi: 0 },
+    _cfdSlideSignature: { standby: null, transaksi: null },
+    _cfdGetSlides: function(type) {
+        const listKey = type === 'standby' ? 'cfd_promo_standby_list' : 'cfd_promo_transaksi_list';
+        const legacyKey = type === 'standby' ? 'cfd_promo_standby' : 'cfd_promo_transaksi';
+        let list = [];
+        try { const parsed = JSON.parse(localStorage.getItem(listKey) || '[]'); if (Array.isArray(parsed)) list = parsed; } catch (_) {}
+        if (!list.length) { const legacy = localStorage.getItem(legacyKey); if (legacy) list = [legacy]; }
+        return Array.from(new Set(list.filter(url => typeof url === 'string' && /^(https?:|data:image\/)/i.test(url))));
     },
-    
+    _cfdApplySlide: function(type, index, attempt) {
+        const el = document.getElementById(type === 'standby' ? 'cfd-bg-standby' : 'cfd-bg-screen');
+        const slides = this._cfdSlides[type] || [];
+        if (!el || !slides.length) return;
+        const tries = Number(attempt || 0);
+        if (tries >= slides.length) {
+            console.warn('[CFD slideshow] Semua gambar gagal dimuat untuk layar ' + type + '. Periksa akses URL gambar.');
+            return;
+        }
+        const safeIndex = ((index % slides.length) + slides.length) % slides.length;
+        const url = slides[safeIndex];
+        const token = ++this._cfdSlideRequestToken[type];
+        let settled = false;
+        const applyOnce = () => {
+            if (settled) return;
+            settled = true;
+            if (token !== this._cfdSlideRequestToken[type]) return;
+            el.style.backgroundImage = `url("${String(url).replace(/["\\\n\r]/g, '')}")`;
+            el.classList.remove('cfd-slide-enter');
+            void el.offsetWidth;
+            el.classList.add('cfd-slide-enter');
+            this._cfdSlideIndex[type] = safeIndex;
+            this._cfdSlideLastChange[type] = Date.now();
+        };
+        const tryNext = () => {
+            if (settled) return;
+            settled = true;
+            if (token !== this._cfdSlideRequestToken[type]) return;
+            console.warn('[CFD slideshow] Gambar tidak dapat dimuat:', url);
+            this._cfdApplySlide(type, safeIndex + 1, tries + 1);
+        };
+        const img = new Image();
+        img.onload = applyOnce;
+        img.onerror = tryNext;
+        img.src = url;
+        // Gunakan callback yang sama untuk gambar cache agar tidak diterapkan dua kali.
+        if (img.complete) {
+            if (img.naturalWidth > 0) applyOnce();
+            else tryNext();
+        }
+    },
+    _cfdStartSlideshow: function(type) {
+        // Idempotent: repeated init/focus/storage events must not reapply the same image
+        // or restart the timer, because that causes visible flicker on the customer display.
+        const allSlides = this._cfdGetSlides(type);
+        const flagsKey = type === 'standby' ? 'cfd_promo_standby_slide_flags' : 'cfd_promo_transaksi_slide_flags';
+        let flags = [];
+        try { flags = JSON.parse(localStorage.getItem(flagsKey) || '[]'); } catch (_) {}
+        const slides = allSlides.filter((_, i) => flags.length === allSlides.length ? flags[i] !== false : true);
+        const enabledKey = type === 'standby' ? 'cfd_promo_standby_enabled' : 'cfd_promo_transaksi_enabled';
+        const enabled = localStorage.getItem(enabledKey) !== 'false';
+        const duration = Math.max(2, Number(this._promoGetDuration(type)) || 8);
+        const signature = JSON.stringify({ slides, enabled, duration });
+        const previousSignature = this._cfdSlideSignature && this._cfdSlideSignature[type];
+        const sameConfig = signature === previousSignature;
+        this._cfdSlideSignature = this._cfdSlideSignature || {};
+
+        if (!slides.length) {
+            if (this._cfdSlideTimers[type]) clearInterval(this._cfdSlideTimers[type]);
+            this._cfdSlideTimers[type] = null;
+            this._cfdSlideSignature[type] = signature;
+            const fallback = document.getElementById(type === 'standby' ? 'cfd-bg-standby' : 'cfd-bg-screen');
+            if (fallback && !fallback.style.backgroundImage) {
+                fallback.style.backgroundImage = "url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1920')";
+            }
+            return;
+        }
+
+        // Configuration unchanged: keep current image/index and existing interval.
+        if (sameConfig && this._cfdSlideTimers[type]) return;
+
+        this._cfdSlides[type] = slides;
+        this._cfdSlideSignature[type] = signature;
+        if (this._cfdSlideTimers[type]) clearInterval(this._cfdSlideTimers[type]);
+        this._cfdSlideTimers[type] = null;
+
+        const bg = document.getElementById(type === 'standby' ? 'cfd-bg-standby' : 'cfd-bg-screen');
+        const hasCurrentImage = !!(bg && bg.style.backgroundImage && bg.style.backgroundImage !== 'none');
+        // Only apply immediately for a changed configuration or a blank background.
+        // Do not reanimate the same slide when the tab regains focus.
+        if (!sameConfig || !hasCurrentImage) {
+            const currentIndex = Number(this._cfdSlideIndex[type]) || 0;
+            this._cfdApplySlide(type, currentIndex % slides.length);
+        }
+
+        if (enabled && slides.length > 1) {
+            this._cfdSlideTimers[type] = setInterval(() => {
+                if (document.hidden) return;
+                const current = Number(this._cfdSlideIndex[type]) || 0;
+                this._cfdApplySlide(type, (current + 1) % this._cfdSlides[type].length);
+            }, duration * 1000);
+        }
+    },
+
+    initCFD: function() {
+        ['login-screen','sidebar','main-app'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+        const cfdScreen = document.getElementById('cfd-screen'); if (cfdScreen) cfdScreen.classList.remove('hidden');
+        window.addEventListener('storage', (e) => {
+            if (['ai_snack_cfd','cfd_promo_standby','cfd_promo_transaksi','cfd_promo_standby_list','cfd_promo_transaksi_list','app_logo_url'].includes(e.key)) {
+                let data = {}; try { data = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); } catch (_) {}
+                if (data.outlet) this.renderCFD(data);
+                if (e.key && e.key.includes('promo')) { this._cfdStartSlideshow('standby'); this._cfdStartSlideshow('transaksi'); }
+                const newLogo = localStorage.getItem('app_logo_url'); if (newLogo) this.updateAppLogos(newLogo);
+            }
+        });
+        let initialData = {}; try { initialData = JSON.parse(localStorage.getItem('ai_snack_cfd') || '{}'); } catch (_) {}
+        if (initialData.outlet) this.renderCFD(initialData);
+        const savedLogo = localStorage.getItem('app_logo_url'); if (savedLogo) this.updateAppLogos(savedLogo);
+        this._cfdStartSlideshow('standby'); this._cfdStartSlideshow('transaksi');
+        // A cleared browser must rehydrate promo URLs/settings from Google Sheets, not remain blank.
+        try {
+            const apiUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
+            if (apiUrl) fetch(apiUrl + (apiUrl.includes('?') ? '&' : '?') + 'ts=' + Date.now(), {cache:'no-store', redirect:'follow'})
+                .then(r=>r.json()).then(data=>{ if(data && data.status==='sukses' && Array.isArray(data.pengaturan)) { this.applyCFDPromoSettings(data.pengaturan); this._cfdStartSlideshow('standby'); this._cfdStartSlideshow('transaksi'); const logo=localStorage.getItem('app_logo_url'); if(logo)this.updateAppLogos(logo); } })
+                .catch(e=>console.warn('Sinkronisasi promo CFD dari server gagal:',e));
+        } catch(e) { console.warn('CFD settings refresh skipped:',e); }
+        // Refresh list from local cache periodically; preserves slides after tab wakes from sleep.
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) { this._cfdStartSlideshow('standby'); this._cfdStartSlideshow('transaksi'); } });
+    },
     renderCFD: function(data) {
         const outNameEl = document.getElementById('cfd-outlet-name'); if (outNameEl) outNameEl.innerText = `Cabang ${data.outlet}`;
-        if (data.promoStandbyUrl) { const bg1 = document.getElementById('cfd-bg-standby'); if (bg1) bg1.style.backgroundImage = `url('${data.promoStandbyUrl}')`; }
-        if (data.promoScreenUrl) { const bg2 = document.getElementById('cfd-bg-screen'); if (bg2) bg2.style.backgroundImage = `url('${data.promoScreenUrl}')`; }
+        // Slideshow is independent from cart updates: renderCFD must not reset its timer/index.
+        if (data.promoStandbyUrl && !this._cfdGetSlides('standby').length) { const bg1 = document.getElementById('cfd-bg-standby'); if (bg1) bg1.style.backgroundImage = `url('${data.promoStandbyUrl}')`; }
+        if (data.promoScreenUrl && !this._cfdGetSlides('transaksi').length) { const bg2 = document.getElementById('cfd-bg-screen'); if (bg2) bg2.style.backgroundImage = `url('${data.promoScreenUrl}')`; }
         const cfdStandby = document.getElementById('cfd-standby'); const cfdSuccess = document.getElementById('cfd-success');
         
         // --- JIKA PEMBAYARAN SUKSES ---
@@ -5644,7 +5916,7 @@ selectOutlet: function(id) {
         // Tarik data baru di background jika online
         if (!res.is_offline) {
             fetch(API_URL + "?ts=" + new Date().getTime(), { redirect: 'follow' })
-                .then(r => r.json()).then(data => { if (data.status === 'sukses') { this.db = data; localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); this.renderUserManagement(); } });
+                .then(r => r.json()).then(data => { if (data.status === 'sukses') { this.db = data; if (data && data.pengaturan) this.applyCFDPromoSettings(data.pengaturan); localStorage.setItem('aisnack_db_cache', JSON.stringify(data)); this.renderUserManagement(); } });
         }
     },
 
@@ -9334,7 +9606,9 @@ openDetailStokOpname: function(sku) {
                 
                 if (t.Status === 'Sukses') { 
                     totalOmset += bayar; countTrx++;
-                    if(String(t.Metode_Bayar||'').toUpperCase() === 'QRIS') totalQris += bayar; else totalTunai += bayar;
+                    const paymentBreakdown = aisnackGetPaymentBreakdown(t);
+                    totalQris += paymentBreakdown.qris;
+                    totalTunai += paymentBreakdown.cash;
                     
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                     items.forEach(item => {
@@ -9617,14 +9891,15 @@ openDetailStokOpname: function(sku) {
             let trxDate = typeof this.parseDateId === 'function' ? this.parseDateId(t.Tanggal) : new Date(t.Tanggal);
             
             if ((filterVal === 'Semua' || t.Outlet === filterVal) && trxDate >= dateStart && trxDate <= dateEnd) {
-                let isQris = String(t.Metode_Bayar).trim().toLowerCase().includes('qris');
+                const paymentBreakdown = aisnackGetPaymentBreakdown(t);
                 let bayar = Number(t.Total_Bayar) || 0;
-                
-                // Sortir Berdasarkan Tipe Kartu yang Diklik
+                let isQris = paymentBreakdown.qris > 0 && paymentBreakdown.cash === 0;
+                // Untuk kartu Tunai/QRIS, ambil nominal parsial metode terkait.
+                let displayAmount = bayar;
                 let match = false;
                 if (type === 'omset' || type === 'struk') match = true;
-                else if (type === 'tunai' && !isQris) match = true;
-                else if (type === 'qris' && isQris) match = true;
+                else if (type === 'tunai') { displayAmount = paymentBreakdown.cash; match = displayAmount > 0; }
+                else if (type === 'qris') { displayAmount = paymentBreakdown.qris; match = displayAmount > 0; }
 
                 if (match) {
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
@@ -9634,9 +9909,9 @@ openDetailStokOpname: function(sku) {
                     
                     details.push({
                         sortTime, dateStr: t.Tanggal, wkt: `${t.Tanggal} ${t.Waktu}`, id: t.ID_TRX, kasir: t.Kasir, outlet: t.Outlet,
-                        nominal: bayar, pcs: pcs, isQris: isQris
+                        nominal: displayAmount, pcs: pcs, isQris: isQris
                     });
-                    totalRp += bayar;
+                    totalRp += displayAmount;
                     totalPcs += pcs;
                     totalStruk++;
                 }
@@ -9906,12 +10181,10 @@ openDetailStokOpname: function(sku) {
                     jamPadat[hour] += bayar;
                     totalRev += bayar;
                     
-                    // 1. Pemisahan Omset Cash dan QRIS
-                    if (String(t.Metode_Bayar).trim().toLowerCase() === 'qris') {
-                        totalQris += bayar;
-                    } else {
-                        totalCash += bayar;
-                    }
+                    // 1. Pemisahan Omset Tunai dan QRIS; mendukung transaksi gabungan.
+                    const paymentBreakdown = aisnackGetPaymentBreakdown(t);
+                    totalCash += paymentBreakdown.cash;
+                    totalQris += paymentBreakdown.qris;
                     
                     let items = []; try { items = JSON.parse(t.Items_JSON || '[]'); } catch(e){}
                     items.forEach(item => {
@@ -14954,4 +15227,3 @@ setInterval(() => {
         superApp.pullFreshData(true); 
     }
 }, 300000);
-
