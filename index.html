@@ -71,7 +71,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261029.5">
   <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:{50:'var(--brand-50)',100:'var(--brand-100)',500:'var(--brand-500)',600:'var(--brand-600)'}}}}}</script>
   <script>
         if (window.location.search.includes('mode=cfd')) {
@@ -2784,17 +2784,17 @@
             <div id="setting-card-standby" class="bg-white border border-slate-200 rounded-[1.5rem] p-5 lg:p-6 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm hover:shadow-xl hover:shadow-blue-100/60 hover:border-blue-200 transition-all duration-300 group hover:-translate-y-1 gap-4 hidden">
                 <div class="flex items-center gap-4">
                     <div class="w-14 h-14 bg-gradient-to-br from-blue-50 to-cyan-50 text-blue-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform border border-blue-100/50 shrink-0"><i class="fas fa-tv"></i></div>
-                    <div><h4 class="font-extrabold text-slate-800 text-base">Layar Promo Standby</h4><p class="text-xs text-slate-500 font-medium mt-1 md:max-w-[220px]">Gambar layar CFD saat tidak ada pelanggan.</p></div>
+                    <div><h4 class="font-extrabold text-slate-800 text-base">Layar Promo Standby</h4><p class="text-xs text-slate-500 font-medium mt-1 md:max-w-[220px]">Unggah beberapa foto sekaligus. Slideshow otomatis setiap 7 detik saat standby.</p></div>
                 </div>
-                <button onclick="superApp.changePromoImage('standby')" class="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-extrabold rounded-xl text-xs lg:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"><i class="fas fa-upload"></i> Unggah Gambar</button>
+                <div class="w-full md:w-auto flex flex-col sm:flex-row gap-2"><button onclick="superApp.openPromoManager('standby')" class="w-full px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 font-extrabold rounded-xl text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-sliders-h"></i> Kelola Slideshow</button><button onclick="superApp.changePromoImage('standby')" class="w-full px-4 py-3.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-extrabold rounded-xl text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-upload"></i> Unggah Foto</button></div>
             </div>
 
             <div id="setting-card-transaksi" class="bg-white border border-slate-200 rounded-[1.5rem] p-5 lg:p-6 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm hover:shadow-xl hover:shadow-orange-100/60 hover:border-brand-200 transition-all duration-300 group hover:-translate-y-1 gap-4 hidden">
                 <div class="flex items-center gap-4">
                     <div class="w-14 h-14 bg-gradient-to-br from-brand-50 to-orange-50 text-brand-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform border border-brand-100/50 shrink-0"><i class="fas fa-image"></i></div>
-                    <div><h4 class="font-extrabold text-slate-800 text-base">Layar Promo Transaksi</h4><p class="text-xs text-slate-500 font-medium mt-1 md:max-w-[220px]">Gambar di layar CFD saat kasir input pesanan.</p></div>
+                    <div><h4 class="font-extrabold text-slate-800 text-base">Layar Promo Transaksi</h4><p class="text-xs text-slate-500 font-medium mt-1 md:max-w-[220px]">Slideshow khusus area promosi saat transaksi; pesanan dan total tetap terlihat.</p></div>
                 </div>
-                <button onclick="superApp.changePromoImage('transaksi')" class="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-brand-500 to-orange-500 text-white font-extrabold rounded-xl text-xs lg:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"><i class="fas fa-upload"></i> Unggah Gambar</button>
+                <div class="w-full md:w-auto flex flex-col sm:flex-row gap-2"><button onclick="superApp.openPromoManager('transaksi')" class="w-full px-4 py-3 bg-orange-50 border border-orange-200 text-orange-700 font-extrabold rounded-xl text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-sliders-h"></i> Kelola Slideshow</button><button onclick="superApp.changePromoImage('transaksi')" class="w-full px-4 py-3.5 bg-gradient-to-r from-brand-500 to-orange-500 text-white font-extrabold rounded-xl text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-upload"></i> Unggah Foto</button></div>
             </div>
 
             <div id="setting-card-struk" class="bg-white border border-slate-200 rounded-[1.5rem] p-5 lg:p-6 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm hover:shadow-xl hover:shadow-emerald-100/60 hover:border-emerald-200 transition-all duration-300 group hover:-translate-y-1 gap-4 hidden">
@@ -2810,10 +2810,39 @@
                     <div class="w-14 h-14 bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform border border-emerald-100/50 shrink-0"><i class="fas fa-building"></i></div>
                     <div><h4 class="font-extrabold text-slate-800 text-base">Logo Aplikasi Global</h4><p class="text-xs text-slate-500 font-medium mt-1 md:max-w-[220px]">Ubah logo seluruh cabang.</p></div>
                 </div>
-                <button onclick="superApp.changeAppLogo()" class="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold rounded-xl text-xs lg:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"><i class="fas fa-upload"></i> Unggah Logo</button>
+                <div class="w-full md:w-auto flex flex-col sm:flex-row gap-2 shrink-0">
+                    <label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-800">Efek logo
+                      <select id="global-logo-effect" onchange="superApp.setGlobalLogoEffect(this.value)" class="bg-white border border-emerald-200 rounded-lg px-2 py-2 text-xs font-bold"><option value="none">Normal</option><option value="shimmer" selected>Berkilau</option><option value="glow">Cahaya</option><option value="float">Mengambang</option><option value="pulse">Denyut lembut</option></select>
+                    </label>
+                    <button onclick="superApp.changeAppLogo()" class="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold rounded-xl text-xs lg:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"><i class="fas fa-upload"></i> Unggah Logo</button>
+                </div>
             </div>
 
         </div> </div> </div>
+
+  <!-- Promo Slideshow Manager -->
+  <div id="modal-promo-manager" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[260] hidden items-center justify-center p-3 sm:p-5">
+    <section class="bg-white w-full max-w-5xl max-h-[94dvh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <header class="px-5 sm:px-7 py-4 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+        <div><div id="promo-manager-kicker" class="text-[10px] font-black uppercase tracking-widest text-blue-600">MANAJEMEN LAYAR PROMO</div><h3 id="promo-manager-title" class="text-xl sm:text-2xl font-black text-slate-900">Slideshow Standby</h3><p class="text-xs text-slate-500 mt-1">Atur durasi, urutan, pratinjau, dan foto yang aktif.</p></div>
+        <button onclick="superApp.closePromoManager()" class="w-10 h-10 shrink-0 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500" aria-label="Tutup"><i class="fas fa-times"></i></button>
+      </header>
+      <div class="p-4 sm:p-6 overflow-y-auto min-h-0 space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_1.3fr] gap-4">
+          <div class="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+            <label for="promo-manager-duration" class="block text-sm font-extrabold text-slate-800 mb-2">Durasi setiap foto</label>
+            <div class="flex items-center gap-3"><input id="promo-manager-duration" type="range" min="1" max="30" step="1" value="7" class="w-full accent-blue-600" oninput="superApp.updatePromoDurationLabel(this.value)"><strong id="promo-manager-duration-label" class="min-w-[58px] text-center rounded-xl bg-white border border-slate-200 px-3 py-2 text-sm">7 detik</strong></div>
+            <p class="text-xs text-slate-500 mt-2">Pilihan 1–30 detik. Durasi berlaku untuk layar ini saja.</p>
+            <label class="flex items-start gap-3 mt-4 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer"><input id="promo-manager-enabled" type="checkbox" class="mt-1 accent-blue-600" checked><span><strong class="block text-sm text-slate-800">Aktifkan slideshow</strong><small class="text-xs text-slate-500">Jika nonaktif, gambar pertama menjadi gambar tetap.</small></span></label>
+            <div class="flex flex-wrap gap-2 mt-4"><button onclick="superApp.changePromoImage(superApp._promoManagerType)" class="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm"><i class="fas fa-upload mr-2"></i>Tambah foto</button><button onclick="superApp.previewPromoSlideshow()" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-sm"><i class="fas fa-eye mr-2"></i>Preview</button></div>
+          </div>
+          <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 min-h-[190px] relative"><img id="promo-manager-preview-img" class="absolute inset-0 w-full h-full object-contain" alt="Pratinjau foto promo"><div class="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-between gap-2"><span id="promo-manager-preview-count" class="text-white text-xs font-bold">Foto 0 dari 0</span><span class="text-white/70 text-[10px]">Preview</span></div><div id="promo-manager-empty" class="absolute inset-0 flex items-center justify-center text-white/70 text-sm">Belum ada foto promo</div></div>
+        </div>
+        <div><div class="flex items-center justify-between gap-3 mb-3"><h4 class="font-black text-slate-800">Urutan slideshow</h4><span id="promo-manager-total" class="text-xs text-slate-500">0 foto</span></div><p class="text-xs text-slate-500 mb-3">Gunakan panah atas/bawah untuk mengatur urutan. Foto yang nonaktif tidak akan ditampilkan.</p><div id="promo-manager-list" class="space-y-2"></div></div>
+      </div>
+      <footer class="px-5 sm:px-7 py-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0"><p class="text-[11px] text-slate-500">Perubahan berlaku pada layar pelanggan di browser/perangkat yang sama.</p><div class="flex gap-2 justify-end"><button onclick="superApp.closePromoManager()" class="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm">Batal</button><button onclick="superApp.savePromoManager()" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm"><i class="fas fa-check mr-2"></i>Simpan pengaturan</button></div></footer>
+    </section>
+  </div>
 
   <!-- 2. MODAL FORENSIC AUDIT (DIKEMBALIKAN) -->
   <div id="modal-forensic-audit" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] hidden flex items-center justify-center p-4 lg:p-6 transition-opacity">
@@ -3537,7 +3566,7 @@
 
   
 <!-- 1. PANGGIL APP.JS TERLEBIH DAHULU -->
-  <script src="app.js?v=20261022.4"></script>
+  <script src="app.js?v=20261029.6"></script>
 <script src="offline-hardening.js?v=20261022.2"></script>
 <script src="pwa-install.js?v=20261023.2" defer></script>
 
