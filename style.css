@@ -962,3 +962,159 @@ html, body {
     touch-action: pan-y;
   }
 }
+
+
+/* v4.4.0 — Unified payment component for backdated transactions */
+.susulan-payment-unified {
+  padding: 1rem !important;
+  border: 1px solid #fed7aa !important;
+  border-radius: 1rem !important;
+  background: linear-gradient(135deg,#fffaf5,#fff) !important;
+}
+.susulan-payment-unified > span {
+  display:block;
+  margin-bottom:.75rem;
+  color:#9a3412;
+  font-weight:900;
+}
+.susulan-payment-summary {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.6rem;
+  margin-bottom:.85rem;
+}
+.susulan-payment-summary > div {
+  min-width:0;
+  padding:.7rem .8rem;
+  border:1px solid #e2e8f0;
+  border-radius:.85rem;
+  background:#fff;
+}
+.susulan-payment-summary small {
+  display:block;
+  color:#64748b;
+  font-size:.72rem;
+  font-weight:800;
+  margin-bottom:.25rem;
+}
+.susulan-payment-summary strong {
+  display:block;
+  overflow-wrap:anywhere;
+  color:#1e293b;
+  font-size:clamp(.85rem,1.4vw,1.1rem);
+  font-weight:900;
+}
+#susulan-payment-difference.is-balanced { color:#059669; }
+#susulan-payment-difference.is-unbalanced { color:#dc2626; }
+.susulan-payment-list {
+  display:flex;
+  flex-direction:column;
+  gap:.65rem;
+}
+.susulan-payment-row {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;
+  align-items:end;
+  gap:.65rem;
+  padding:.75rem;
+  border:1px solid #e2e8f0;
+  border-radius:1rem;
+  background:#fff;
+}
+.susulan-payment-row label { display:block; min-width:0; }
+.susulan-payment-row label > span {
+  display:block;
+  color:#64748b;
+  font-size:.72rem;
+  font-weight:800;
+  margin-bottom:.35rem;
+}
+.susulan-payment-row select,
+.susulan-payment-row input {
+  width:100%;
+  min-width:0;
+  height:46px;
+  padding:.65rem .75rem;
+  border:1px solid #dbe4f0;
+  border-radius:.8rem;
+  background:#f8fafc;
+  color:#0f172a;
+  font:inherit;
+}
+.susulan-payment-row select:focus,
+.susulan-payment-row input:focus {
+  outline:none;
+  border-color:#fb923c;
+  box-shadow:0 0 0 3px rgba(251,146,60,.15);
+}
+.susulan-payment-row .susulan-remove-payment {
+  width:44px;
+  height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:.8rem;
+  background:#fff1f2;
+  color:#e11d48;
+}
+.susulan-payment-row .susulan-remove-payment:active { transform:scale(.97); }
+@media(max-width:767px) {
+  .susulan-payment-summary { grid-template-columns:1fr; gap:.45rem; }
+  .susulan-payment-summary > div { display:flex; justify-content:space-between; align-items:center; gap:.75rem; }
+  .susulan-payment-summary small { margin:0; }
+  .susulan-payment-row { grid-template-columns:minmax(0,1fr) 44px; gap:.5rem; }
+  .susulan-payment-row .susulan-payment-method { grid-column:1; }
+  .susulan-payment-row .susulan-payment-amount { grid-column:1; }
+  .susulan-payment-row .susulan-remove-payment { grid-column:2; grid-row:1 / span 2; align-self:center; }
+}
+
+/* v4.5.0 — CFD independent promo slideshows */
+#cfd-bg-screen, #cfd-bg-standby { background-size: cover; background-position: center; will-change: opacity, transform; }
+.cfd-slide-enter { animation: cfdPromoFade 850ms ease both; }
+@keyframes cfdPromoFade { from { opacity: .25; transform: scale(1.015); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cfd-slide-enter { animation: none !important; } }
+
+/* Promo slideshow manager: touch-friendly controls */
+.promo-manager-row button { touch-action: manipulation; min-width: 36px; min-height: 36px; }
+#modal-promo-manager input[type="range"] { min-height: 32px; touch-action: pan-x; }
+#modal-promo-manager { overscroll-behavior: contain; }
+#modal-promo-manager > section { overscroll-behavior: contain; }
+
+
+/* v4.5.2 — Windows/Chrome desktop date & time picker visibility */
+#modal-form:has(.susulan-shell) .susulan-field input[type="date"],
+#modal-form:has(.susulan-shell) .susulan-field input[type="time"] {
+  display:block; width:100%; min-width:0; min-height:48px; box-sizing:border-box;
+  color:#172033 !important; background-color:#fbfcfe !important;
+  color-scheme:light; appearance:auto; -webkit-appearance:auto;
+  font-variant-numeric:tabular-nums; line-height:1.35; cursor:pointer;
+  position:relative; z-index:1;
+}
+#modal-form:has(.susulan-shell) .susulan-field input[type="date"]::-webkit-calendar-picker-indicator,
+#modal-form:has(.susulan-shell) .susulan-field input[type="time"]::-webkit-calendar-picker-indicator {
+  display:block; opacity:1; cursor:pointer; filter:none; width:18px; height:18px;
+  padding:2px; margin-left:6px;
+}
+#modal-form:has(.susulan-shell) .susulan-field input[type="date"]:focus-visible,
+#modal-form:has(.susulan-shell) .susulan-field input[type="time"]:focus-visible {
+  outline:3px solid rgba(249,115,22,.24); outline-offset:1px; border-color:#fb923c;
+}
+@media (min-width:801px) {
+  #modal-form:has(.susulan-shell) .susulan-fields-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #modal-form:has(.susulan-shell) .susulan-field input[type="date"],
+  #modal-form:has(.susulan-shell) .susulan-field input[type="time"] { min-height:50px; font-size:14px; padding:12px 13px; }
+}
+
+
+/* Global logo personalization effects; respects reduced-motion preferences. */
+.app-logo-effect-host { position: relative; isolation: isolate; overflow: hidden; }
+.app-logo-effect-host .app-logo-img { position: relative; z-index: 1; }
+.logo-effect-shimmer::after { content: ''; position: absolute; z-index: 2; inset: -35% auto -35% -70%; width: 45%; pointer-events: none; transform: skewX(-22deg); background: linear-gradient(90deg,transparent,rgba(255,255,255,.78),transparent); animation: aisnackLogoShimmer 3.8s ease-in-out infinite; }
+.logo-effect-glow { filter: drop-shadow(0 0 5px rgba(16,185,129,.45)) drop-shadow(0 0 12px rgba(59,130,246,.18)); }
+.logo-effect-float .app-logo-img { animation: aisnackLogoFloat 3.4s ease-in-out infinite; }
+.logo-effect-pulse .app-logo-img { animation: aisnackLogoPulse 2.8s ease-in-out infinite; }
+@keyframes aisnackLogoShimmer { 0%,45% { left:-70%; } 85%,100% { left:135%; } }
+@keyframes aisnackLogoFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
+@keyframes aisnackLogoPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.035); } }
+@media (prefers-reduced-motion: reduce) { .logo-effect-shimmer::after,.logo-effect-float .app-logo-img,.logo-effect-pulse .app-logo-img { animation:none !important; } }
