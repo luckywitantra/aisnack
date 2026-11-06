@@ -4778,8 +4778,7 @@ selectOutlet: function(id) {
         let repCount = 0;
 
         (this.db.laporanHarian || []).forEach(rep => {
-            // Ditolak berarti revisi ditolak; laporan dasar tetap dihitung.
-            // Pending Edit juga tetap memakai nilai dasar sampai revisi disetujui.
+            if (rep.Status_Approval === 'Ditolak') return;
             let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             if (repOutlet !== outName) return;
 
@@ -4964,6 +4963,35 @@ selectOutlet: function(id) {
         else if (kpiType === 'pcs') { kpiName = "Rata-rata Pendapatan per Pcs"; kpiColorClass = "text-teal-400"; glowColor = "bg-teal-500/30"; }
         else if (kpiType === 'netlaci') { kpiName = "Net Laci (Cash - OPEX)"; kpiColorClass = "text-emerald-400"; glowColor = "bg-emerald-500/30"; }
 
+        // Normalisasi nama outlet agar label Ai-CHA/Ai-Snack tidak menyebabkan mismatch.
+        const normalizeOutletName = (value) => String(value || '')
+            .replace(/^\\s*Ai[-\\s]?CHA\\s+/i, '')
+            .replace(/^\\s*Ai[-\\s]?Snack\\s+/i, '')
+            .replace(/\\s+/g, ' ').trim().toLocaleLowerCase('id-ID');
+
+        // Terima tanggal ISO, DD/MM/YYYY, atau MM/DD/YYYY.
+        const parseKpiDate = (value) => {
+            if (value instanceof Date && !isNaN(value.getTime()))
+                return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+            const raw = String(value || '').trim();
+            if (!raw) return null;
+            const clean = raw.split(',').pop().trim();
+            let m = clean.match(/^(\\d{4})[-\\/](\\d{1,2})[-\\/](\\d{1,2})(?:$|T|\\s)/);
+            if (m) {
+                const y=+m[1], mo=+m[2], day=+m[3], d=new Date(y,mo-1,day);
+                return d.getFullYear()===y && d.getMonth()===mo-1 && d.getDate()===day ? d : null;
+            }
+            m = clean.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$/);
+            if (!m) return null;
+            const a=+m[1], b=+m[2], y=+m[3];
+            let candidates = a>12 ? [new Date(y,b-1,a)] : b>12 ? [new Date(y,a-1,b)] : [new Date(y,b-1,a),new Date(y,a-1,b)];
+            candidates = candidates.filter(d => d.getFullYear()===y);
+            return candidates.find(d =>
+                (!startObj || d >= new Date(startObj.getFullYear(),startObj.getMonth(),startObj.getDate())) &&
+                (!endObj || d <= new Date(endObj.getFullYear(),endObj.getMonth(),endObj.getDate()))
+            ) || candidates[0] || null;
+        };
+
         // Penentuan Skala Global vs Lokal
         let isGlobal = (outName === 'global');
         let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
@@ -4979,36 +5007,22 @@ selectOutlet: function(id) {
         let dateMap = {};
 
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
-            
-            let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            let currOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            
-            if (!isGlobal && repOutlet !== outName) return; 
-            if (isGlobal && !isConsolidated && repOutlet !== currOutlet) return; 
+            // Ditolak hanya menolak revisi; laporan dasar tetap dihitung.
+            // Revisi yang disetujui harus sudah menggantikan nilai dasar di record aktif.
+            const repOutletKey = normalizeOutletName(rep.Outlet);
+            const requestedOutletKey = normalizeOutletName(outName);
+            const currentOutletKey = normalizeOutletName(this.outlet);
+            if (!isGlobal && repOutletKey !== requestedOutletKey) return;
+            if (isGlobal && !isConsolidated && repOutletKey !== currentOutletKey) return;
 
-            // Gunakan normalisasi tanggal yang konsisten dengan dashboard.
-            let dateStrLokal = String(rep.Tanggal || '').trim();
-            let cleanStr = dateStrLokal.split(',').pop().trim();
-            let candidates = [];
-            let match = cleanStr.match(/^(\\d{4})[-\\/](\\d{1,2})[-\\/](\\d{1,2})/);
-            if (match) {
-                candidates = [new Date(+match[1], +match[2]-1, +match[3])];
-            } else {
-                match = cleanStr.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$/);
-                if (match) {
-                    const a=+match[1], b=+match[2], y=+match[3];
-                    if (a > 12) candidates=[new Date(y,b-1,a)];
-                    else if (b > 12) candidates=[new Date(y,a-1,b)];
-                    else candidates=[new Date(y,b-1,a),new Date(y,a-1,b)];
-                }
-            }
-            candidates=candidates.filter(d => !isNaN(d.getTime()));
-            if (!candidates.length) return;
-            let repDateObj=candidates.find(d => (!startObj || d >= startObj) && (!endObj || d <= endObj));
+            const dateStrLokal = String(rep.Tanggal || rep.tanggal || rep.Date || rep.date || '').trim();
+            const repDateObj = parseKpiDate(dateStrLokal);
             if (!repDateObj) return;
-            let dateKey = `${repDateObj.getFullYear()}-${String(repDateObj.getMonth()+1).padStart(2,'0')}-${String(repDateObj.getDate()).padStart(2,'0')}`;
-            if (!dateMap[dateKey]) dateMap[dateKey]={dateObj:repDateObj,label:dateStrLokal,s:0,c:0,q:0,o:0,b:0,p:0};
+            if (startObj && repDateObj < new Date(startObj.getFullYear(),startObj.getMonth(),startObj.getDate())) return;
+            if (endObj && repDateObj > new Date(endObj.getFullYear(),endObj.getMonth(),endObj.getDate())) return;
+
+            const dateKey = `${repDateObj.getFullYear()}-${String(repDateObj.getMonth()+1).padStart(2,'0')}-${String(repDateObj.getDate()).padStart(2,'0')}`;
+            if (!dateMap[dateKey]) dateMap[dateKey] = { dateObj: repDateObj, label: dateStrLokal, s: 0, c: 0, q: 0, o: 0, b: 0, p: 0 };
             dateMap[dateKey].s += Number(rep.Net_Sales || 0);
             dateMap[dateKey].c += Number(rep.Cash || 0);
             dateMap[dateKey].q += Number(rep.QRIS || 0);
