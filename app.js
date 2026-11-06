@@ -3237,8 +3237,8 @@ pullFreshData: async function(silent = false) {
         let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim();
         let cleanCurrTanggal = String(tglTeks).trim().toLowerCase();
 
+        // Ditolak hanya menolak revisi; data dasar laporan tetap sah dan tetap dihitung.
         let existingRep = (this.db.laporanHarian || []).find(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
             let xTgl = String(x.Tanggal || '').trim().toLowerCase();
             return xOut === cleanCurrOutlet.toLowerCase() && xTgl === cleanCurrTanggal;
@@ -3330,33 +3330,32 @@ pullFreshData: async function(silent = false) {
                 let rUrl = (typeof API_URL !== 'undefined') ? API_URL : this.webAppUrl;
                 let syncUrl = rUrl + "?ts=" + new Date().getTime() + "&action=get_laporan_only";
                 
-                await new Promise((resolve) => {
+                const syncVerified = await new Promise((resolve) => {
                     const xhr = new XMLHttpRequest();
                     xhr.open("GET", syncUrl, true);
-                    xhr.timeout = 3000; 
-                    
+                    xhr.timeout = 8000;
                     xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 400) {
-                            try {
-                                const freshData = JSON.parse(xhr.responseText);
-                                if (freshData && freshData.laporanHarian && freshData.laporanHarian.length > 0) {
-                                    if (!this.db.laporanHarian) this.db.laporanHarian = [];
-                                    
-                                    freshData.laporanHarian.forEach(fRep => {
-                                        let idx = this.db.laporanHarian.findIndex(r => String(r.ID_Laporan).trim() === String(fRep.ID_Laporan).trim());
-                                        if (idx > -1) this.db.laporanHarian[idx] = fRep;
-                                        else this.db.laporanHarian.push(fRep);
-                                    });
-                                    localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
-                                }
-                            } catch(e) {}
-                        }
-                        resolve();
+                        try {
+                            if (xhr.status < 200 || xhr.status >= 400) return resolve(false);
+                            const freshData = JSON.parse(xhr.responseText);
+                            if (!freshData || freshData.status !== 'sukses' || !Array.isArray(freshData.laporanHarian)) return resolve(false);
+                            if (!this.db.laporanHarian) this.db.laporanHarian = [];
+                            freshData.laporanHarian.forEach(fRep => {
+                                const id = String(fRep.ID_Laporan || fRep.id_laporan || '').trim();
+                                if (!id) return;
+                                const idx = this.db.laporanHarian.findIndex(r => String(r.ID_Laporan || r.id_laporan || '').trim() === id);
+                                if (idx > -1) this.db.laporanHarian[idx] = fRep;
+                                else this.db.laporanHarian.push(fRep);
+                            });
+                            localStorage.setItem('aisnack_db_cache', JSON.stringify(this.db));
+                            resolve(true);
+                        } catch(e) { resolve(false); }
                     };
-                    xhr.onerror = () => resolve();
-                    xhr.ontimeout = () => resolve();
+                    xhr.onerror = () => resolve(false);
+                    xhr.ontimeout = () => resolve(false);
                     xhr.send();
                 });
+                if (!syncVerified) throw new Error('Sinkronisasi laporan ke server gagal. Laporan tidak disimpan agar akumulasi bulanan tidak dihitung dari data lama. Periksa koneksi lalu coba kembali.');
             } catch(e) {}
         }
 
@@ -3367,7 +3366,7 @@ pullFreshData: async function(silent = false) {
             let accumPrevious = 0;
             (this.db.laporanHarian || []).forEach(rep => {
                 let repOut = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
-                if (repOut === cleanCurrOutlet.toLowerCase() && rep.Status_Approval !== 'Ditolak') {
+                if (repOut === cleanCurrOutlet.toLowerCase()) {
                     if (rep.ID_Laporan !== idRep) {
                         accumPrevious += Number(rep.Net_Sales || 0);
                     }
@@ -3502,73 +3501,70 @@ pullFreshData: async function(silent = false) {
     // 🚀 ENGINE AKUMULASI PRESISI (KEBAL FORMAT TANGGAL & PREFIX OUTLET)
     // =========================================================
     calcMonthlyAccumulation: function(liveNetSales) {
-        let tglTeks = document.getElementById('daily-form-date')?.innerText || '';
-        
-        // Helper Parser Tanggal Universal (Aman untuk DD-MM-YYYY maupun YYYY-MM-DD)
-        const parseAnyDate = (str) => {
-            if (!str) return null;
-            let s = String(str).split(',').pop().trim();
-            let m = s.match(/(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
-            if (m) {
-                let p1 = parseInt(m[1], 10), p2 = parseInt(m[2], 10), p3 = parseInt(m[3], 10);
-                if (p1 > 1000) return { y: p1, m: p2, d: p3 }; // Format YYYY-MM-DD
-                else return { y: p3, m: p2, d: p1 };         // Format DD-MM-YYYY
-            }
-            let d = new Date(s);
-            return isNaN(d.getTime()) ? null : { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+        const rawDate = document.getElementById('daily-form-date')?.innerText || '';
+        const parseParts = (raw) => {
+            if (raw instanceof Date && !isNaN(raw.getTime())) return { y: raw.getFullYear(), m: raw.getMonth()+1, d: raw.getDate() };
+            let s = String(raw == null ? '' : raw).trim();
+            if (!s) return null;
+            if (s.includes(',')) s = s.split(',').pop().trim();
+            let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:$|[T\s])/);
+            if (m) return { y:Number(m[1]), m:Number(m[2]), d:Number(m[3]) };
+            m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+            if (m) return { y:Number(m[3]), m:Number(m[2]), d:Number(m[1]) };
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : { y:d.getFullYear(), m:d.getMonth()+1, d:d.getDate() };
         };
-
-        let targetDate = parseAnyDate(tglTeks) || { y: new Date().getFullYear(), m: new Date().getMonth() + 1, d: new Date().getDate() };
-        let accumPreviousDays = 0;
-        let activeReportId = this.editReportId; 
-
-        let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
-        let cleanCurrOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
-
-        // Tentukan Target Bulanan secara Akurat
-        let targetPerhitungan = this.targetBulanan || 180000000;
-        if (isConsolidated && this.db && this.db.outlets) {
-            let totalTargetSemua = 0;
-            this.db.outlets.forEach(o => {
-                if (o.Nama_Outlet !== 'Pusat' && o.Nama_Outlet !== 'Semua') {
-                    let t = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
-                    totalTargetSemua += (t && !isNaN(t)) ? Number(t) : 180000000;
-                }
-            });
-            if (totalTargetSemua > 0) targetPerhitungan = totalTargetSemua;
+        const targetDate = parseParts(rawDate);
+        if (!targetDate || targetDate.m < 1 || targetDate.m > 12 || targetDate.d < 1 || targetDate.d > 31) {
+            throw new Error('Tanggal laporan tidak valid. Akumulasi bulanan tidak dapat dihitung.');
         }
-
-        // Jumlahkan HANYA laporan masa lalu sebelum tanggal target (Tanggal 1 s/d H-1)
-        (this.db.laporanHarian || []).forEach(rep => {
-            let repOutClean = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
-            
-            if (isConsolidated || repOutClean === cleanCurrOutlet) {
-                if (activeReportId && String(rep.ID_Laporan).trim() === String(activeReportId).trim()) return;
-                if (rep.Status_Approval === 'Ditolak') return;
-
-                let rDate = parseAnyDate(rep.Tanggal);
-                if (rDate) {
-                    // KUNCI PRESISI: Bulan & Tahun sama, DAN Hari lebih kecil (Tanggal 1 s/d H-1)
-                    if (rDate.y === targetDate.y && rDate.m === targetDate.m && rDate.d < targetDate.d) {
-                        accumPreviousDays += Number(rep.Net_Sales || 0);
-                    }
-                }
-            }
+        const cleanOutlet = v => String(v || '').replace(/^Ai[-\s]?CHA\s+/i, '').replace(/^Ai[-\s]?Snack\s+/i, '').trim().toLowerCase();
+        const isConsolidated = ['pusat','semua',''].includes(cleanOutlet(this.outlet));
+        const currentOutlet = cleanOutlet(this.outlet);
+        const activeId = String(this.editReportId || '').trim();
+        const byId = new Map();
+        (this.db?.laporanHarian || []).forEach(rep => {
+            const id = String(rep.ID_Laporan || rep.id_laporan || '').trim();
+            if (id && !byId.has(id)) byId.set(id, rep);
         });
-
-        let totalAccumUpToDate = accumPreviousDays + Number(liveNetSales || 0);
-        let pct = Math.min(Math.round((totalAccumUpToDate / targetPerhitungan) * 100), 100);
-        let kurang = Math.max(targetPerhitungan - totalAccumUpToDate, 0);
-
-        // Update Radar UI di layar
-        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totalAccumUpToDate.toLocaleString('id-ID')}`;
-        if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Rp ${targetPerhitungan.toLocaleString('id-ID')}`;
-        if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pct}%`;
-        if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `Progress: ${pct}%`;
-        if (document.getElementById('accum-remaining')) document.getElementById('accum-remaining').innerText = `Kurang: Rp ${kurang.toLocaleString('id-ID')}`;
-
-        this.currentAccumMonth = totalAccumUpToDate;
-        return totalAccumUpToDate;
+        let previous = 0;
+        byId.forEach(rep => {
+            if (activeId && String(rep.ID_Laporan || rep.id_laporan || '').trim() === activeId) return;
+            // Status Ditolak berarti revisi ditolak, bukan laporan dasar dihapus.
+            // Net_Sales pada baris ini tetap merupakan angka terakhir yang disetujui.
+            const outlet = cleanOutlet(rep.Outlet || rep.outlet);
+            if (!isConsolidated && outlet !== currentOutlet) return;
+            const date = parseParts(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+            if (!date || date.y !== targetDate.y || date.m !== targetDate.m || date.d >= targetDate.d) return;
+            const value = Number(rep.Net_Sales ?? rep.net_sales ?? 0);
+            if (Number.isFinite(value)) previous += value;
+        });
+        const live = Number(liveNetSales || 0);
+        if (!Number.isFinite(live) || live < 0) throw new Error('Net sales tidak valid untuk perhitungan akumulasi.');
+        const total = previous + live;
+        let target = Number(this.targetBulanan || 180000000);
+        if (isConsolidated && Array.isArray(this.db?.outlets)) {
+            const targets = this.db.outlets.filter(o => !['pusat','semua'].includes(cleanOutlet(o.Nama_Outlet)));
+            if (targets.length) target = targets.reduce((sum,o) => {
+                const stored = localStorage.getItem('aicha_target_bulanan_' + o.Nama_Outlet);
+                const n = Number(stored);
+                return sum + (stored && Number.isFinite(n) && n > 0 ? n : 180000000);
+            }, 0);
+        }
+        const pct = target > 0 ? Math.min(Math.round(total / target * 100), 100) : 0;
+        const remaining = Math.max(target - total, 0);
+        const salesEl = document.getElementById('accum-net-sales');
+        const targetEl = document.getElementById('accum-target');
+        const barEl = document.getElementById('accum-progress-bar');
+        const pctEl = document.getElementById('accum-percent');
+        const remainingEl = document.getElementById('accum-remaining');
+        if (salesEl) salesEl.innerText = `Rp ${total.toLocaleString('id-ID')}`;
+        if (targetEl) targetEl.innerText = `Rp ${target.toLocaleString('id-ID')}`;
+        if (barEl) barEl.style.width = `${pct}%`;
+        if (pctEl) pctEl.innerText = `${pct}%`;
+        if (remainingEl) remainingEl.innerText = `Kurang: Rp ${remaining.toLocaleString('id-ID')}`;
+        this.currentAccumMonth = total;
+        return total;
     },
 
     // =========================================================
@@ -4060,7 +4056,7 @@ pullFreshData: async function(silent = false) {
                         let rDay = parseInt(rMatch[1], 10);
                         let rMonth = parseInt(rMatch[2], 10);
                         let rYear = parseInt(rMatch[3], 10);
-                        if (rYear === targetYear && rMonth === targetMonth && rDay < targetDay && item.Status_Approval !== 'Ditolak') {
+                        if (rYear === targetYear && rMonth === targetMonth && rDay < targetDay) {
                             sumPast += Number(item.Net_Sales || 0);
                         }
                     }
@@ -4281,7 +4277,7 @@ pullFreshData: async function(silent = false) {
         // 2. Cari laporan dengan mencocokkan Hari, Bulan, Tahun secara presisi (Matematika)
         let existingReport = (this.db.laporanHarian || []).find(x => {
             let xOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            if (xOutlet !== cleanOutlet || x.Status_Approval === 'Ditolak') return false;
+            if (xOutlet !== cleanOutlet) return false;
 
             let xDate = this.normalizeDateObj(x.Tanggal);
             return (xDate.getDate() === tDay && xDate.getMonth() === tMonth && xDate.getFullYear() === tYear);
@@ -4538,7 +4534,7 @@ selectOutlet: function(id) {
         this.execExpenseData = {}; 
 
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
+            // Ditolak mempertahankan snapshot dasar yang terakhir disetujui.
 
             if (startObj || endObj) {
                 let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
@@ -4603,10 +4599,39 @@ selectOutlet: function(id) {
             if (tCons > 0) targetTotal = tCons;
         }
 
-        let pctExec = Math.min(Math.round((totSales / targetTotal) * 100), 100);
-        let sisaTarget = Math.max(targetTotal - totSales, 0);
+        // Akumulasi bulanan selalu dihitung dari tanggal 1 sampai tanggal akhir filter,
+        // sedangkan KPI Net Sales tetap mengikuti rentang tanggal yang dipilih.
+        const monthEnd = endObj || new Date();
+        const monthStart = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), 1);
+        let monthlyAccum = 0;
+        const normOutlet = v => String(v || '').replace(/^Ai[-\s]?CHA\s+/i, '').replace(/^Ai[-\s]?Snack\s+/i, '').trim().toLowerCase();
+        const selectedOutlet = normOutlet(this.outlet);
+        const consolidatedForMonth = ['','pusat','semua'].includes(selectedOutlet);
+        const parseDashDate = raw => {
+            if (raw instanceof Date && !isNaN(raw.getTime())) return new Date(raw.getFullYear(),raw.getMonth(),raw.getDate());
+            let s=String(raw == null ? '' : raw).trim(); if(!s) return null; if(s.includes(',')) s=s.split(',').pop().trim();
+            let m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:$|[T\s])/);
+            if(m) return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+            m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+            if(m) return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+            const d=new Date(s); return isNaN(d.getTime())?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+        };
+        const seenMonthlyIds = new Set();
+        (this.db.laporanHarian || []).forEach(rep => {
+            const status=String(rep.Status_Approval || rep.status_approval || rep['Status Approval'] || 'Disetujui').trim().toLowerCase();
+            if(status==='ditolak') return;
+            const id=String(rep.ID_Laporan || rep.id_laporan || '').trim();
+            if(id && seenMonthlyIds.has(id)) return;
+            if(id) seenMonthlyIds.add(id);
+            if(!consolidatedForMonth && normOutlet(rep.Outlet || rep.outlet)!==selectedOutlet) return;
+            const d=parseDashDate(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+            if(!d || d<monthStart || d>new Date(monthEnd.getFullYear(),monthEnd.getMonth(),monthEnd.getDate())) return;
+            const n=Number(rep.Net_Sales ?? rep.net_sales ?? 0); if(Number.isFinite(n)) monthlyAccum+=n;
+        });
+        let pctExec = targetTotal > 0 ? Math.min(Math.round((monthlyAccum / targetTotal) * 100), 100) : 0;
+        let sisaTarget = Math.max(targetTotal - monthlyAccum, 0);
 
-        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${totSales.toLocaleString('id-ID')}`;
+        if (document.getElementById('accum-net-sales')) document.getElementById('accum-net-sales').innerText = `Rp ${monthlyAccum.toLocaleString('id-ID')}`;
         if (document.getElementById('accum-target')) document.getElementById('accum-target').innerText = `Target: Rp ${targetTotal.toLocaleString('id-ID')}`;
         if (document.getElementById('accum-progress-bar')) document.getElementById('accum-progress-bar').style.width = `${pctExec}%`;
         if (document.getElementById('accum-percent')) document.getElementById('accum-percent').innerText = `${pctExec}%`;
@@ -4669,7 +4694,7 @@ selectOutlet: function(id) {
         let repCount = 0;
 
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
+            // Ditolak mempertahankan snapshot dasar yang terakhir disetujui.
             let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             if (repOutlet !== outName) return;
 
@@ -4869,7 +4894,7 @@ selectOutlet: function(id) {
         let dateMap = {};
 
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
+            // Ditolak mempertahankan snapshot dasar yang terakhir disetujui.
             
             let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             let currOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
@@ -5035,7 +5060,6 @@ selectOutlet: function(id) {
 
         // Ambil daftar tanggal terisi dari database (untuk bulan yang sedang dibuka di datepicker)
         const terisiDates = (this.db.laporanHarian || []).filter(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             return isConsolidated || repOutlet === currOutletClean;
         }).map(l => {
@@ -5164,7 +5188,6 @@ selectOutlet: function(id) {
 
         // 🚀 KUNCI PERBAIKAN: Ambtil data laporan dinamis mengikuti outlet terpilih
         const terisiDates = (this.db.laporanHarian || []).filter(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             return isConsolidated || repOutlet === currOutletClean;
         }).map(l => {
@@ -11240,7 +11263,7 @@ openDetailStokOpname: function(sku) {
 
         // Kumpulkan data riwayat
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
+            // Ditolak mempertahankan snapshot dasar yang terakhir disetujui.
 
             let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
             if (!isConsolidated && repOutlet !== currOutletClean) return;
@@ -14124,7 +14147,7 @@ openAIDeepDive: function(type, param) {
 
         // 1. Ekstrak Laporan Ai-CHA
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
+            // Ditolak mempertahankan snapshot dasar yang terakhir disetujui.
             let rOut = String(rep.Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
             if (selOut !== 'Semua' && rOut !== selOut) return;
 
