@@ -4628,17 +4628,35 @@ selectOutlet: function(id) {
         // 🚀 KUNCI PERBAIKAN: Gunakan variabel global superApp untuk menampung data item biaya
         this.execExpenseData = {}; 
 
+        // Parser tanggal toleran terhadap format Google Sheets (MM/DD/YYYY atau DD/MM/YYYY),
+        // ISO (YYYY-MM-DD), dan objek Date. Untuk tanggal ambigu, pilih kandidat yang cocok
+        // dengan rentang filter aktif agar locale browser tidak membuat laporan hilang.
+        const parseReportDateCandidates = value => {
+            if (value instanceof Date && !isNaN(value.getTime())) {
+                return [new Date(value.getFullYear(), value.getMonth(), value.getDate())];
+            }
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return [];
+            let m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (m) return [new Date(+m[1], +m[2]-1, +m[3])];
+            m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (m) {
+                const a=+m[1], b=+m[2], y=+m[3];
+                if (a > 12) return [new Date(y,b-1,a)];
+                if (b > 12) return [new Date(y,a-1,b)];
+                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+            }
+            const parsed = new Date(raw);
+            return isNaN(parsed.getTime()) ? [] : [new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())];
+        };
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
-
+            // Status Ditolak adalah status revisi; data dasar tetap dihitung.
             if (startObj || endObj) {
-                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
-                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                if (match) {
-                    let repDateObj = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
-                    if (startObj && repDateObj < startObj) return;
-                    if (endObj && repDateObj > endObj) return;
-                } else return;
+                const candidates = parseReportDateCandidates(rep.Tanggal);
+                const matchesRange = candidates.some(d =>
+                    (!startObj || d >= startObj) && (!endObj || d <= endObj)
+                );
+                if (!matchesRange) return;
             }
 
             let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
