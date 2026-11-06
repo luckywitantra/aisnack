@@ -869,6 +869,8 @@ const superApp = {
 
             // 🚀 PERBAIKAN KRITIS: Panggil refreshData() langsung agar Produk & Header 100% tersinkronisasi!
             this.refreshData(); 
+            // Tarik Laporan Harian segera setelah identitas/outlet user ditetapkan.
+            this.pullLaporanHarianData(true);
             this.updateNetworkUI(); 
             this.syncOfflineQueue(); 
             this.checkShiftStatus(); 
@@ -1108,6 +1110,35 @@ pullFreshData: async function(silent = false) {
         } finally { this._transactionFastPullInFlight = false; }
     },
 
+    // Sinkronisasi khusus Laporan Harian Ai-CHA: setelah login, saat menu dibuka, dan berkala.
+    pullLaporanHarianData: async function(silent = true) {
+        if (!navigator.onLine || this._laporanHarianPullInFlight) return false;
+        this._laporanHarianPullInFlight = true;
+        try {
+            const res = await fetch(API_URL + '?action=get_laporan_only&history=90&ts=' + Date.now(), { method:'GET', redirect:'follow', cache:'no-store' });
+            const raw = await res.text();
+            if (raw.trim().startsWith('<!DOCTYPE') || raw.trim().startsWith('<html')) throw new Error('Server mengirim HTML, bukan JSON');
+            const data = JSON.parse(raw);
+            if (!res.ok || !data || data.status !== 'sukses' || !Array.isArray(data.laporanHarian)) throw new Error((data && data.pesan) || 'Data Laporan Harian tidak valid');
+            this.db = this.mergeDatabase(this.db || {}, data);
+            const cacheValue = JSON.stringify(this.db);
+            try { localStorage.setItem('aisnack_db_cache', cacheValue); } catch (e) { console.warn('Cache Laporan Harian localStorage penuh:', e.message || e); }
+            if (typeof AisnackOfflineStore !== 'undefined' && AisnackOfflineStore.saveDatabaseCache) await AisnackOfflineStore.saveDatabaseCache(cacheValue).catch(e => console.warn('Cache Laporan Harian IndexedDB gagal:', e));
+            localStorage.setItem('aisnack_last_laporan_sync', String(Date.now()));
+            if (this.currentUser) {
+                if (typeof this.renderLaporanHarianHistory === 'function') this.renderLaporanHarianHistory();
+                if (typeof this.renderExecutiveDashboard === 'function') this.renderExecutiveDashboard();
+                if (typeof this.renderCalendar === 'function' && !document.getElementById('view-lapharian')?.classList.contains('hidden')) this.renderCalendar();
+            }
+            console.info('Laporan Harian Ai-CHA tersinkron:', data.laporanHarian.length, 'baris');
+            return true;
+        } catch (e) {
+            console.warn('Sinkronisasi Laporan Harian gagal; cache lokal dipertahankan:', e.message || e);
+            if (!silent && this.showToast) this.showToast('Laporan Harian belum berhasil diperbarui. Data lokal tetap ditampilkan.', 'warning');
+            return false;
+        } finally { this._laporanHarianPullInFlight = false; }
+    },
+
     // =========================================================================
     // 🚀 2. PENARIK DATA LATAR BELAKANG (DIBATASI 90 HARI & MENGGUNAKAN MERGE)
     // =========================================================================
@@ -1132,6 +1163,7 @@ pullFreshData: async function(silent = false) {
                 if (this.cart.length === 0) this.refreshData();
                 if (typeof this.renderReport === 'function' && !document.getElementById('view-report')?.classList.contains('hidden')) this.renderReport();
                 if (typeof this.generateAIReport === 'function' && !document.getElementById('view-ai')?.classList.contains('hidden')) this.generateAIReport();
+                if (typeof this.renderExecutiveDashboard === 'function') this.renderExecutiveDashboard();
             }
             console.log("✅ Sinkronisasi riwayat 90 hari selesai; master/stok tidak diunduh ulang.");
         } catch (e) { console.warn("Sinkronisasi riwayat latar belakang dilewati:", e.message); }
@@ -6911,6 +6943,7 @@ refreshData: function() {
     }
     if (menu === 'laporan-harian' && typeof this.initLaporanHarian === 'function') {
         this.initLaporanHarian();
+        this.pullLaporanHarianData(true);
     }
     if (menu === 'audit' && typeof this.renderAudit === 'function') this.renderAudit();
     if (menu === 'terima' && typeof this.renderTerimaBarang === 'function') {
@@ -14920,6 +14953,10 @@ openAIDeepDive: function(type, param) {
         // Fast transaction lane is intentionally frequent to reduce loss exposure during unstable power.
         this._transactionSyncTimer = setInterval(runFast, 15000);
         this._centralSyncTimer = setInterval(runFull, 300000);
+        // Jalur khusus laporan, terpisah dari status menu POS.
+        this._laporanSyncTimer = setInterval(() => {
+            if (!document.hidden && navigator.onLine && this.currentUser) this.pullLaporanHarianData(true);
+        }, 60000);
         window.addEventListener('online', () => {
             this.isOnline = true;
             // Immediate catch-up on reconnection; queue first, then server snapshot.
