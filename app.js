@@ -4589,47 +4589,6 @@ selectOutlet: function(id) {
    // =========================================================
     // 🚀 RENDER DASHBOARD EKSEKUTIF DENGAN KARTU MINI INTERAKTIF
     // =========================================================
-    // =========================================================
-    // NORMALISASI DATA LAPORAN AI-CHA (TANGGAL & OUTLET)
-    // =========================================================
-    normalizeLaporanOutlet: function(value) {
-        return String(value == null ? '' : value).trim()
-            .replace(/^Ai[\s-]*CHA\s+/i, '')
-            .replace(/^Ai[\s-]*Snack\s+/i, '')
-            .replace(/\s+/g, ' ').trim().toLocaleLowerCase('id-ID');
-    },
-
-    parseLaporanDateLocal: function(value) {
-        if (value instanceof Date && !isNaN(value.getTime()))
-            return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-        if (typeof value === 'number' && isFinite(value)) {
-            const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
-            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-        }
-        let raw = String(value == null ? '' : value).trim();
-        if (!raw) return null;
-        if (raw.includes(',')) raw = raw.split(',').pop().trim();
-        let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
-        if (m) {
-            const y=+m[1], mo=+m[2], d=+m[3], out=new Date(y,mo-1,d);
-            return out.getFullYear()===y && out.getMonth()===mo-1 && out.getDate()===d ? out : null;
-        }
-        m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-        if (m) {
-            const d=+m[1], mo=+m[2], y=+m[3], out=new Date(y,mo-1,d);
-            return out.getFullYear()===y && out.getMonth()===mo-1 && out.getDate()===d ? out : null;
-        }
-        return null; // Jangan gunakan new Date() untuk string tanggal ambigu.
-    },
-
-    parseDateInputLocal: function(value, endOfDay = false) {
-        const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!m) return null;
-        const y=+m[1], mo=+m[2], d=+m[3];
-        const out=new Date(y,mo-1,d,endOfDay?23:0,endOfDay?59:0,endOfDay?59:0,endOfDay?999:0);
-        return out.getFullYear()===y && out.getMonth()===mo-1 && out.getDate()===d ? out : null;
-    },
-
     renderExecutiveDashboard: function() {
         const dashCont = document.getElementById('lapharian-executive-dashboard');
         if (!dashCont) return;
@@ -4655,8 +4614,15 @@ selectOutlet: function(id) {
             endInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         }
 
-        let startObj = (startInput && startInput.value) ? this.parseDateInputLocal(startInput.value, false) : null;
-        let endObj = (endInput && endInput.value) ? this.parseDateInputLocal(endInput.value, true) : null;
+        const parseDateInput = (value, endOfDay) => {
+            const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return null;
+            const y=+m[1], mo=+m[2], d=+m[3];
+            const dt=new Date(y,mo-1,d,endOfDay?23:0,endOfDay?59:0,endOfDay?59:0,endOfDay?999:0);
+            return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+        };
+        let startObj = (startInput && startInput.value) ? parseDateInput(startInput.value, false) : null;
+        let endObj = (endInput && endInput.value) ? parseDateInput(endInput.value, true) : null;
 
         let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
         let titleEl = document.getElementById('exec-dash-title');
@@ -4670,19 +4636,39 @@ selectOutlet: function(id) {
         // 🚀 KUNCI PERBAIKAN: Gunakan variabel global superApp untuk menampung data item biaya
         this.execExpenseData = {}; 
 
-        // Parser tanggal dan normalisasi outlet terpusat digunakan di seluruh dashboard.
+        // Parser baku: tanggal lokal slash/hyphen = DD/MM/YYYY; ISO = YYYY-MM-DD.
+        // Jangan memilih kandidat berdasarkan rentang filter: 11/07 tidak boleh berubah menjadi 07/11.
+        const parseReportDate = value => {
+            if (value instanceof Date && !isNaN(value.getTime())) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+            if (typeof value === 'number' && isFinite(value)) {
+                const utc = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
+                return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
+            }
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return null;
+            let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
+            if (m) {
+                const y=+m[1], mo=+m[2], d=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            m = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (m) {
+                const d=+m[1], mo=+m[2], y=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            return null;
+        };
         (this.db.laporanHarian || []).forEach(rep => {
             // Status Ditolak adalah status revisi; data dasar tetap dihitung.
             if (startObj || endObj) {
-                const reportDate = this.parseLaporanDateLocal(rep.Tanggal);
+                const reportDate = parseReportDate(rep.Tanggal);
                 if (!reportDate || (startObj && reportDate < startObj) || (endObj && reportDate > endObj)) return;
             }
 
-            let repOutletRaw = String(rep.Outlet || 'Lainnya').trim();
-            let repOutlet = repOutletRaw.replace(/^Ai[\s-]*CHA\s+/i, '').replace(/^Ai[\s-]*Snack\s+/i, '').trim() || 'Lainnya';
-            let repOutletKey = this.normalizeLaporanOutlet(repOutletRaw);
-            let currOutletKey = this.normalizeLaporanOutlet(this.outlet);
-            if (!isConsolidated && repOutletKey !== currOutletKey) return;
+            let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
+            let currOutlet = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+
+            if (!isConsolidated && repOutlet !== currOutlet) return;
 
             let net = Number(rep.Net_Sales || 0);
             let cash = Number(rep.Cash || 0);
@@ -4995,21 +4981,26 @@ selectOutlet: function(id) {
             .replace(/^\s*Ai[-\s]?CHA\s+/i, '')
             .replace(/^\s*Ai[-\s]?Snack\s+/i, '')
             .replace(/\s+/g, ' ').trim().toLocaleLowerCase('id-ID');
-        const parseKpiDateCandidates = value => {
-            if (value instanceof Date && !isNaN(value.getTime())) return [new Date(value.getFullYear(), value.getMonth(), value.getDate())];
-            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
-            if (!raw) return [];
-            let m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-            if (m) return [new Date(+m[1], +m[2]-1, +m[3])];
-            m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-            if (m) {
-                const a=+m[1], b=+m[2], y=+m[3];
-                if (a > 12) return [new Date(y,b-1,a)];
-                if (b > 12) return [new Date(y,a-1,b)];
-                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+        const parseKpiDate = value => {
+            if (value instanceof Date && !isNaN(value.getTime())) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+            if (typeof value === 'number' && isFinite(value)) {
+                const utc = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
+                return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
             }
-            const d = new Date(raw);
-            return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return null;
+            let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
+            if (m) {
+                const y=+m[1], mo=+m[2], d=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            m = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (m) {
+                // Format tanggal Indonesia yang baku: DD/MM/YYYY.
+                const d=+m[1], mo=+m[2], y=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            return null;
         };
 
         let isGlobal = (outName === 'global');
@@ -5031,13 +5022,8 @@ selectOutlet: function(id) {
             const repOutletKey = normalizeOutletName(rep.Outlet);
             if (!isGlobal && repOutletKey !== requestedOutletKey) return;
             if (isGlobal && !isConsolidated && repOutletKey !== currentOutletKey) return;
-            const candidates = parseKpiDateCandidates(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
-            const repDateObj = candidates.find(d => {
-                const afterStart = !startObj || d >= new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate());
-                const beforeEnd = !endObj || d <= new Date(endObj.getFullYear(), endObj.getMonth(), endObj.getDate());
-                return afterStart && beforeEnd;
-            });
-            if (!repDateObj) return;
+            const repDateObj = parseKpiDate(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+            if (!repDateObj || (startObj && repDateObj < startObj) || (endObj && repDateObj > endObj)) return;
             const dateKey = `${repDateObj.getFullYear()}-${String(repDateObj.getMonth()+1).padStart(2,'0')}-${String(repDateObj.getDate()).padStart(2,'0')}`;
             if (!dateMap[dateKey]) dateMap[dateKey] = { dateObj: repDateObj, label: repDateObj.toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}), s:0,c:0,q:0,o:0,b:0,p:0 };
             dateMap[dateKey].s += Number(rep.Net_Sales || rep.net_sales || 0);
@@ -5467,24 +5453,25 @@ selectOutlet: function(id) {
         let startDateStr = startInput?.value || defaultStart;
         let endDateStr = endInput?.value || defaultEnd;
 
-        let startObj = this.parseDateInputLocal(startDateStr, false);
-        let endObj = this.parseDateInputLocal(endDateStr, true);
-        if (!startObj || !endObj || startObj > endObj) {
-            console.warn('Filter tanggal Laporan Harian tidak valid:', startDateStr, endDateStr);
-            startObj = this.parseDateInputLocal(defaultStart, false);
-            endObj = this.parseDateInputLocal(defaultEnd, true);
-        }
+        let startObj = new Date(startDateStr); startObj.setHours(0,0,0,0);
+        let endObj = new Date(endDateStr); endObj.setHours(23,59,59,999);
 
         let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
-        let currOutletKey = this.normalizeLaporanOutlet(this.outlet);
+        let currOutletClean = String(this.outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
 
         // 1. Filter Data Sesuai Tanggal & Cabang
         let filteredList = [...(this.db.laporanHarian || [])].filter(x => {
-            const repOutletKey = this.normalizeLaporanOutlet(x.Outlet);
-            const cocokOutlet = isConsolidated || repOutletKey === currOutletKey;
+            let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
+            let cocokOutlet = isConsolidated || (repOutlet === currOutletClean);
             if (!cocokOutlet) return false;
-            const reportDate = this.parseLaporanDateLocal(x.Tanggal);
-            return !!reportDate && reportDate >= startObj && reportDate <= endObj;
+
+            let cleanStr = (x.Tanggal || '').split(',').pop().trim();
+            let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (match) {
+                let dObj = new Date(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10));
+                return dObj >= startObj && dObj <= endObj;
+            }
+            return false;
         });
 
         // 2. Kalkulasi Agregasi Keuangan
@@ -5506,7 +5493,7 @@ selectOutlet: function(id) {
             let bill = Number(item.Bill || 0);
             let pcs = Number(item.Pcs || 0);
             let opex = Number(item.Total_Pengeluaran || 0);
-            let outName = String(item.Outlet || 'Umum').trim().replace(/^Ai[\s-]*CHA\s+/i, '').replace(/^Ai[\s-]*Snack\s+/i, '').trim() || 'Umum';
+            let outName = String(item.Outlet || 'Umum').replace(/^Ai\-Snack\s+/i, '').trim();
 
             summary.totalNetSales += sales;
             summary.totalCash += cash;
@@ -5555,12 +5542,6 @@ selectOutlet: function(id) {
         summary.startDateStr = startDateStr;
         summary.endDateStr = endDateStr;
         summary.totalReports = filteredList.length;
-        summary.totalSourceReports = (this.db.laporanHarian || []).length;
-        summary.selectedOutlet = this.outlet || 'Semua';
-        console.info('[Ai-CHA Executive] laporan:', summary.totalSourceReports,
-            '| lolos filter:', summary.totalReports,
-            '| outlet:', summary.selectedOutlet,
-            '| periode:', startDateStr, 's/d', endDateStr);
 
         return summary;
     },
