@@ -3329,7 +3329,6 @@ pullFreshData: async function(silent = false) {
         let cleanCurrTanggal = String(tglTeks).trim().toLowerCase();
 
         let existingRep = (this.db.laporanHarian || []).find(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let xOut = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').replace(/^Ai\-CHA\s+/i, '').trim().toLowerCase();
             let xTgl = String(x.Tanggal || '').trim().toLowerCase();
             return xOut === cleanCurrOutlet.toLowerCase() && xTgl === cleanCurrTanggal;
@@ -3635,8 +3634,7 @@ pullFreshData: async function(silent = false) {
             
             if (isConsolidated || repOutClean === cleanCurrOutlet) {
                 if (activeReportId && String(rep.ID_Laporan).trim() === String(activeReportId).trim()) return;
-                if (rep.Status_Approval === 'Ditolak') return;
-
+                // Status Ditolak menolak revisi, bukan laporan dasar; tetap akumulasikan nilai existing.
                 let rDate = parseAnyDate(rep.Tanggal);
                 if (rDate) {
                     // KUNCI PRESISI: Bulan & Tahun sama, DAN Hari lebih kecil (Tanggal 1 s/d H-1)
@@ -4372,7 +4370,7 @@ pullFreshData: async function(silent = false) {
         // 2. Cari laporan dengan mencocokkan Hari, Bulan, Tahun secara presisi (Matematika)
         let existingReport = (this.db.laporanHarian || []).find(x => {
             let xOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            if (xOutlet !== cleanOutlet || x.Status_Approval === 'Ditolak') return false;
+            if (xOutlet !== cleanOutlet) return false;
 
             let xDate = this.normalizeDateObj(x.Tanggal);
             return (xDate.getDate() === tDay && xDate.getMonth() === tMonth && xDate.getFullYear() === tYear);
@@ -4767,50 +4765,57 @@ selectOutlet: function(id) {
         // 1. Baca filter tanggal eksekutif aktif
         const startInput = document.getElementById('exec-filter-start');
         const endInput = document.getElementById('exec-filter-end');
-        let startObj = (startInput && startInput.value) ? new Date(startInput.value) : null;
-        if (startObj) startObj.setHours(0, 0, 0, 0);
-        let endObj = (endInput && endInput.value) ? new Date(endInput.value) : null;
-        if (endObj) endObj.setHours(23, 59, 59, 999);
+        const startObj = startInput && startInput.value ? new Date(startInput.value + 'T00:00:00') : null;
+        const endObj = endInput && endInput.value ? new Date(endInput.value + 'T23:59:59.999') : null;
 
-        // 2. Kumpulkan metrik khusus cabang ini
+        // Gunakan parser tanggal yang sama untuk format Date, ISO, DD/MM/YYYY dan MM/DD/YYYY.
+        const parseDetailDateCandidates = value => {
+            if (value instanceof Date && !isNaN(value.getTime())) return [new Date(value.getFullYear(), value.getMonth(), value.getDate())];
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return [];
+            let m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (m) return [new Date(+m[1], +m[2]-1, +m[3])];
+            m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (m) {
+                const a=+m[1], b=+m[2], y=+m[3];
+                if (a > 12) return [new Date(y,b-1,a)];
+                if (b > 12) return [new Date(y,a-1,b)];
+                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+            }
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
+        };
+        const normalizeDetailOutlet = value => String(value || '').replace(/^\s*Ai[-\s]?CHA\s+/i, '').replace(/^\s*Ai[-\s]?Snack\s+/i, '').replace(/\s+/g,' ').trim().toLocaleLowerCase('id-ID');
+
+        // 2. Kumpulkan metrik outlet. Status Ditolak tidak menghapus laporan dasar;
+        // hanya pengajuan revisinya yang ditolak. Pending Edit juga tetap memakai nilai dasar.
         let totSales = 0, totCash = 0, totQris = 0, totExp = 0, totBill = 0, totPcs = 0;
         let expItemMap = {};
         let repCount = 0;
+        const requestedOutletKey = normalizeDetailOutlet(outName);
 
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
-            let repOutlet = String(rep.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
-            if (repOutlet !== outName) return;
-
+            if (normalizeDetailOutlet(rep.Outlet) !== requestedOutletKey) return;
             if (startObj || endObj) {
-                let cleanStr = (rep.Tanggal || '').split(',').pop().trim();
-                let match = cleanStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                if (match) {
-                    let repDate = new Date(parseInt(match[3],10), parseInt(match[2],10)-1, parseInt(match[1],10));
-                    if (startObj && repDate < startObj) return;
-                    if (endObj && repDate > endObj) return;
-                } else return;
+                const candidates = parseDetailDateCandidates(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+                if (!candidates.some(d => (!startObj || d >= startObj) && (!endObj || d <= endObj))) return;
             }
-
             repCount++;
-            totSales += Number(rep.Net_Sales || 0);
-            totCash += Number(rep.Cash || 0);
-            totQris += Number(rep.QRIS || 0);
-            totExp += Number(rep.Total_Pengeluaran || 0);
-            totBill += Number(rep.Bill || 0);
-            totPcs += Number(rep.Pcs || 0);
-
+            totSales += Number(rep.Net_Sales || rep.net_sales || 0);
+            totCash += Number(rep.Cash || rep.cash || 0);
+            totQris += Number(rep.QRIS || rep.qris || 0);
+            totExp += Number(rep.Total_Pengeluaran || rep.total_pengeluaran || 0);
+            totBill += Number(rep.Bill || rep.bill || 0);
+            totPcs += Number(rep.Pcs || rep.pcs || 0);
             try {
-                let expArr = JSON.parse(rep.Pengeluaran_JSON || '[]');
+                const rawExp = rep.Pengeluaran_JSON || rep.pengeluaran_json || '[]';
+                const expArr = Array.isArray(rawExp) ? rawExp : JSON.parse(rawExp);
                 expArr.forEach(x => {
-                    let nm = String(x.nama || 'LAINNYA').toUpperCase().trim();
-                    let nmNom = Number(x.nominal || 0);
-                    if (nm !== '' && nmNom > 0) {
-                        if (!expItemMap[nm]) expItemMap[nm] = 0;
-                        expItemMap[nm] += nmNom;
-                    }
+                    const nm = String(x.nama || 'LAINNYA').toUpperCase().trim();
+                    const nmNom = Number(x.nominal || 0);
+                    if (nm && nmNom > 0) expItemMap[nm] = (expItemMap[nm] || 0) + nmNom;
                 });
-            } catch(e){}
+            } catch(e) {}
         });
 
         // 3. Kalkulasi Target Cabang & Rata-rata
@@ -4963,72 +4968,62 @@ selectOutlet: function(id) {
         else if (kpiType === 'pcs') { kpiName = "Rata-rata Pendapatan per Pcs"; kpiColorClass = "text-teal-400"; glowColor = "bg-teal-500/30"; }
         else if (kpiType === 'netlaci') { kpiName = "Net Laci (Cash - OPEX)"; kpiColorClass = "text-emerald-400"; glowColor = "bg-emerald-500/30"; }
 
-        // Normalisasi nama outlet agar label Ai-CHA/Ai-Snack tidak menyebabkan mismatch.
-        const normalizeOutletName = (value) => String(value || '')
-            .replace(/^\\s*Ai[-\\s]?CHA\\s+/i, '')
-            .replace(/^\\s*Ai[-\\s]?Snack\\s+/i, '')
-            .replace(/\\s+/g, ' ').trim().toLocaleLowerCase('id-ID');
-
-        // Terima tanggal ISO, DD/MM/YYYY, atau MM/DD/YYYY.
-        const parseKpiDate = (value) => {
-            if (value instanceof Date && !isNaN(value.getTime()))
-                return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-            const raw = String(value || '').trim();
-            if (!raw) return null;
-            const clean = raw.split(',').pop().trim();
-            let m = clean.match(/^(\\d{4})[-\\/](\\d{1,2})[-\\/](\\d{1,2})(?:$|T|\\s)/);
+        // Normalisasi outlet dan parser tanggal kalender (regex literal, bukan teks escapado).
+        const normalizeOutletName = value => String(value || '')
+            .replace(/^\s*Ai[-\s]?CHA\s+/i, '')
+            .replace(/^\s*Ai[-\s]?Snack\s+/i, '')
+            .replace(/\s+/g, ' ').trim().toLocaleLowerCase('id-ID');
+        const parseKpiDateCandidates = value => {
+            if (value instanceof Date && !isNaN(value.getTime())) return [new Date(value.getFullYear(), value.getMonth(), value.getDate())];
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return [];
+            let m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (m) return [new Date(+m[1], +m[2]-1, +m[3])];
+            m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
             if (m) {
-                const y=+m[1], mo=+m[2], day=+m[3], d=new Date(y,mo-1,day);
-                return d.getFullYear()===y && d.getMonth()===mo-1 && d.getDate()===day ? d : null;
+                const a=+m[1], b=+m[2], y=+m[3];
+                if (a > 12) return [new Date(y,b-1,a)];
+                if (b > 12) return [new Date(y,a-1,b)];
+                return [new Date(y,b-1,a), new Date(y,a-1,b)];
             }
-            m = clean.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$/);
-            if (!m) return null;
-            const a=+m[1], b=+m[2], y=+m[3];
-            let candidates = a>12 ? [new Date(y,b-1,a)] : b>12 ? [new Date(y,a-1,b)] : [new Date(y,b-1,a),new Date(y,a-1,b)];
-            candidates = candidates.filter(d => d.getFullYear()===y);
-            return candidates.find(d =>
-                (!startObj || d >= new Date(startObj.getFullYear(),startObj.getMonth(),startObj.getDate())) &&
-                (!endObj || d <= new Date(endObj.getFullYear(),endObj.getMonth(),endObj.getDate()))
-            ) || candidates[0] || null;
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
         };
 
-        // Penentuan Skala Global vs Lokal
         let isGlobal = (outName === 'global');
         let isConsolidated = (this.outlet === 'Pusat' || this.outlet === 'Semua' || !this.outlet);
-        let displayOutletName = isGlobal 
-            ? (isConsolidated ? "Seluruh Outlet (Konsolidasi)" : `Ai-CHA ${String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim()}`) 
-            : `Ai-CHA ${outName}`;
+        let displayOutletName = isGlobal
+            ? (isConsolidated ? 'Seluruh Outlet (Konsolidasi)' : `Ai-CHA ${String(this.outlet).replace(/^Ai\-Snack\s+/i, '').trim()}`)
+            : `Ai-CHA ${String(outName).replace(/^Ai[-\s]?CHA\s+/i, '').replace(/^Ai[-\s]?Snack\s+/i, '').trim()}`;
 
         document.getElementById('kpi-detail-title').innerText = `Breakdown Harian: ${kpiName}`;
         document.getElementById('kpi-detail-subtitle').innerText = displayOutletName;
         document.getElementById('kpi-detail-glow').className = `absolute -right-4 -top-4 w-16 h-16 rounded-full blur-xl pointer-events-none ${glowColor}`;
 
-        // 🚀 Agregasi Data Berdasarkan Hari (Agar Global Data Digabung)
-        let dateMap = {};
-
+        // Sumber data dan aturan status sama dengan dashboard: laporan dasar tetap dihitung,
+        // termasuk Ditolak dan Pending Edit. Revisi baru berlaku setelah Disetujui.
+        const dateMap = {};
+        const requestedOutletKey = normalizeOutletName(outName);
+        const currentOutletKey = normalizeOutletName(this.outlet);
         (this.db.laporanHarian || []).forEach(rep => {
-            // Ditolak hanya menolak revisi; laporan dasar tetap dihitung.
-            // Revisi yang disetujui harus sudah menggantikan nilai dasar di record aktif.
             const repOutletKey = normalizeOutletName(rep.Outlet);
-            const requestedOutletKey = normalizeOutletName(outName);
-            const currentOutletKey = normalizeOutletName(this.outlet);
             if (!isGlobal && repOutletKey !== requestedOutletKey) return;
             if (isGlobal && !isConsolidated && repOutletKey !== currentOutletKey) return;
-
-            const dateStrLokal = String(rep.Tanggal || rep.tanggal || rep.Date || rep.date || '').trim();
-            const repDateObj = parseKpiDate(dateStrLokal);
+            const candidates = parseKpiDateCandidates(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+            const repDateObj = candidates.find(d => {
+                const afterStart = !startObj || d >= new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate());
+                const beforeEnd = !endObj || d <= new Date(endObj.getFullYear(), endObj.getMonth(), endObj.getDate());
+                return afterStart && beforeEnd;
+            });
             if (!repDateObj) return;
-            if (startObj && repDateObj < new Date(startObj.getFullYear(),startObj.getMonth(),startObj.getDate())) return;
-            if (endObj && repDateObj > new Date(endObj.getFullYear(),endObj.getMonth(),endObj.getDate())) return;
-
             const dateKey = `${repDateObj.getFullYear()}-${String(repDateObj.getMonth()+1).padStart(2,'0')}-${String(repDateObj.getDate()).padStart(2,'0')}`;
-            if (!dateMap[dateKey]) dateMap[dateKey] = { dateObj: repDateObj, label: dateStrLokal, s: 0, c: 0, q: 0, o: 0, b: 0, p: 0 };
-            dateMap[dateKey].s += Number(rep.Net_Sales || 0);
-            dateMap[dateKey].c += Number(rep.Cash || 0);
-            dateMap[dateKey].q += Number(rep.QRIS || 0);
-            dateMap[dateKey].o += Number(rep.Total_Pengeluaran || 0);
-            dateMap[dateKey].b += Number(rep.Bill || 0);
-            dateMap[dateKey].p += Number(rep.Pcs || 0);
+            if (!dateMap[dateKey]) dateMap[dateKey] = { dateObj: repDateObj, label: repDateObj.toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}), s:0,c:0,q:0,o:0,b:0,p:0 };
+            dateMap[dateKey].s += Number(rep.Net_Sales || rep.net_sales || 0);
+            dateMap[dateKey].c += Number(rep.Cash || rep.cash || 0);
+            dateMap[dateKey].q += Number(rep.QRIS || rep.qris || 0);
+            dateMap[dateKey].o += Number(rep.Total_Pengeluaran || rep.total_pengeluaran || 0);
+            dateMap[dateKey].b += Number(rep.Bill || rep.bill || 0);
+            dateMap[dateKey].p += Number(rep.Pcs || rep.pcs || 0);
         });
 
         // Ekstraksi ke Array untuk ditampilkan
@@ -5045,7 +5040,7 @@ selectOutlet: function(id) {
             else if (kpiType === 'pcs') { if (d.p > 0) { val = Math.round(d.s / d.p); isValid = true; } }
             else if (kpiType === 'netlaci') { if (d.c > 0 || d.o > 0) { val = d.c - d.o; isValid = true; } }
 
-            if (isValid) dailyData.push({ dateObj: d.dateObj, label: d.label || dateStr, val: val });
+            if (isValid) dailyData.push({ dateObj: d.dateObj, label: dateStr, val: val });
         }
 
         dailyData.sort((a, b) => b.dateObj - a.dateObj);
@@ -5166,7 +5161,6 @@ selectOutlet: function(id) {
 
         // Ambil daftar tanggal terisi dari database (untuk bulan yang sedang dibuka di datepicker)
         const terisiDates = (this.db.laporanHarian || []).filter(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             return isConsolidated || repOutlet === currOutletClean;
         }).map(l => {
@@ -5295,7 +5289,6 @@ selectOutlet: function(id) {
 
         // 🚀 KUNCI PERBAIKAN: Ambtil data laporan dinamis mengikuti outlet terpilih
         const terisiDates = (this.db.laporanHarian || []).filter(x => {
-            if (x.Status_Approval === 'Ditolak') return false;
             let repOutlet = String(x.Outlet || '').replace(/^Ai\-Snack\s+/i, '').trim();
             return isConsolidated || repOutlet === currOutletClean;
         }).map(l => {
@@ -11384,8 +11377,6 @@ openDetailStokOpname: function(sku) {
 
         // Kumpulkan data riwayat
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
-
             let repOutlet = String(rep.Outlet || 'Lainnya').replace(/^Ai\-Snack\s+/i, '').trim();
             if (!isConsolidated && repOutlet !== currOutletClean) return;
 
@@ -14268,7 +14259,6 @@ openAIDeepDive: function(type, param) {
 
         // 1. Ekstrak Laporan Ai-CHA
         (this.db.laporanHarian || []).forEach(rep => {
-            if (rep.Status_Approval === 'Ditolak') return;
             let rOut = String(rep.Outlet).replace(/^Ai\-Snack\s+/i, '').trim();
             if (selOut !== 'Semua' && rOut !== selOut) return;
 
