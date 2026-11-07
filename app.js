@@ -4773,25 +4773,38 @@ selectOutlet: function(id) {
         // 1. Baca filter tanggal eksekutif aktif
         const startInput = document.getElementById('exec-filter-start');
         const endInput = document.getElementById('exec-filter-end');
-        const startObj = startInput && startInput.value ? new Date(startInput.value + 'T00:00:00') : null;
-        const endObj = endInput && endInput.value ? new Date(endInput.value + 'T23:59:59.999') : null;
+        const parseDetailInputDate = (value, endOfDay) => {
+            const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return null;
+            const y=+m[1], mo=+m[2], d=+m[3];
+            const dt=new Date(y,mo-1,d,endOfDay?23:0,endOfDay?59:0,endOfDay?59:0,endOfDay?999:0);
+            return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+        };
+        const startObj = startInput && startInput.value ? parseDetailInputDate(startInput.value, false) : null;
+        const endObj = endInput && endInput.value ? parseDetailInputDate(endInput.value, true) : null;
 
-        // Gunakan parser tanggal yang sama untuk format Date, ISO, DD/MM/YYYY dan MM/DD/YYYY.
-        const parseDetailDateCandidates = value => {
-            if (value instanceof Date && !isNaN(value.getTime())) return [new Date(value.getFullYear(), value.getMonth(), value.getDate())];
-            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
-            if (!raw) return [];
-            let m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-            if (m) return [new Date(+m[1], +m[2]-1, +m[3])];
-            m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-            if (m) {
-                const a=+m[1], b=+m[2], y=+m[3];
-                if (a > 12) return [new Date(y,b-1,a)];
-                if (b > 12) return [new Date(y,a-1,b)];
-                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+        // Format sumber Indonesia: DD/MM/YYYY. Jangan membuat kandidat MM/DD/YYYY.
+        // Pemilihan tanggal tidak boleh bergantung pada apakah kandidat masuk periode filter.
+        const parseDetailDate = value => {
+            if (value instanceof Date && !isNaN(value.getTime()))
+                return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+            if (typeof value === 'number' && isFinite(value)) {
+                const utc = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
+                return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
             }
-            const d = new Date(raw);
-            return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
+            const raw = String(value == null ? '' : value).trim().split(',').pop().trim();
+            if (!raw) return null;
+            let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
+            if (m) {
+                const y=+m[1], mo=+m[2], d=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            m = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (m) {
+                const d=+m[1], mo=+m[2], y=+m[3], dt=new Date(y,mo-1,d);
+                return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+            }
+            return null;
         };
         const normalizeDetailOutlet = value => String(value || '').replace(/^\s*Ai[-\s]?CHA\s+/i, '').replace(/^\s*Ai[-\s]?Snack\s+/i, '').replace(/\s+/g,' ').trim().toLocaleLowerCase('id-ID');
 
@@ -4805,8 +4818,8 @@ selectOutlet: function(id) {
         (this.db.laporanHarian || []).forEach(rep => {
             if (normalizeDetailOutlet(rep.Outlet) !== requestedOutletKey) return;
             if (startObj || endObj) {
-                const candidates = parseDetailDateCandidates(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
-                if (!candidates.some(d => (!startObj || d >= startObj) && (!endObj || d <= endObj))) return;
+                const reportDate = parseDetailDate(rep.Tanggal || rep.tanggal || rep.Date || rep.date);
+                if (!reportDate || (startObj && reportDate < startObj) || (endObj && reportDate > endObj)) return;
             }
             repCount++;
             totSales += Number(rep.Net_Sales || rep.net_sales || 0);
