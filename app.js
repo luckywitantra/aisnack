@@ -4640,9 +4640,12 @@ selectOutlet: function(id) {
             m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
             if (m) {
                 const a=+m[1], b=+m[2], y=+m[3];
-                if (a > 12) return [new Date(y,b-1,a)];
-                if (b > 12) return [new Date(y,a-1,b)];
-                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+                // Aplikasi berlokasi di Indonesia: format tanggal bertanda garis miring
+                // selalu DD/MM/YYYY. Jangan menebak MM/DD berdasarkan rentang filter.
+                const day = a, month = b;
+                const parsed = new Date(y, month - 1, day);
+                if (parsed.getFullYear() !== y || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return [];
+                return [parsed];
             }
             const parsed = new Date(raw);
             return isNaN(parsed.getTime()) ? [] : [new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())];
@@ -4778,9 +4781,12 @@ selectOutlet: function(id) {
             m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
             if (m) {
                 const a=+m[1], b=+m[2], y=+m[3];
-                if (a > 12) return [new Date(y,b-1,a)];
-                if (b > 12) return [new Date(y,a-1,b)];
-                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+                // Aplikasi berlokasi di Indonesia: format tanggal bertanda garis miring
+                // selalu DD/MM/YYYY. Jangan menebak MM/DD berdasarkan rentang filter.
+                const day = a, month = b;
+                const parsed = new Date(y, month - 1, day);
+                if (parsed.getFullYear() !== y || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return [];
+                return [parsed];
             }
             const d = new Date(raw);
             return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
@@ -4982,9 +4988,12 @@ selectOutlet: function(id) {
             m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
             if (m) {
                 const a=+m[1], b=+m[2], y=+m[3];
-                if (a > 12) return [new Date(y,b-1,a)];
-                if (b > 12) return [new Date(y,a-1,b)];
-                return [new Date(y,b-1,a), new Date(y,a-1,b)];
+                // Aplikasi berlokasi di Indonesia: format tanggal bertanda garis miring
+                // selalu DD/MM/YYYY. Jangan menebak MM/DD berdasarkan rentang filter.
+                const day = a, month = b;
+                const parsed = new Date(y, month - 1, day);
+                if (parsed.getFullYear() !== y || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return [];
+                return [parsed];
             }
             const d = new Date(raw);
             return isNaN(d.getTime()) ? [] : [new Date(d.getFullYear(),d.getMonth(),d.getDate())];
